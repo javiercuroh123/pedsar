@@ -1,0 +1,146 @@
+import type { Metadata } from "next";
+import { CheckCircle2Icon, ReceiptIcon, WalletIcon } from "lucide-react";
+import { EncabezadoPagina, EstadoBadge, EstadoVacio, PanelTabla, TarjetaKpi, tabla } from "@/components/comunes";
+import { listarMisInscripciones } from "@/features/academico/consultas";
+import { DialogoReembolso } from "@/features/academico/dialogo-reembolso";
+import { requireRol } from "@/lib/auth";
+import { createClient } from "@/lib/supabase/server";
+import { ETIQUETA_METODO, formatearFecha, formatearSoles } from "@/lib/formato";
+
+export const metadata: Metadata = { title: "Pagos y comprobantes" };
+
+// HU-12 · Pagos · HU-30 · Comprobantes · HU-31 · Reembolsos · HU-50
+export default async function EstudiantePagosPage({ searchParams }: PageProps<"/estudiante/pagos">) {
+  const usuario = await requireRol("estudiante");
+  const { inscripcion: nueva } = await searchParams;
+  const inscripciones = (await listarMisInscripciones(usuario.id)).filter((i) => i.pago);
+
+  const supabase = await createClient();
+  const { data: reembolsos } = inscripciones.length
+    ? await supabase
+        .from("reembolsos")
+        .select("id, pago_id, motivo, monto, estado, fecha_solicitud")
+        .in(
+          "pago_id",
+          inscripciones.map((i) => i.pago!.id),
+        )
+        .order("fecha_solicitud", { ascending: false })
+    : { data: [] };
+
+  const pagado = inscripciones.filter((i) => i.pago?.estado === "APROBADO").reduce((a, i) => a + i.pago!.monto, 0);
+  const pendiente = inscripciones.filter((i) => i.pago?.estado === "PENDIENTE").reduce((a, i) => a + i.pago!.monto, 0);
+  const reembolsables = inscripciones
+    .filter((i) => i.pago?.estado === "APROBADO" && !(reembolsos ?? []).some((r) => r.pago_id === i.pago!.id && r.estado !== "RECHAZADO"))
+    .map((i) => ({ id: i.pago!.id, etiqueta: `${i.curso.titulo} · ${formatearSoles(i.pago!.monto)}` }));
+  const recien = typeof nueva === "string" ? inscripciones.find((i) => i.codigo === nueva) : undefined;
+
+  return (
+    <div className="space-y-6">
+      <EncabezadoPagina titulo="Pagos y comprobantes" descripcion="Historial de pagos y comprobantes electrónicos emitidos." eyebrow="Cuenta" />
+
+      {recien && (
+        <div className="flex items-start gap-3 rounded-2xl border border-emerald-200 bg-linear-to-r from-emerald-50 to-teal-50 p-5 dark:border-emerald-500/25 dark:from-emerald-500/10 dark:to-teal-500/5" role="status">
+          <CheckCircle2Icon className="mt-0.5 size-6 shrink-0 text-emerald-600 dark:text-emerald-400" />
+          <div>
+            <p className="font-semibold text-emerald-900 dark:text-emerald-200">¡Inscripción registrada! · {recien.curso.titulo}</p>
+            <p className="mt-1 text-sm text-emerald-800/80 dark:text-emerald-200/70">
+              N.º <span className="font-mono">{recien.codigo}</span>. Tu cupo se confirmará en cuanto se valide el pago; te avisaremos por correo.
+            </p>
+          </div>
+        </div>
+      )}
+
+      <div className="grid gap-4 sm:grid-cols-3">
+        <TarjetaKpi etiqueta="Total pagado" valor={formatearSoles(pagado)} icono={WalletIcon} tono="turquesa" />
+        <TarjetaKpi etiqueta="Pendiente de validación" valor={formatearSoles(pendiente)} icono={ReceiptIcon} tono="ambar" />
+        <TarjetaKpi etiqueta="Comprobantes emitidos" valor={inscripciones.filter((i) => i.pago?.comprobante).length} icono={ReceiptIcon} tono="indigo" />
+      </div>
+
+      {inscripciones.length ? (
+        <PanelTabla titulo="Historial de pagos">
+          <table className={tabla.table}>
+            <thead className={tabla.thead}>
+              <tr>
+                <th className={tabla.th}>Fecha</th>
+                <th className={tabla.th}>Curso</th>
+                <th className={tabla.th}>Método</th>
+                <th className={`${tabla.th} text-right`}>Monto</th>
+                <th className={tabla.th}>Estado</th>
+                <th className={tabla.th}>Comprobante</th>
+              </tr>
+            </thead>
+            <tbody>
+              {inscripciones.map((i) => {
+                const p = i.pago!;
+                return (
+                  <tr key={i.id} className={tabla.tr}>
+                    <td className={`${tabla.td} whitespace-nowrap text-muted-foreground`}>{formatearFecha(p.fecha_pago ?? i.fecha_inscripcion)}</td>
+                    <td className={`${tabla.td} font-medium`}>
+                      {i.curso.titulo}
+                      <span className="block font-mono text-xs font-normal text-muted-foreground">{i.codigo}</span>
+                    </td>
+                    <td className={tabla.td}>{ETIQUETA_METODO[p.metodo]}</td>
+                    <td className={`${tabla.td} text-right tabular-nums`}>{formatearSoles(p.monto)}</td>
+                    <td className={tabla.td}>
+                      <EstadoBadge estado={p.estado} />
+                    </td>
+                    <td className={tabla.td}>
+                      {p.comprobante ? (
+                        p.comprobante.pdf_url ? (
+                          <a href={p.comprobante.pdf_url} target="_blank" rel="noreferrer" className="font-mono text-xs text-primary hover:underline">
+                            {p.comprobante.serie}-{p.comprobante.numero}
+                          </a>
+                        ) : (
+                          <span className="font-mono text-xs">
+                            {p.comprobante.serie}-{p.comprobante.numero}
+                          </span>
+                        )
+                      ) : (
+                        <span className="text-xs text-muted-foreground">{p.estado === "APROBADO" ? "En emisión" : "—"}</span>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </PanelTabla>
+      ) : (
+        <EstadoVacio icono={ReceiptIcon} titulo="Aún no tienes pagos" descripcion="Cuando te inscribas en un curso, tu pago aparecerá aquí." />
+      )}
+
+      {(reembolsos ?? []).length > 0 && (
+        <PanelTabla titulo="Solicitudes de reembolso">
+          <table className={tabla.table}>
+            <thead className={tabla.thead}>
+              <tr>
+                <th className={tabla.th}>Fecha</th>
+                <th className={tabla.th}>Curso</th>
+                <th className={tabla.th}>Motivo</th>
+                <th className={`${tabla.th} text-right`}>Monto</th>
+                <th className={tabla.th}>Estado</th>
+              </tr>
+            </thead>
+            <tbody>
+              {(reembolsos ?? []).map((r) => (
+                <tr key={r.id} className={tabla.tr}>
+                  <td className={`${tabla.td} text-muted-foreground`}>{formatearFecha(r.fecha_solicitud)}</td>
+                  <td className={`${tabla.td} font-medium`}>{inscripciones.find((i) => i.pago?.id === r.pago_id)?.curso.titulo}</td>
+                  <td className={`${tabla.td} max-w-xs text-muted-foreground`}>{r.motivo}</td>
+                  <td className={`${tabla.td} text-right tabular-nums`}>{formatearSoles(Number(r.monto))}</td>
+                  <td className={tabla.td}>
+                    <EstadoBadge estado={r.estado} />
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </PanelTabla>
+      )}
+
+      <p className="text-sm text-muted-foreground">
+        ¿Necesitas una devolución? {reembolsables.length ? <DialogoReembolso pagos={reembolsables} /> : <span>No tienes pagos aprobados reembolsables.</span>}
+      </p>
+    </div>
+  );
+}

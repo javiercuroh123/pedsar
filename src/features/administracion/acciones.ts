@@ -1,0 +1,321 @@
+"use server";
+
+import { revalidatePath } from "next/cache";
+import { z } from "zod";
+import { registrarActividad } from "@/lib/auditoria";
+import { requireRol } from "@/lib/auth";
+import { generarCodigoCertificado } from "@/lib/certificados";
+import { publicEnv } from "@/lib/env";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { createClient } from "@/lib/supabase/server";
+import type { EstadoFormulario } from "@/features/usuarios/esquemas";
+
+/**
+ * Acciones del administrador. La mayoría usan el cliente con sesión (RLS: es_admin);
+ * pagos, notificaciones e invitaciones requieren el cliente admin (sin políticas de escritura).
+ */
+const admin = () => requireRol("administrador");
+const fallo = (e: z.ZodError): EstadoFormulario => ({ ok: false, mensaje: e.issues[0]?.message ?? "Datos no válidos" });
+const vacioANull = (v: unknown) => (v === "" ? null : v);
+
+async function notificar(usuarioId: string, mensaje: string, enlace?: string) {
+  await createAdminClient().from("notificaciones").insert({ usuario_id: usuarioId, mensaje, enlace: enlace ?? null, tipo: "IN_APP" });
+}
+
+const slugDe = (texto: string) =>
+  texto
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "")
+    .slice(0, 60);
+
+async function slugUnico(base: string, excluirId?: string) {
+  const supabase = await createClient();
+  let slug = slugDe(base) || "curso";
+  for (let i = 2; ; i++) {
+    let q = supabase.from("cursos").select("id").eq("slug", slug);
+    if (excluirId) q = q.neq("id", excluirId);
+    const { data } = await q.maybeSingle();
+    if (!data) return slug;
+    slug = `${slugDe(base)}-${i}`;
+  }
+}
+
+// ---------- Cursos (HU-04 · HU-56 · HU-57) ----------
+const cursoSchema = z.object({
+  id: z.preprocess(vacioANull, z.uuid().nullable()),
+  titulo: z.string().trim().min(3, "Escribe el título").max(160),
+  descripcion: z.string().trim().max(2000).optional(),
+  categoriaId: z.preprocess(vacioANull, z.coerce.number().int().nullable()),
+  instructorId: z.preprocess(vacioANull, z.uuid().nullable()),
+  nivel: z.enum(["BASICO", "INTERMEDIO", "AVANZADO"]),
+  modalidad: z.enum(["PRESENCIAL", "VIRTUAL", "SEMIPRESENCIAL"]),
+  precio: z.coerce.number().min(0, "El precio no puede ser negativo"),
+  cupo: z.coerce.number().int().min(1, "El cupo debe ser al menos 1"),
+  horas: z.coerce.number().int().min(0),
+  estado: z.enum(["BORRADOR", "PUBLICADO", "DESPUBLICADO"]),
+  destacado: z.preprocess((v) => v === "on", z.boolean()),
+  publicarEn: z.preprocess(vacioANull, z.string().nullable()),
+  imagen: z.preprocess(vacioANull, z.url("La imagen debe ser una URL").nullable()),
+});
+
+export async function guardarCurso(_: EstadoFormulario, formData: FormData): Promise<EstadoFormulario> {
+  const usuario = await admin();
+  const d = cursoSchema.safeParse(Object.fromEntries(formData));
+  if (!d.success) return fallo(d.error);
+  const c = d.data;
+  const supabase = await createClient();
+  const fila = {
+    titulo: c.titulo,
+    descripcion: c.descripcion || null,
+    categoria_id: c.categoriaId,
+    instructor_id: c.instructorId,
+    nivel: c.nivel,
+    modalidad: c.modalidad,
+    precio: c.precio,
+    cupo_maximo: c.cupo,
+    duracion_horas: c.horas,
+    estado: c.estado,
+    destacado: c.destacado,
+    publicar_en: c.publicarEn ? new Date(`${c.publicarEn}:00-05:00`).toISOString() : null,
+    imagen_url: c.imagen,
+  };
+  const { error } = c.id
+    ? await supabase.from("cursos").update(fila).eq("id", c.id)
+    : await supabase.from("cursos").insert({ ...fila, slug: await slugUnico(c.titulo) });
+  if (error) return { ok: false, mensaje: `No se pudo guardar: ${error.message}` };
+  await registrarActividad(usuario.id, c.id ? "EDITAR_CURSO" : "CREAR_CURSO", { titulo: c.titulo, estado: c.estado });
+  revalidatePath("/", "layout");
+  return { ok: true, mensaje: c.id ? "Curso actualizado" : "Curso creado" };
+}
+
+export async function cambiarEstadoCurso(formData: FormData) {
+  const usuario = await admin();
+  const id = z.uuid().parse(formData.get("id"));
+  const estado = z.enum(["PUBLICADO", "DESPUBLICADO", "BORRADOR"]).parse(formData.get("estado"));
+  const supabase = await createClient();
+  await supabase.from("cursos").update({ estado }).eq("id", id);
+  await registrarActividad(usuario.id, estado === "PUBLICADO" ? "PUBLICAR_CURSO" : "DESPUBLICAR_CURSO", { curso: id });
+  revalidatePath("/", "layout");
+}
+
+export async function duplicarCurso(formData: FormData) {
+  const usuario = await admin();
+  const id = z.uuid().parse(formData.get("id"));
+  const supabase = await createClient();
+  const { data: original } = await supabase.from("cursos").select("*, modulos(titulo, orden)").eq("id", id).single();
+  if (!original) return;
+  const { modulos, ...resto } = original;
+  for (const campo of ["id", "slug", "creado_en", "actualizado_en"]) delete resto[campo];
+  const titulo = `${original.titulo} (copia)`;
+  const { data: copia } = await supabase
+    .from("cursos")
+    .insert({ ...resto, titulo, slug: await slugUnico(titulo), estado: "BORRADOR", destacado: false })
+    .select("id")
+    .single();
+  if (copia && modulos?.length) {
+    await supabase.from("modulos").insert(modulos.map((m: { titulo: string; orden: number }) => ({ ...m, curso_id: copia.id })));
+  }
+  await registrarActividad(usuario.id, "DUPLICAR_CURSO", { original: id, copia: copia?.id });
+  revalidatePath("/admin/cursos");
+}
+
+export async function eliminarCurso(formData: FormData): Promise<EstadoFormulario> {
+  const usuario = await admin();
+  const id = z.uuid().parse(formData.get("id"));
+  const supabase = await createClient();
+  const { error } = await supabase.from("cursos").delete().eq("id", id);
+  if (error) {
+    // inscripciones.curso_id es ON DELETE RESTRICT: no se borran cursos con matrículas.
+    return { ok: false, mensaje: "El curso tiene inscripciones; despublícalo en lugar de eliminarlo." };
+  }
+  await registrarActividad(usuario.id, "ELIMINAR_CURSO", { curso: id });
+  revalidatePath("/", "layout");
+  return { ok: true, mensaje: "Curso eliminado" };
+}
+
+// ---------- Categorías (HU-18) ----------
+const categoriaSchema = z.object({
+  id: z.preprocess(vacioANull, z.coerce.number().int().nullable()),
+  nombre: z.string().trim().min(3, "Escribe el nombre").max(80),
+  descripcion: z.string().trim().max(300).optional(),
+});
+
+export async function guardarCategoria(_: EstadoFormulario, formData: FormData): Promise<EstadoFormulario> {
+  const usuario = await admin();
+  const d = categoriaSchema.safeParse(Object.fromEntries(formData));
+  if (!d.success) return fallo(d.error);
+  const supabase = await createClient();
+  const fila = { nombre: d.data.nombre, slug: slugDe(d.data.nombre), descripcion: d.data.descripcion || null };
+  const { error } = d.data.id
+    ? await supabase.from("categorias").update(fila).eq("id", d.data.id)
+    : await supabase.from("categorias").insert(fila);
+  if (error) return { ok: false, mensaje: error.code === "23505" ? "Ya existe una categoría con ese nombre" : error.message };
+  await registrarActividad(usuario.id, "GUARDAR_CATEGORIA", { nombre: d.data.nombre });
+  revalidatePath("/", "layout");
+  return { ok: true, mensaje: "Categoría guardada" };
+}
+
+export async function eliminarCategoria(formData: FormData) {
+  await admin();
+  const id = z.coerce.number().int().parse(formData.get("id"));
+  const supabase = await createClient();
+  await supabase.from("categorias").delete().eq("id", id); // los cursos quedan sin categoría (ON DELETE SET NULL)
+  revalidatePath("/", "layout");
+}
+
+// ---------- Inscripciones y pagos (HU-07 · HU-12 · HU-17) ----------
+export async function resolverPago(formData: FormData) {
+  const usuario = await admin();
+  const inscripcionId = z.uuid().parse(formData.get("inscripcionId"));
+  const aprobar = formData.get("decision") === "aprobar";
+  const db = createAdminClient();
+
+  const { data: ins } = await db.from("inscripciones").select("id, codigo, estudiante_id, curso:cursos(titulo)").eq("id", inscripcionId).single();
+  if (!ins) return;
+  await db
+    .from("pagos")
+    .update({ estado: aprobar ? "APROBADO" : "RECHAZADO", fecha_pago: aprobar ? new Date().toISOString() : null })
+    .eq("inscripcion_id", inscripcionId);
+  await db.from("inscripciones").update({ estado: aprobar ? "CONFIRMADA" : "CANCELADA" }).eq("id", inscripcionId);
+
+  const curso = (Array.isArray(ins.curso) ? ins.curso[0] : ins.curso) as { titulo: string } | null;
+  await notificar(
+    ins.estudiante_id,
+    aprobar
+      ? `¡Tu inscripción en ${curso?.titulo ?? "el curso"} fue confirmada! Ya puedes ingresar al aula virtual.`
+      : `No pudimos validar el pago de tu inscripción ${ins.codigo}. Comunícate con nosotros.`,
+    aprobar ? "/estudiante/cursos" : "/estudiante/pagos",
+  );
+  await registrarActividad(usuario.id, aprobar ? "CONFIRMAR_PAGO" : "RECHAZAR_PAGO", { inscripcion: ins.codigo });
+  // TODO: emitir comprobante electrónico (SUNAT) al aprobar.
+  revalidatePath("/admin", "layout");
+}
+
+export async function resolverReembolso(formData: FormData) {
+  const usuario = await admin();
+  const id = z.coerce.number().int().parse(formData.get("id"));
+  const aprobar = formData.get("decision") === "aprobar";
+  const db = createAdminClient();
+  const { data: r } = await db.from("reembolsos").select("id, pago:pagos(id, inscripcion_id, inscripcion:inscripciones(estudiante_id))").eq("id", id).single();
+  if (!r) return;
+  await db.from("reembolsos").update({ estado: aprobar ? "APROBADO" : "RECHAZADO" }).eq("id", id);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const pago = (Array.isArray(r.pago) ? r.pago[0] : r.pago) as any;
+  if (aprobar && pago) {
+    // TODO: ejecutar getPasarela().reembolsar(...) y marcar el reembolso como PROCESADO.
+    await db.from("pagos").update({ estado: "REEMBOLSADO" }).eq("id", pago.id);
+    await db.from("inscripciones").update({ estado: "CANCELADA" }).eq("id", pago.inscripcion_id);
+  }
+  const estudiante = (Array.isArray(pago?.inscripcion) ? pago.inscripcion[0] : pago?.inscripcion)?.estudiante_id;
+  if (estudiante) await notificar(estudiante, aprobar ? "Tu solicitud de reembolso fue aprobada." : "Tu solicitud de reembolso fue rechazada.", "/estudiante/pagos");
+  await registrarActividad(usuario.id, aprobar ? "APROBAR_REEMBOLSO" : "RECHAZAR_REEMBOLSO", { reembolso: id });
+  revalidatePath("/admin", "layout");
+}
+
+// ---------- Cupones (HU-32) ----------
+const cuponSchema = z.object({
+  codigo: z
+    .string()
+    .trim()
+    .toUpperCase()
+    .regex(/^[A-Z0-9]{4,20}$/, "Usa de 4 a 20 letras o números, sin espacios"),
+  porcentaje: z.coerce.number().min(1).max(100),
+  vigencia: z.iso.date("Fecha no válida"),
+  usos: z.preprocess(vacioANull, z.coerce.number().int().positive().nullable()),
+});
+
+export async function crearCupon(_: EstadoFormulario, formData: FormData): Promise<EstadoFormulario> {
+  const usuario = await admin();
+  const d = cuponSchema.safeParse(Object.fromEntries(formData));
+  if (!d.success) return fallo(d.error);
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("cupones")
+    .insert({ codigo: d.data.codigo, porcentaje_descuento: d.data.porcentaje, fecha_vigencia: d.data.vigencia, usos_maximos: d.data.usos });
+  if (error) return { ok: false, mensaje: error.code === "23505" ? "Ese código ya existe" : error.message };
+  await registrarActividad(usuario.id, "CREAR_CUPON", { codigo: d.data.codigo });
+  revalidatePath("/admin/cupones");
+  return { ok: true, mensaje: `Cupón ${d.data.codigo} creado` };
+}
+
+export async function alternarCupon(formData: FormData) {
+  await admin();
+  const id = z.coerce.number().int().parse(formData.get("id"));
+  const activo = formData.get("activo") === "true";
+  const supabase = await createClient();
+  await supabase.from("cupones").update({ activo }).eq("id", id);
+  revalidatePath("/admin/cupones");
+}
+
+// ---------- Certificados (HU-11 · HU-60) ----------
+export async function emitirCertificados(formData: FormData): Promise<EstadoFormulario> {
+  const usuario = await admin();
+  const ids = z.array(z.uuid()).min(1, "Selecciona al menos un estudiante").safeParse(formData.getAll("inscripcion"));
+  if (!ids.success) return fallo(ids.error);
+  const supabase = await createClient();
+  const { data: filas } = await supabase.from("inscripciones").select("id, estudiante_id, curso:cursos(titulo)").in("id", ids.data).eq("estado", "CONFIRMADA");
+
+  let emitidos = 0;
+  for (const ins of filas ?? []) {
+    const codigo = generarCodigoCertificado();
+    const { error } = await supabase.from("certificados").insert({ inscripcion_id: ins.id, codigo_unico: codigo });
+    if (error) continue; // ya tenía certificado (inscripcion_id es único)
+    emitidos++;
+    const curso = (Array.isArray(ins.curso) ? ins.curso[0] : ins.curso) as { titulo: string } | null;
+    await notificar(ins.estudiante_id, `¡Felicidades! Ya puedes descargar tu certificado de ${curso?.titulo ?? "tu curso"}.`, "/estudiante/certificados");
+    await registrarActividad(usuario.id, "EMITIR_CERTIFICADO", { codigo, inscripcion: ins.id });
+  }
+  revalidatePath("/admin/certificados");
+  return emitidos ? { ok: true, mensaje: `${emitidos} certificado(s) emitido(s)` } : { ok: false, mensaje: "No se emitió ningún certificado" };
+}
+
+// ---------- Usuarios y roles (HU-03 · HU-34 · HU-53) ----------
+export async function cambiarRol(formData: FormData) {
+  const usuario = await admin();
+  const id = z.uuid().parse(formData.get("id"));
+  const rol = z.enum(["administrador", "instructor", "estudiante"]).parse(formData.get("rol"));
+  if (id === usuario.id) return; // evita quitarse el rol de administrador por error
+  const supabase = await createClient();
+  await supabase.from("perfiles").update({ rol }).eq("id", id);
+  await registrarActividad(usuario.id, "CAMBIAR_ROL", { usuario: id, rol });
+  revalidatePath("/admin/usuarios");
+}
+
+export async function alternarUsuario(formData: FormData) {
+  const usuario = await admin();
+  const id = z.uuid().parse(formData.get("id"));
+  const estado = formData.get("estado") === "true";
+  if (id === usuario.id) return;
+  const supabase = await createClient();
+  await supabase.from("perfiles").update({ estado }).eq("id", id);
+  await registrarActividad(usuario.id, estado ? "ACTIVAR_USUARIO" : "DESACTIVAR_USUARIO", { usuario: id });
+  revalidatePath("/admin/usuarios");
+}
+
+const invitacionSchema = z.object({
+  nombres: z.string().trim().min(2, "Escribe los nombres"),
+  apellidos: z.string().trim().min(2, "Escribe los apellidos"),
+  correo: z.email("Correo no válido"),
+  rol: z.enum(["administrador", "instructor", "estudiante"]),
+  especialidad: z.string().trim().max(120).optional(),
+});
+
+export async function invitarUsuario(_: EstadoFormulario, formData: FormData): Promise<EstadoFormulario> {
+  const usuario = await admin();
+  const d = invitacionSchema.safeParse(Object.fromEntries(formData));
+  if (!d.success) return fallo(d.error);
+  const db = createAdminClient();
+  const { data, error } = await db.auth.admin.inviteUserByEmail(d.data.correo, {
+    data: { nombres: d.data.nombres, apellidos: d.data.apellidos },
+    redirectTo: `${publicEnv.NEXT_PUBLIC_SITE_URL}/auth/confirm?next=/cuenta/nueva-contrasena`,
+  });
+  if (error || !data.user) return { ok: false, mensaje: error?.message ?? "No se pudo invitar al usuario" };
+  // El trigger crea el perfil como estudiante; aquí se asigna el rol elegido.
+  await db.from("perfiles").update({ rol: d.data.rol, especialidad: d.data.especialidad || null }).eq("id", data.user.id);
+  await registrarActividad(usuario.id, "INVITAR_USUARIO", { correo: d.data.correo, rol: d.data.rol });
+  revalidatePath("/admin/usuarios");
+  return { ok: true, mensaje: `Invitación enviada a ${d.data.correo}` };
+}
