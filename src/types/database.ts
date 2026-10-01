@@ -102,24 +102,45 @@ export type Database = {
       certificados: {
         Row: {
           archivo_pdf: string | null
+          asistencia: number | null
           codigo_unico: string
+          curso_titulo: string | null
+          duracion_horas: number | null
+          estudiante_nombre: string | null
           fecha_emision: string
           id: string
           inscripcion_id: string
+          instructor_nombre: string | null
+          motivo_excepcion: string | null
+          nota_final: number | null
         }
         Insert: {
           archivo_pdf?: string | null
+          asistencia?: number | null
           codigo_unico: string
+          curso_titulo?: string | null
+          duracion_horas?: number | null
+          estudiante_nombre?: string | null
           fecha_emision?: string
           id?: string
           inscripcion_id: string
+          instructor_nombre?: string | null
+          motivo_excepcion?: string | null
+          nota_final?: number | null
         }
         Update: {
           archivo_pdf?: string | null
+          asistencia?: number | null
           codigo_unico?: string
+          curso_titulo?: string | null
+          duracion_horas?: number | null
+          estudiante_nombre?: string | null
           fecha_emision?: string
           id?: string
           inscripcion_id?: string
+          instructor_nombre?: string | null
+          motivo_excepcion?: string | null
+          nota_final?: number | null
         }
         Relationships: [
           {
@@ -860,6 +881,21 @@ export type Database = {
           nombres: string
         }[]
       }
+      resultado_academico: {
+        Args: { p_inscripciones: string[] }
+        Returns: {
+          asistencia: number
+          completados: number
+          contenidos: number
+          evaluaciones: number
+          inscripcion_id: string
+          nota_final: number
+          presentes: number
+          progreso: number
+          rendidas: number
+          sesiones: number
+        }[]
+      }
       verificar_certificado: {
         Args: { p_codigo: string }
         Returns: {
@@ -868,6 +904,8 @@ export type Database = {
           duracion_horas: number
           estudiante: string
           fecha_emision: string
+          instructor: string
+          nota_final: number
         }[]
       }
     }
