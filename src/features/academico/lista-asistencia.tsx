@@ -11,9 +11,9 @@ import type { EstadoAsistencia } from "@/types/dominio";
 import { guardarAsistencia } from "./acciones-instructor";
 
 const OPCIONES: { v: EstadoAsistencia; t: string; activo: string }[] = [
-  { v: "PRESENTE", t: "Presente", activo: "bg-emerald-500 text-white shadow-sm" },
+  { v: "PRESENTE", t: "Presente", activo: "bg-green-600 text-white shadow-sm" },
   { v: "TARDANZA", t: "Tardanza", activo: "bg-amber-500 text-white shadow-sm" },
-  { v: "AUSENTE", t: "Ausente", activo: "bg-rose-500 text-white shadow-sm" },
+  { v: "AUSENTE", t: "Ausente", activo: "bg-red-600 text-white shadow-sm" },
 ];
 
 export function ListaAsistencia({
@@ -45,12 +45,12 @@ export function ListaAsistencia({
       <input type="hidden" name="fecha" value={fecha} />
       <div className="grid gap-4 sm:grid-cols-3">
         {[
-          { t: "Presentes", n: cuenta("PRESENTE"), c: "from-emerald-400 to-teal-500" },
-          { t: "Tardanzas", n: cuenta("TARDANZA"), c: "from-amber-400 to-orange-500" },
-          { t: "Ausentes", n: cuenta("AUSENTE"), c: "from-rose-400 to-pink-500" },
+          { t: "Presentes", n: cuenta("PRESENTE"), c: "bg-green-600" },
+          { t: "Tardanzas", n: cuenta("TARDANZA"), c: "bg-amber-500" },
+          { t: "Ausentes", n: cuenta("AUSENTE"), c: "bg-red-600" },
         ].map((k) => (
           <div key={k.t} className="relative flex items-center justify-between overflow-hidden rounded-2xl border bg-card p-4 shadow-xs">
-            <span className={cn("absolute inset-y-0 left-0 w-1 bg-linear-to-b", k.c)} />
+            <span className={cn("absolute inset-y-0 left-0 w-1", k.c)} />
             <span className="text-sm text-muted-foreground">{k.t}</span>
             <span className="font-mono text-2xl font-bold" aria-live="polite">
               {k.n}

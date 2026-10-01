@@ -108,13 +108,13 @@ export default async function AulaPage({ params, searchParams }: PageProps<"/est
               ) : actual.tipo === "PDF" && url ? (
                 <iframe src={url} title={actual.titulo} className="absolute inset-0 size-full bg-white" />
               ) : (
-                <div className="absolute inset-0 grid place-items-center bg-linear-to-br from-brand-700 via-violet-700 to-fuchsia-700 p-6 text-center">
+                <div className="absolute inset-0 grid place-items-center fondo-marca p-6 text-center">
                   <div className="fondo-puntos absolute inset-0 text-white/10" />
                   <div className="relative">
-                    <LinkIcon className="mx-auto size-10 text-orange-300" />
+                    <LinkIcon className="flotar mx-auto size-10 text-brand-300" />
                     <p className="mt-3 text-lg font-semibold">{actual.titulo}</p>
                     {url && (
-                      <a href={url} target="_blank" rel="noreferrer" className={buttonVariants({ className: "mt-4 bg-white text-brand-700 hover:bg-orange-50" })}>
+                      <a href={url} target="_blank" rel="noreferrer" className={buttonVariants({ className: "mt-4 bg-white text-brand-800 hover:bg-brand-50" })}>
                         Abrir recurso <ExternalLinkIcon />
                       </a>
                     )}
@@ -140,7 +140,7 @@ export default async function AulaPage({ params, searchParams }: PageProps<"/est
                 ) : null}
                 {hechos.has(actual.id) ? (
                   <span className={buttonVariants({ variant: "secondary", className: "h-9 px-4" })}>
-                    <CircleCheckIcon className="text-emerald-600" /> Completada
+                    <CircleCheckIcon className="text-green-600" /> Completada
                   </span>
                 ) : (
                   <form action={marcarCompletado}>
@@ -162,7 +162,7 @@ export default async function AulaPage({ params, searchParams }: PageProps<"/est
 
             {url && actual.tipo !== "ENLACE" && (
               <div className="mt-6 flex items-center gap-3 rounded-2xl border bg-card p-4">
-                <span className="grid size-10 place-items-center rounded-xl bg-rose-50 text-rose-600 dark:bg-rose-500/10 dark:text-rose-300">
+                <span className="grid size-10 place-items-center rounded-xl bg-red-50 text-red-600 dark:bg-red-500/10 dark:text-red-300">
                   {actual.tipo === "PDF" ? <FileTextIcon className="size-5" /> : <CirclePlayIcon className="size-5" />}
                 </span>
                 <div className="flex-1">
@@ -178,7 +178,7 @@ export default async function AulaPage({ params, searchParams }: PageProps<"/est
           </div>
 
           <aside className="h-fit overflow-hidden rounded-2xl border bg-card shadow-xs xl:sticky xl:top-24">
-            <div className="border-b bg-linear-to-br from-brand-50 to-transparent p-5 dark:from-brand-500/10">
+            <div className="border-b p-5">
               <p className="text-sm font-semibold">Contenido del curso</p>
               <div className="mt-3 flex items-center gap-3">
                 <BarraProgreso valor={porcentaje} tono="turquesa" className="h-1.5" />
@@ -218,7 +218,7 @@ export default async function AulaPage({ params, searchParams }: PageProps<"/est
                             <span
                               className={cn(
                                 "mt-0.5 grid size-4 shrink-0 place-items-center rounded-full",
-                                hecho ? "bg-emerald-500 text-white" : "border border-input",
+                                hecho ? "bg-green-600 text-white" : "border border-input",
                               )}
                             >
                               {hecho && <CheckIcon className="size-2.5" />}

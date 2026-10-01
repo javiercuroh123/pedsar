@@ -51,7 +51,7 @@ export default async function AdminInscripcionesPage({ searchParams }: PageProps
     <div className="space-y-6">
       <EncabezadoPagina eyebrow="Comercial" titulo="Inscripciones y pagos" descripcion="Confirma matrículas, verifica pagos y gestiona reembolsos." />
 
-      <div className="grid gap-4 sm:grid-cols-3">
+      <div className="escalonado grid gap-4 sm:grid-cols-3">
         <TarjetaKpi etiqueta="Pendientes de verificación" valor={pendientes ?? 0} icono={ClockIcon} tono="ambar" />
         <TarjetaKpi etiqueta="Ingresos del mes" valor={formatearSoles(ingresosMes)} icono={WalletIcon} tono="turquesa" />
         <TarjetaKpi etiqueta="Reembolsos por atender" valor={solicitados} icono={ReceiptIcon} tono="rosa" />

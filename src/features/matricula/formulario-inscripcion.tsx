@@ -26,7 +26,7 @@ import { cn } from "@/lib/utils";
 import { inscribirse, validarCupon } from "./acciones";
 
 const METODOS = [
-  { valor: "CULQI", titulo: "Tarjeta", detalle: "Visa, Mastercard, Amex", icono: CreditCardIcon, color: "from-brand-500 to-violet-600" },
+  { valor: "CULQI", titulo: "Tarjeta", detalle: "Visa, Mastercard, Amex", icono: CreditCardIcon, color: "from-brand-600 to-brand-800" },
   { valor: "YAPE", titulo: "Yape", detalle: "Código de aprobación", icono: SmartphoneIcon, color: "from-[#742284] to-[#9b3cb0]" },
   { valor: "PLIN", titulo: "Plin", detalle: "Pago con QR", icono: SmartphoneIcon, color: "from-[#00a7b8] to-[#00c7a0]" },
 ] as const;
@@ -80,13 +80,22 @@ export function FormularioInscripcion({ curso, perfil, cupoLibre, cupoMaximo }: 
           const actual = n === paso;
           return (
             <li key={p} className="flex items-center gap-3">
-              {i > 0 && <span className={cn("h-0.5 w-8 rounded-full sm:w-16", hecho || actual ? "bg-primary" : "bg-border")} />}
+              {i > 0 && (
+                <span className="relative h-0.5 w-8 overflow-hidden rounded-full bg-border sm:w-16">
+                  <span
+                    className={cn(
+                      "absolute inset-y-0 left-0 rounded-full bg-green-600 transition-[width] duration-500 ease-(--ease-salida)",
+                      hecho || actual ? "w-full" : "w-0",
+                    )}
+                  />
+                </span>
+              )}
               <span className="flex items-center gap-2" aria-current={actual ? "step" : undefined}>
                 <span
                   className={cn(
                     "grid size-8 place-items-center rounded-full font-mono text-xs font-bold transition",
-                    hecho && "bg-emerald-500 text-white",
-                    actual && "bg-linear-to-br from-brand-500 to-violet-600 text-white shadow-md shadow-brand-600/30",
+                    hecho && "bg-green-600 text-white",
+                    actual && "bg-primary text-primary-foreground shadow-md shadow-primary/30 ring-4 ring-primary/15",
                     !hecho && !actual && "border bg-card text-muted-foreground",
                   )}
                 >
@@ -153,9 +162,9 @@ export function FormularioInscripcion({ curso, perfil, cupoLibre, cupoMaximo }: 
                 <p className="text-xs text-muted-foreground">Aquí enviaremos la confirmación y el comprobante.</p>
               </div>
             </div>
-            <div className="mt-6 grid gap-3 rounded-xl bg-emerald-50 p-4 text-sm sm:grid-cols-2 dark:bg-emerald-500/10">
+            <div className="mt-6 grid gap-3 rounded-xl bg-green-50 p-4 text-sm sm:grid-cols-2 dark:bg-green-500/10">
               <p className="flex items-start gap-2">
-                <CircleCheckIcon className="mt-0.5 size-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
+                <CircleCheckIcon className="mt-0.5 size-4 shrink-0 text-green-600 dark:text-green-400" />
                 <span>
                   <b className="font-semibold">Cupo disponible</b>
                   <br />
@@ -165,7 +174,7 @@ export function FormularioInscripcion({ curso, perfil, cupoLibre, cupoMaximo }: 
                 </span>
               </p>
               <p className="flex items-start gap-2">
-                <CircleCheckIcon className="mt-0.5 size-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
+                <CircleCheckIcon className="mt-0.5 size-4 shrink-0 text-green-600 dark:text-green-400" />
                 <span>
                   <b className="font-semibold">Pago seguro</b>
                   <br />
@@ -200,8 +209,10 @@ export function FormularioInscripcion({ curso, perfil, cupoLibre, cupoMaximo }: 
                   <label
                     key={m.valor}
                     className={cn(
-                      "relative flex cursor-pointer flex-col gap-2 rounded-xl border p-4 transition has-focus-visible:ring-3 has-focus-visible:ring-ring/50",
-                      metodo === m.valor ? "border-primary bg-brand-50/70 ring-1 ring-primary dark:bg-brand-500/10" : "hover:border-brand-300",
+                      "relative flex cursor-pointer flex-col gap-2 rounded-xl border p-4 transition-all duration-200 has-focus-visible:ring-3 has-focus-visible:ring-ring/50",
+                      metodo === m.valor
+                        ? "border-primary bg-brand-50 ring-1 ring-primary dark:bg-brand-500/10"
+                        : "hover:-translate-y-0.5 hover:border-brand-300 hover:shadow-md",
                     )}
                   >
                     <input
@@ -217,7 +228,11 @@ export function FormularioInscripcion({ curso, perfil, cupoLibre, cupoMaximo }: 
                     </span>
                     <span className="text-sm font-semibold">{m.titulo}</span>
                     <span className="text-xs text-muted-foreground">{m.detalle}</span>
-                    {metodo === m.valor && <CheckIcon className="absolute top-3 right-3 size-4 text-primary" />}
+                    {metodo === m.valor && (
+                      <span className="animar-escala absolute top-3 right-3 grid size-5 place-items-center rounded-full bg-primary text-primary-foreground">
+                        <CheckIcon className="size-3" />
+                      </span>
+                    )}
                   </label>
                 ))}
               </div>
@@ -287,7 +302,7 @@ export function FormularioInscripcion({ curso, perfil, cupoLibre, cupoMaximo }: 
               </Button>
               <BotonEnviar
                 pendiente="Procesando…"
-                className="h-11 bg-linear-to-r from-brand-600 to-violet-600 px-6 text-base shadow-lg shadow-brand-600/25 hover:opacity-90"
+                className="h-11 px-6 text-[0.95rem]"
               >
                 <LockIcon /> Confirmar inscripción · {formatearSoles(total)}
               </BotonEnviar>
@@ -295,9 +310,9 @@ export function FormularioInscripcion({ curso, perfil, cupoLibre, cupoMaximo }: 
           </div>
         </div>
 
-        <aside className="lg:sticky lg:top-24 lg:self-start">
-          <div className="overflow-hidden rounded-2xl border bg-card shadow-lg shadow-brand-900/5">
-            <div className="flex gap-4 border-b bg-linear-to-br from-brand-50 to-orange-50/50 p-5 dark:from-brand-500/10 dark:to-transparent">
+        <aside className="animar-escala lg:sticky lg:top-24 lg:self-start [--i:2]">
+          <div className="overflow-hidden rounded-2xl border bg-card shadow-md">
+            <div className="flex gap-4 border-b p-5">
               <SiglaCurso titulo={curso.titulo} categoria={curso.categoria} className="size-14 text-base" />
               <div className="min-w-0">
                 <p className="leading-snug font-semibold">{curso.titulo}</p>
@@ -311,16 +326,16 @@ export function FormularioInscripcion({ curso, perfil, cupoLibre, cupoMaximo }: 
                 <span className="tabular-nums">{formatearSoles(curso.precio)}</span>
               </div>
               {cupon && (
-                <div className="flex justify-between text-emerald-700 dark:text-emerald-400">
+                <div className="animar-escala flex justify-between rounded-lg bg-green-50 px-3 py-2 text-green-700 dark:bg-green-500/10 dark:text-green-400">
                   <span>
                     Cupón {cupon.codigo} (−{cupon.porcentaje} %)
                   </span>
                   <span className="tabular-nums">− {formatearSoles(descuento)}</span>
                 </div>
               )}
-              <div className="flex justify-between border-t pt-3 text-base font-bold">
-                <span>Total</span>
-                <span className="tabular-nums">{formatearSoles(total)}</span>
+              <div className="flex items-baseline justify-between border-t pt-3">
+                <span className="font-medium">Total a pagar</span>
+                <span className="text-[1.875rem] font-semibold tracking-tight tabular-nums">{formatearSoles(total)}</span>
               </div>
               <div className="flex gap-2 pt-2">
                 <label className="relative flex-1">
@@ -346,15 +361,15 @@ export function FormularioInscripcion({ curso, perfil, cupoLibre, cupoMaximo }: 
             </div>
             <ul className="space-y-2 border-t bg-muted/40 p-5 text-xs text-muted-foreground">
               <li className="flex items-center gap-2">
-                <ReceiptIcon className="size-3.5 text-brand-500" />
+                <ReceiptIcon className="size-3.5 text-brand-600 dark:text-brand-400" />
                 Comprobante electrónico SUNAT
               </li>
               <li className="flex items-center gap-2">
-                <AwardIcon className="size-3.5 text-orange-500" />
+                <AwardIcon className="size-3.5 text-rose-500" />
                 Certificado digital con código verificable
               </li>
               <li className="flex items-center gap-2">
-                <ShieldCheckIcon className="size-3.5 text-teal-500" />
+                <ShieldCheckIcon className="size-3.5 text-green-600" />
                 Conexión cifrada HTTPS/TLS
               </li>
             </ul>

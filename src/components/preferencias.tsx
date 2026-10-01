@@ -12,14 +12,14 @@ export function BotonTema({ className }: { className?: string }) {
   const { resolvedTheme, setTheme } = useTheme();
   return (
     <Button
-      variant="ghost"
+      variant="outline"
       size="icon"
       className={className}
       aria-label="Cambiar modo claro u oscuro"
       onClick={() => setTheme(resolvedTheme === "dark" ? "light" : "dark")}
     >
-      <MoonIcon className="dark:hidden" />
-      <SunIcon className="hidden dark:block" />
+      <MoonIcon className="transition-transform duration-500 hover:-rotate-12 dark:hidden" />
+      <SunIcon className="hidden transition-transform duration-500 dark:block dark:hover:rotate-45" />
     </Button>
   );
 }
@@ -87,7 +87,7 @@ export function MenuAccesibilidad({ className }: { className?: string }) {
   return (
     <Popover.Root>
       <Popover.Trigger
-        render={<Button variant="ghost" size="icon" className={className} aria-label="Opciones de accesibilidad" />}
+        render={<Button variant="outline" size="icon" className={className} aria-label="Opciones de accesibilidad" />}
       >
         <AccessibilityIcon />
       </Popover.Trigger>

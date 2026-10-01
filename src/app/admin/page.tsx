@@ -5,6 +5,7 @@ import { BarraProgreso, EncabezadoPagina, PanelTabla, TarjetaKpi, tabla } from "
 import { BotonAccion } from "@/components/boton-accion";
 import { resolverPago } from "@/features/administracion/acciones";
 import { GraficoBarras } from "@/features/administracion/grafico-barras";
+import { GraficoDona } from "@/features/administracion/grafico-dona";
 import { uno } from "@/features/academico/consultas";
 import { requireRol } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
@@ -14,6 +15,7 @@ import type { MetodoPago, Modalidad } from "@/types/dominio";
 
 export const metadata: Metadata = { title: "Panel principal" };
 
+const COLOR_MODALIDAD: Record<Modalidad, string> = { VIRTUAL: "var(--chart-1)", PRESENCIAL: "var(--chart-5)", SEMIPRESENCIAL: "var(--chart-3)" };
 const MES = new Intl.DateTimeFormat("es-PE", { month: "short", timeZone: "America/Lima" });
 
 // HU-20 · Panel de administración con indicadores
@@ -75,7 +77,7 @@ export default async function AdminPage() {
         </Link>
       </EncabezadoPagina>
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="escalonado grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <TarjetaKpi etiqueta="Usuarios registrados" valor={(usuarios.count ?? 0).toLocaleString("es-PE")} icono={UsersIcon} tono="indigo" detalle={`+${usuariosMes.count ?? 0} este mes`} />
         <TarjetaKpi etiqueta="Inscripciones (12 meses)" valor={filasIns.length.toLocaleString("es-PE")} icono={ClipboardListIcon} tono="coral" detalle={`${insMes} este mes`} />
         <TarjetaKpi etiqueta="Ingresos registrados" valor={formatearSoles(ingresos)} icono={WalletIcon} tono="turquesa" detalle={`${formatearSoles(ingresosMes)} este mes`} />
@@ -83,27 +85,19 @@ export default async function AdminPage() {
       </div>
 
       <div className="grid gap-6 lg:grid-cols-3">
-        <section className="rounded-2xl border bg-card p-6 shadow-xs lg:col-span-2">
-          <h2 className="font-semibold">Matrículas por mes</h2>
+        <section className="animar-entrada rounded-2xl border bg-card p-6 shadow-xs [--i:2] lg:col-span-2">
+          <h2 className="text-lg font-semibold tracking-tight">Matrículas por mes</h2>
           <p className="text-sm text-muted-foreground">Inscripciones registradas en los últimos 12 meses</p>
           <GraficoBarras datos={meses} etiqueta="Matrículas por mes" />
         </section>
-        <section className="rounded-2xl border bg-card p-6 shadow-xs">
-          <h2 className="font-semibold">Oferta por modalidad</h2>
-          <p className="text-sm text-muted-foreground">{publicados.length} cursos publicados</p>
-          <ul className="mt-6 space-y-5">
-            {porModalidad.map(({ m, n }) => (
-              <li key={m}>
-                <div className="flex justify-between text-sm">
-                  <span>{ETIQUETA_MODALIDAD[m]}</span>
-                  <span className="font-mono text-xs text-muted-foreground">
-                    {n} · {publicados.length ? Math.round((n / publicados.length) * 100) : 0} %
-                  </span>
-                </div>
-                <BarraProgreso valor={publicados.length ? (n / publicados.length) * 100 : 0} className="mt-1.5" etiqueta={ETIQUETA_MODALIDAD[m]} />
-              </li>
-            ))}
-          </ul>
+        <section className="animar-entrada rounded-2xl border bg-card p-6 shadow-xs [--i:3]">
+          <h2 className="text-lg font-semibold tracking-tight">Oferta por modalidad</h2>
+          <p className="mb-6 text-sm text-muted-foreground">{publicados.length} cursos publicados</p>
+          <GraficoDona
+            etiqueta="Oferta por modalidad"
+            total={publicados.length}
+            datos={porModalidad.map(({ m, n }) => ({ clave: m, etiqueta: ETIQUETA_MODALIDAD[m], valor: n, color: COLOR_MODALIDAD[m] }))}
+          />
         </section>
       </div>
 
@@ -150,7 +144,7 @@ export default async function AdminPage() {
           )}
         </PanelTabla>
         <section className="rounded-2xl border bg-card p-5 shadow-xs">
-          <h2 className="font-semibold">Ocupación por curso</h2>
+          <h2 className="text-lg font-semibold tracking-tight">Ocupación por curso</h2>
           {ocupacion.length ? (
             <ul className="mt-5 space-y-4">
               {ocupacion.map((c) => (
@@ -159,7 +153,7 @@ export default async function AdminPage() {
                     <span className="truncate">{c.titulo}</span>
                     <span className="font-mono text-xs text-muted-foreground">{c.p}%</span>
                   </div>
-                  <BarraProgreso valor={c.p} tono={c.p >= 100 ? "rojo" : c.p >= 80 ? "coral" : "turquesa"} className="mt-1.5 h-1.5" etiqueta={c.titulo} />
+                  <BarraProgreso valor={c.p} tono={c.p >= 100 ? "rojo" : c.p >= 80 ? "ambar" : "indigo"} className="mt-1.5 h-1.5" etiqueta={c.titulo} />
                 </li>
               ))}
             </ul>

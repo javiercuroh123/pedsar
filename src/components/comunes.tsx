@@ -1,5 +1,5 @@
+import { ChevronRightIcon, type LucideIcon } from "lucide-react";
 import Link from "next/link";
-import type { LucideIcon } from "lucide-react";
 import { ETIQUETA_ESTADO, iniciales } from "@/lib/formato";
 import { cn } from "@/lib/utils";
 
@@ -18,36 +18,51 @@ export function EncabezadoPagina({
   return (
     <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
       <div className="min-w-0">
-        {eyebrow && <p className="mb-1 text-xs font-semibold tracking-[0.14em] text-primary uppercase">{eyebrow}</p>}
-        <h1 className="text-2xl font-bold tracking-tight sm:text-[1.7rem]">{titulo}</h1>
-        {descripcion && <p className="mt-1 text-sm text-muted-foreground">{descripcion}</p>}
+        {eyebrow && (
+          <p className="mb-1.5 flex items-center gap-1.5 text-sm text-muted-foreground">
+            {eyebrow}
+            {typeof titulo === "string" && (
+              <>
+                <ChevronRightIcon className="size-3.5" aria-hidden />
+                <span className="font-medium text-foreground">{titulo}</span>
+              </>
+            )}
+          </p>
+        )}
+        <h1 className="text-2xl font-semibold tracking-tight sm:text-[1.875rem] sm:leading-[2.375rem]">{titulo}</h1>
+        {descripcion && <p className="mt-1 text-[0.95rem] text-muted-foreground">{descripcion}</p>}
       </div>
       {children && <div className="flex flex-wrap items-center gap-2">{children}</div>}
     </div>
   );
 }
 
+/**
+ * Tonos del sistema «Grafito y cian»: indigo = cian (marca), coral = rosa (acento),
+ * turquesa = verde (éxito), ambar = ámbar, rosa = violeta (apoyo), cielo = grafito.
+ * Se conservan los nombres para no romper las pantallas que ya los usan.
+ */
 export type Tono = "indigo" | "coral" | "turquesa" | "ambar" | "rosa" | "cielo";
 
 const TONO_ICONO: Record<Tono, string> = {
-  indigo: "bg-brand-100 text-brand-700 dark:bg-brand-500/15 dark:text-brand-300",
-  coral: "bg-orange-100 text-orange-700 dark:bg-orange-500/15 dark:text-orange-300",
-  turquesa: "bg-teal-100 text-teal-700 dark:bg-teal-500/15 dark:text-teal-300",
-  ambar: "bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300",
-  rosa: "bg-pink-100 text-pink-700 dark:bg-pink-500/15 dark:text-pink-300",
-  cielo: "bg-sky-100 text-sky-700 dark:bg-sky-500/15 dark:text-sky-300",
+  indigo: "bg-brand-50 text-brand-700 dark:bg-brand-500/15 dark:text-brand-300",
+  coral: "bg-rose-50 text-rose-600 dark:bg-rose-500/15 dark:text-rose-300",
+  turquesa: "bg-green-50 text-green-700 dark:bg-green-500/15 dark:text-green-300",
+  ambar: "bg-amber-50 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300",
+  rosa: "bg-violet-50 text-violet-700 dark:bg-violet-500/15 dark:text-violet-300",
+  cielo: "bg-zinc-100 text-zinc-700 dark:bg-white/10 dark:text-zinc-300",
 };
 
 const TONO_BARRA: Record<Tono, string> = {
-  indigo: "from-brand-500 to-violet-500",
-  coral: "from-orange-400 to-rose-500",
-  turquesa: "from-teal-400 to-emerald-500",
-  ambar: "from-amber-400 to-orange-400",
-  rosa: "from-pink-400 to-fuchsia-500",
-  cielo: "from-sky-400 to-blue-500",
+  indigo: "bg-primary",
+  coral: "bg-rose-500",
+  turquesa: "bg-green-600 dark:bg-green-500",
+  ambar: "bg-amber-500",
+  rosa: "bg-violet-600 dark:bg-violet-400",
+  cielo: "bg-zinc-600 dark:bg-zinc-400",
 };
 
-/** Indicador (KPI) con ícono de color y una franja superior en degradado. */
+/** Indicador (KPI): etiqueta, ícono de color y valor; se eleva al pasar el cursor. */
 export function TarjetaKpi({
   etiqueta,
   valor,
@@ -62,15 +77,19 @@ export function TarjetaKpi({
   tono?: Tono;
 }) {
   return (
-    <div className="relative overflow-hidden rounded-2xl border bg-card p-5 shadow-xs">
-      <div className={cn("absolute inset-x-0 top-0 h-1 bg-linear-to-r", TONO_BARRA[tono])} />
+    <div className="elevar group/kpi relative overflow-hidden rounded-xl border bg-card p-5 shadow-xs">
       <div className="flex items-start justify-between gap-3">
         <p className="text-sm font-medium text-muted-foreground">{etiqueta}</p>
-        <span className={cn("grid size-9 shrink-0 place-items-center rounded-xl", TONO_ICONO[tono])}>
+        <span
+          className={cn(
+            "grid size-9 shrink-0 place-items-center rounded-lg transition-transform duration-300 group-hover/kpi:scale-110 group-hover/kpi:-rotate-6",
+            TONO_ICONO[tono],
+          )}
+        >
           <Icono className="size-4.5" />
         </span>
       </div>
-      <p className="mt-2 text-3xl font-bold tracking-tight tabular-nums">{valor}</p>
+      <p className="mt-3 text-[1.875rem] leading-none font-semibold tracking-tight tabular-nums">{valor}</p>
       {detalle && <div className="mt-1 text-xs text-muted-foreground">{detalle}</div>}
     </div>
   );
@@ -78,7 +97,7 @@ export function TarjetaKpi({
 
 export function IconoTono({ icono: Icono, tono = "indigo", className }: { icono: LucideIcon; tono?: Tono; className?: string }) {
   return (
-    <span className={cn("grid size-10 shrink-0 place-items-center rounded-xl", TONO_ICONO[tono], className)}>
+    <span className={cn("grid size-10 shrink-0 place-items-center rounded-lg", TONO_ICONO[tono], className)}>
       <Icono className="size-5" />
     </span>
   );
@@ -99,8 +118,8 @@ export function EstadoVacio({
   className?: string;
 }) {
   return (
-    <div className={cn("flex flex-col items-center rounded-2xl border border-dashed bg-card/50 px-6 py-14 text-center", className)}>
-      <span className="grid size-12 place-items-center rounded-2xl bg-linear-to-br from-brand-100 to-violet-100 text-brand-600 dark:from-brand-500/15 dark:to-violet-500/15 dark:text-brand-300">
+    <div className={cn("animar-escala flex flex-col items-center rounded-2xl border border-dashed bg-card/50 px-6 py-14 text-center", className)}>
+      <span className="grid size-12 place-items-center rounded-xl bg-brand-50 text-brand-700 dark:bg-brand-500/15 dark:text-brand-300">
         <Icono className="size-6" />
       </span>
       <p className="mt-4 font-semibold">{titulo}</p>
@@ -125,13 +144,13 @@ const COLOR_ESTADO: Record<string, string> = {
 };
 
 const CLASE_PILDORA = {
-  verde: "bg-emerald-50 text-emerald-700 ring-emerald-600/20 dark:bg-emerald-500/10 dark:text-emerald-300 dark:ring-emerald-500/25",
-  ambar: "bg-amber-50 text-amber-800 ring-amber-600/25 dark:bg-amber-500/10 dark:text-amber-300 dark:ring-amber-500/25",
-  rojo: "bg-rose-50 text-rose-700 ring-rose-600/20 dark:bg-rose-500/10 dark:text-rose-300 dark:ring-rose-500/25",
-  gris: "bg-muted text-muted-foreground ring-foreground/10",
-  indigo: "bg-brand-50 text-brand-700 ring-brand-600/20 dark:bg-brand-500/10 dark:text-brand-300 dark:ring-brand-500/25",
-  coral: "bg-orange-50 text-orange-700 ring-orange-600/20 dark:bg-orange-500/10 dark:text-orange-300 dark:ring-orange-500/25",
-  turquesa: "bg-teal-50 text-teal-700 ring-teal-600/20 dark:bg-teal-500/10 dark:text-teal-300 dark:ring-teal-500/25",
+  verde: "bg-green-50 text-green-700 ring-green-600/15 dark:bg-green-500/10 dark:text-green-300 dark:ring-green-500/25",
+  ambar: "bg-amber-50 text-amber-700 ring-amber-600/20 dark:bg-amber-500/10 dark:text-amber-300 dark:ring-amber-500/25",
+  rojo: "bg-red-50 text-red-700 ring-red-600/15 dark:bg-red-500/10 dark:text-red-300 dark:ring-red-500/25",
+  gris: "bg-zinc-100 text-zinc-700 ring-zinc-900/5 dark:bg-white/10 dark:text-zinc-300 dark:ring-white/10",
+  indigo: "bg-brand-50 text-brand-800 ring-brand-600/15 dark:bg-brand-500/10 dark:text-brand-300 dark:ring-brand-500/25",
+  coral: "bg-rose-50 text-rose-700 ring-rose-600/15 dark:bg-rose-500/10 dark:text-rose-300 dark:ring-rose-500/25",
+  turquesa: "bg-violet-50 text-violet-700 ring-violet-600/15 dark:bg-violet-500/10 dark:text-violet-300 dark:ring-violet-500/25",
 } as const;
 
 export type ColorPildora = keyof typeof CLASE_PILDORA;
@@ -149,7 +168,7 @@ export function Pildora({
   return (
     <span
       className={cn(
-        "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium whitespace-nowrap ring-1 ring-inset [&>svg]:size-3",
+        "inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium whitespace-nowrap ring-1 ring-inset [&>svg]:size-3",
         CLASE_PILDORA[color],
         className,
       )}
@@ -192,7 +211,7 @@ export function BarraProgreso({
       className={cn("h-2 w-full overflow-hidden rounded-full bg-muted", className)}
     >
       <div
-        className={cn("h-full rounded-full bg-linear-to-r", tono === "rojo" ? "from-rose-400 to-rose-600" : TONO_BARRA[tono])}
+        className={cn("animar-barra h-full rounded-full", tono === "rojo" ? "bg-red-600 dark:bg-red-500" : TONO_BARRA[tono])}
         style={{ width: `${v}%` }}
       />
     </div>
@@ -220,8 +239,8 @@ export function PestanasEnlace({
           className={cn(
             "-mb-px flex items-center gap-1.5 border-b-2 px-0.5 pb-3 text-sm font-medium whitespace-nowrap transition-colors",
             i.valor === activa
-              ? "border-primary text-foreground"
-              : "border-transparent text-muted-foreground hover:text-foreground",
+              ? "border-primary text-primary"
+              : "border-transparent text-muted-foreground hover:border-border hover:text-foreground",
           )}
         >
           {i.etiqueta}
@@ -232,11 +251,11 @@ export function PestanasEnlace({
 }
 
 const TONOS_AVATAR = [
-  "bg-brand-100 text-brand-700 dark:bg-brand-500/20 dark:text-brand-200",
-  "bg-orange-100 text-orange-700 dark:bg-orange-500/20 dark:text-orange-200",
-  "bg-teal-100 text-teal-700 dark:bg-teal-500/20 dark:text-teal-200",
-  "bg-pink-100 text-pink-700 dark:bg-pink-500/20 dark:text-pink-200",
-  "bg-sky-100 text-sky-700 dark:bg-sky-500/20 dark:text-sky-200",
+  "bg-brand-100 text-brand-800 dark:bg-brand-500/20 dark:text-brand-200",
+  "bg-rose-100 text-rose-700 dark:bg-rose-500/20 dark:text-rose-200",
+  "bg-violet-100 text-violet-700 dark:bg-violet-500/20 dark:text-violet-200",
+  "bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-200",
+  "bg-green-100 text-green-700 dark:bg-green-500/20 dark:text-green-200",
 ];
 
 export const indiceDeTexto = (texto: string, n: number) =>
@@ -295,8 +314,8 @@ export function PanelTabla({
 /** Clases reutilizables para tablas simples de datos. */
 export const tabla = {
   table: "w-full min-w-[720px] text-left text-sm",
-  thead: "border-b bg-muted/50",
-  th: "px-4 py-3 text-xs font-medium whitespace-nowrap text-muted-foreground",
-  tr: "border-b last:border-0 transition-colors hover:bg-muted/40",
-  td: "px-4 py-3 align-middle",
+  thead: "border-b bg-muted/60",
+  th: "px-4 py-3 text-[11px] font-semibold tracking-wider whitespace-nowrap text-muted-foreground uppercase",
+  tr: "border-b last:border-0 transition-colors duration-200 hover:bg-brand-50/50 dark:hover:bg-white/5",
+  td: "px-4 py-3.5 align-middle",
 };

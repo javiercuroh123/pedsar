@@ -76,7 +76,7 @@ export default async function AdminReportesPage({ searchParams }: PageProps<"/ad
         </Button>
       </Form>
 
-      <div className="grid gap-4 sm:grid-cols-3">
+      <div className="escalonado grid gap-4 sm:grid-cols-3">
         <TarjetaKpi etiqueta="Inscripciones" valor={inscritos} icono={ClipboardListIcon} tono="indigo" />
         <TarjetaKpi etiqueta="Confirmadas" valor={confirmados} icono={UsersIcon} tono="turquesa" detalle={inscritos ? `${Math.round((confirmados / inscritos) * 100)} % del total` : undefined} />
         <TarjetaKpi etiqueta="Ingresos aprobados" valor={formatearSoles(total)} icono={WalletIcon} tono="coral" />

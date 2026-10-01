@@ -7,7 +7,7 @@ export const metadata: Metadata = { title: "Crear cuenta" };
 export default function RegistroPage() {
   return (
     <>
-      <h1 className="text-3xl font-extrabold tracking-tight">Crea tu cuenta</h1>
+      <h1 className="text-[1.875rem] leading-tight font-semibold tracking-tight">Crea tu cuenta</h1>
       <p className="mt-2 mb-8 text-sm text-muted-foreground">Regístrate para inscribirte en cursos y seguir tu progreso.</p>
       <RegistroForm />
       <p className="mt-8 text-center text-sm text-muted-foreground">

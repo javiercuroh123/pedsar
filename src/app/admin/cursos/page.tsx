@@ -151,7 +151,7 @@ export default async function AdminCursosPage({ searchParams }: PageProps<"/admi
                           confirmar={`¿Eliminar "${c.titulo}"? Esta acción no se puede deshacer.`}
                           variant="ghost"
                           size="icon-sm"
-                          className="text-rose-600 dark:text-rose-400"
+                          className="text-red-600 dark:text-red-400"
                           aria-label="Eliminar"
                           title="Eliminar"
                         >

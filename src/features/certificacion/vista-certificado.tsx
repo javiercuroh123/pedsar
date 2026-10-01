@@ -1,3 +1,4 @@
+import { GraduationCapIcon, QrCodeIcon } from "lucide-react";
 import { formatearFecha } from "@/lib/formato";
 
 export interface DatosCertificado {
@@ -20,16 +21,16 @@ export function VistaCertificado({ datos }: { datos: DatosCertificado }) {
       role="img"
       aria-label={`Certificado de ${datos.estudiante} por el curso ${datos.curso}`}
     >
-      <div className="absolute inset-0 bg-[radial-gradient(60%_60%_at_0%_0%,oklch(0.93_0.045_277),transparent_70%),radial-gradient(50%_50%_at_100%_100%,oklch(0.95_0.05_45),transparent_70%)]" />
+      <div className="absolute inset-0 bg-[radial-gradient(60%_60%_at_0%_0%,#cffafe,transparent_70%),radial-gradient(50%_50%_at_100%_100%,#ffe4e6,transparent_70%)]" />
       <div className="absolute inset-[3%] rounded-md border-[0.4cqw] border-brand-700/80" />
       <div className="absolute inset-[4.4%] rounded-sm border border-brand-700/30" />
       <div className="relative flex h-full flex-col items-center justify-between px-[11%] py-[8%] text-center">
         <div className="flex items-center gap-[1.2cqw]" style={{ fontSize: "2.2cqw" }}>
           <span
-            className="grid place-items-center rounded bg-linear-to-br from-brand-500 to-fuchsia-600 font-mono font-bold text-white"
-            style={{ width: "3.8cqw", height: "3.8cqw", fontSize: "2cqw" }}
+            className="grid place-items-center rounded-[0.9cqw] bg-linear-to-br from-brand-400 to-brand-700 text-white"
+            style={{ width: "3.8cqw", height: "3.8cqw" }}
           >
-            P
+            <GraduationCapIcon style={{ width: "2.3cqw", height: "2.3cqw" }} />
           </span>
           <b className="tracking-tight">PEDSAR</b>
         </div>
@@ -57,10 +58,10 @@ export function VistaCertificado({ datos }: { datos: DatosCertificado }) {
           </div>
           <div className="flex flex-col items-center">
             <div
-              className="grid place-items-center rounded border border-zinc-300 bg-white font-mono text-zinc-400"
-              style={{ width: "9cqw", height: "9cqw", fontSize: "1.4cqw" }}
+              className="grid place-items-center rounded border border-zinc-200 bg-white text-zinc-900"
+              style={{ width: "9cqw", height: "9cqw" }}
             >
-              QR
+              <QrCodeIcon style={{ width: "7cqw", height: "7cqw" }} strokeWidth={1.6} />
             </div>
             <div className="font-mono" style={{ marginTop: ".8cqw" }}>
               {datos.codigo_unico}
