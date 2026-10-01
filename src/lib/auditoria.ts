@@ -1,6 +1,7 @@
 import "server-only";
 import { headers } from "next/headers";
 import { createAdminClient } from "@/lib/supabase/admin";
+import type { Json } from "@/types/database";
 
 /**
  * Registra una acción crítica en registro_actividad (HU-61, RNF-05).
@@ -9,7 +10,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 export async function registrarActividad(
   usuarioId: string | null,
   accion: string,
-  detalle?: Record<string, unknown>,
+  detalle?: Record<string, Json | undefined>,
 ) {
   const h = await headers();
   const ip = h.get("x-forwarded-for")?.split(",")[0]?.trim() || null;

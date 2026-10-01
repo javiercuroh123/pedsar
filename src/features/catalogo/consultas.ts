@@ -50,7 +50,7 @@ async function nombresInstructores(ids: string[]) {
   const unicos = [...new Set(ids.filter(Boolean))];
   if (!unicos.length) return new Map<string, string>();
   const supabase = await createClient();
-  const { data } = await supabase.from("instructores_publicos").select("id, nombres, apellidos").in("id", unicos);
+  const { data } = await supabase.rpc("instructores_publicos", { p_ids: unicos });
   return new Map((data ?? []).map((i: { id: string; nombres: string; apellidos: string }) => [i.id, nombreCompleto(i)]));
 }
 
@@ -145,11 +145,7 @@ export async function obtenerCursoPorSlug(slug: string) {
   const [{ data: cupo }, { data: instructor }] = await Promise.all([
     supabase.rpc("cupo_disponible", { p_curso: data.id }),
     data.instructor_id
-      ? supabase
-          .from("instructores_publicos")
-          .select("nombres, apellidos, especialidad, avatar_url")
-          .eq("id", data.instructor_id)
-          .maybeSingle()
+      ? supabase.rpc("instructores_publicos", { p_ids: [data.instructor_id] }).maybeSingle()
       : Promise.resolve({ data: null }),
   ]);
 

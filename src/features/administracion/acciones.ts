@@ -105,10 +105,14 @@ export async function duplicarCurso(formData: FormData) {
   const usuario = await admin();
   const id = z.uuid().parse(formData.get("id"));
   const supabase = await createClient();
-  const { data: original } = await supabase.from("cursos").select("*, modulos(titulo, orden)").eq("id", id).single();
+  // Se copian solo los datos del curso: la copia nace en borrador, sin publicación programada.
+  const { data: original } = await supabase
+    .from("cursos")
+    .select("titulo, descripcion, imagen_url, nivel, modalidad, precio, cupo_maximo, duracion_horas, categoria_id, instructor_id, modulos(titulo, orden)")
+    .eq("id", id)
+    .single();
   if (!original) return;
   const { modulos, ...resto } = original;
-  for (const campo of ["id", "slug", "creado_en", "actualizado_en"]) delete resto[campo];
   const titulo = `${original.titulo} (copia)`;
   const { data: copia } = await supabase
     .from("cursos")
@@ -116,7 +120,7 @@ export async function duplicarCurso(formData: FormData) {
     .select("id")
     .single();
   if (copia && modulos?.length) {
-    await supabase.from("modulos").insert(modulos.map((m: { titulo: string; orden: number }) => ({ ...m, curso_id: copia.id })));
+    await supabase.from("modulos").insert(modulos.map((m) => ({ ...m, curso_id: copia.id })));
   }
   await registrarActividad(usuario.id, "DUPLICAR_CURSO", { original: id, copia: copia?.id });
   revalidatePath("/admin/cursos");

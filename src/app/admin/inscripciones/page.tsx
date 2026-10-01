@@ -9,6 +9,7 @@ import { requireRol } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { ETIQUETA_METODO, formatearFecha, formatearSoles, hoyISO, nombreCompleto } from "@/lib/formato";
 import { cn } from "@/lib/utils";
+import { Constants } from "@/types/database";
 import type { MetodoPago } from "@/types/dominio";
 
 export const metadata: Metadata = { title: "Inscripciones y pagos" };
@@ -20,7 +21,7 @@ export default async function AdminInscripcionesPage({ searchParams }: PageProps
   await requireRol("administrador");
   const { tab, estado } = await searchParams;
   const pestana = tab === "reembolsos" ? "reembolsos" : "inscripciones";
-  const filtro = typeof estado === "string" ? estado : "";
+  const filtro = Constants.public.Enums.estado_inscripcion.find((e) => e === estado) ?? "";
   const supabase = await createClient();
   const inicioMes = `${hoyISO().slice(0, 7)}-01`;
 

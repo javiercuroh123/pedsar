@@ -78,6 +78,9 @@ src/
 - El cupo se valida en la base de datos (trigger), no solo en la interfaz.
 - Las respuestas correctas de las evaluaciones no son legibles por estudiantes.
 - `SUPABASE_SECRET_KEY` ignora RLS: úsala solo en `lib/supabase/admin.ts` (servidor).
+- Las funciones auxiliares de RLS (`rol_actual`, `es_instructor_de`, …) viven en el esquema
+  `privado`, que la API no expone. Solo son públicas a propósito `cupo_disponible`,
+  `verificar_certificado` e `instructores_publicos`.
 
 ## Estado
 
@@ -107,5 +110,6 @@ Varias funciones (pagos, evaluaciones, notificaciones, auditoría) requieren `SU
 | `db:start` / `db:stop` | Supabase local |
 | `db:reset` | Recrear la BD con migraciones + seed |
 | `db:migration <nombre>` | Nueva migración |
-| `db:types` | Regenerar tipos de la BD |
+| `db:types` | Regenerar tipos de la BD local |
+| `db:types:nube` | Regenerar tipos desde el proyecto vinculado en la nube |
 | `db:push` | Aplicar migraciones al proyecto en la nube |
