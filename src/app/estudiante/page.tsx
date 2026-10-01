@@ -123,12 +123,12 @@ export default async function EstudiantePage() {
               <div className="flex-1">
                 <p className="font-semibold text-amber-900 dark:text-amber-200">Pago pendiente · {i.curso.titulo}</p>
                 <p className="mt-0.5 text-amber-800/80 dark:text-amber-200/70">
-                  {i.pago ? `${ETIQUETA_METODO[i.pago.metodo]} · ${formatearSoles(i.pago.monto)} · ${situacionPagoPendiente(i.pago).texto}. ` : ""}Tu cupo se
+                  {i.pago ? `${ETIQUETA_METODO[i.pago.metodo]} · ${formatearSoles(i.pago.monto)} · ${situacionPagoPendiente(i.pago, i).texto}. ` : ""}Tu cupo se
                   confirmará cuando se valide el pago.
                 </p>
               </div>
               <Link href="/estudiante/pagos" className={buttonVariants({ variant: "outline", size: "sm" })}>
-                {i.pago ? situacionPagoPendiente(i.pago).accion : "Ver pago"}
+                {i.pago ? situacionPagoPendiente(i.pago, i).accion : "Ver pago"}
               </Link>
             </div>
           ))}

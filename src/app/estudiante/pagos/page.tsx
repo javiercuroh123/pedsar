@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { CheckCircle2Icon, ReceiptIcon, WalletIcon } from "lucide-react";
 import { EncabezadoPagina, EstadoBadge, EstadoVacio, PanelTabla, TarjetaKpi, tabla } from "@/components/comunes";
+import { PLAZO_PAGO_HORAS, reservaVencida } from "@/config/matricula";
 import { listarMisInscripciones } from "@/features/academico/consultas";
 import { DialogoReembolso } from "@/features/academico/dialogo-reembolso";
 import { PagoManual } from "@/features/matricula/pago-manual";
@@ -29,7 +30,7 @@ export default async function EstudiantePagosPage({ searchParams }: PageProps<"/
     : { data: [] };
 
   const pagado = inscripciones.filter((i) => i.pago?.estado === "APROBADO").reduce((a, i) => a + i.pago!.monto, 0);
-  const pendiente = inscripciones.filter((i) => i.pago?.estado === "PENDIENTE").reduce((a, i) => a + i.pago!.monto, 0);
+  const pendiente = inscripciones.filter((i) => i.pago?.estado === "PENDIENTE" && !reservaVencida(i)).reduce((a, i) => a + i.pago!.monto, 0);
   const reembolsables = inscripciones
     .filter((i) => i.pago?.estado === "APROBADO" && !(reembolsos ?? []).some((r) => r.pago_id === i.pago!.id && r.estado !== "RECHAZADO"))
     .map((i) => ({ id: i.pago!.id, etiqueta: `${i.curso.titulo} · ${formatearSoles(i.pago!.monto)}` }));
@@ -49,8 +50,8 @@ export default async function EstudiantePagosPage({ searchParams }: PageProps<"/
           <div>
             <p className="font-semibold text-green-900 dark:text-green-200">¡Inscripción registrada! · {recien.curso.titulo}</p>
             <p className="mt-1 text-sm text-green-800/80 dark:text-green-200/70">
-              N.º <span className="font-mono">{recien.codigo}</span>. Tu cupo queda reservado: realiza el pago y registra el N.º de operación para confirmar tu
-              matrícula.
+              N.º <span className="font-mono">{recien.codigo}</span>. Tu cupo queda reservado por {PLAZO_PAGO_HORAS} horas: realiza el pago y registra el N.º de
+              operación para confirmar tu matrícula.
             </p>
           </div>
         </div>
@@ -60,7 +61,7 @@ export default async function EstudiantePagosPage({ searchParams }: PageProps<"/
         <PagoManual
           key={i.id}
           estudianteId={usuario.id}
-          curso={i.curso.titulo}
+          curso={{ titulo: i.curso.titulo, slug: i.curso.slug }}
           codigo={i.codigo}
           pago={{
             id: i.pago!.id,
@@ -69,6 +70,7 @@ export default async function EstudiantePagosPage({ searchParams }: PageProps<"/
             numero_operacion: i.pago!.numero_operacion,
             reportado_en: i.pago!.reportado_en,
             observacion: i.pago!.observacion,
+            vence_en: i.vence_en,
           }}
         />
       ))}

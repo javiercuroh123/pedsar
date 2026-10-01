@@ -59,10 +59,10 @@ function TarjetaInscripcion({ i }: { i: InscripcionEstudiante }) {
         <div className="mt-auto pt-4">
           <p className="flex items-center gap-2 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:bg-amber-500/10 dark:text-amber-300">
             <ClockIcon className="size-4 shrink-0" />
-            {i.pago ? `${ETIQUETA_METODO[i.pago.metodo]} · ${formatearSoles(i.pago.monto)} · ${situacionPagoPendiente(i.pago).texto}` : "Pago pendiente"}
+            {i.pago ? `${ETIQUETA_METODO[i.pago.metodo]} · ${formatearSoles(i.pago.monto)} · ${situacionPagoPendiente(i.pago, i).texto}` : "Pago pendiente"}
           </p>
           <Link href="/estudiante/pagos" className={buttonVariants({ variant: "outline", size: "sm", className: "mt-3" })}>
-            {i.pago ? situacionPagoPendiente(i.pago).accion : "Ver pago"}
+            {i.pago ? situacionPagoPendiente(i.pago, i).accion : "Ver pago"}
           </Link>
         </div>
       )}

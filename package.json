@@ -12,8 +12,8 @@
     "db:stop": "supabase stop",
     "db:reset": "supabase db reset",
     "db:migration": "supabase migration new",
-    "db:types": "supabase gen types typescript --local > src/types/database.ts",
-    "db:types:nube": "supabase gen types typescript --linked > src/types/database.ts",
+    "db:types": "node scripts/generar-tipos.mjs",
+    "db:types:nube": "node scripts/generar-tipos.mjs --nube",
     "db:push": "supabase db push"
   },
   "dependencies": {

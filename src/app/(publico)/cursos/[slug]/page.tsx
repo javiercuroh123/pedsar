@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { AvatarIniciales, EstadoVacio, tabla } from "@/components/comunes";
 import { buttonVariants } from "@/components/ui/button";
+import { reservaVencida } from "@/config/matricula";
 import { obtenerCursoPorSlug } from "@/features/catalogo/consultas";
 import { IndicadorCupo } from "@/features/catalogo/curso-card";
 import { ICONO_MODALIDAD, PortadaCurso } from "@/features/catalogo/portada-curso";
@@ -44,18 +45,18 @@ export default async function CursoPage({ params }: PageProps<"/cursos/[slug]">)
   const [curso, usuario] = await Promise.all([obtenerCursoPorSlug(slug), getUsuarioActual()]);
   if (!curso) notFound();
 
-  // ¿El estudiante ya está inscrito? Así no se le ofrece inscribirse otra vez.
+  // ¿El estudiante ya está inscrito? Así no se le ofrece inscribirse otra vez (una reserva vencida no cuenta).
   let inscripcion: { estado: string } | null = null;
   if (usuario?.rol === "estudiante") {
     const supabase = await createClient();
     const { data } = await supabase
       .from("inscripciones")
-      .select("estado")
+      .select("estado, vence_en")
       .eq("curso_id", curso.id)
       .eq("estudiante_id", usuario.id)
       .neq("estado", "CANCELADA")
       .maybeSingle();
-    inscripcion = data;
+    inscripcion = data && !reservaVencida(data) ? data : null;
   }
 
   const sinCupo = curso.cupo_disponible <= 0;

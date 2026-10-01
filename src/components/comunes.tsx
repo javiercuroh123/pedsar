@@ -139,6 +139,7 @@ const COLOR_ESTADO: Record<string, string> = {
   DESPUBLICADO: "ambar",
   BORRADOR: "gris",
   REEMBOLSADO: "gris",
+  VENCIDO: "gris",
   RECHAZADO: "rojo",
   CANCELADA: "rojo",
 };

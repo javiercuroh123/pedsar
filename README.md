@@ -101,6 +101,9 @@ Todas las pantallas del prototipo están implementadas y conectadas a Supabase:
 de la Tabla 12). El estudiante registra el N.º de operación y la captura en «Pagos» (bucket
 privado `vouchers`) y el administrador valida en «Inscripciones y pagos»: confirma, observa
 (devuelve para corregir) o rechaza. El celular de cobro se configura en `src/config/empresa.ts`.
+Cada inscripción pendiente reserva el cupo 48 horas (`PLAZO_PAGO_HORAS`). Si no se registra el
+pago a tiempo, deja de contar en el cupo y una tarea de pg_cron (cada 15 min) la cancela, marca el
+pago como VENCIDO y avisa al estudiante. Una inscripción cancelada no impide volver a inscribirse.
 
 Pendiente: cobro con tarjeta mediante el checkout de la pasarela, emisión de comprobantes SUNAT
 y reembolso automático en la pasarela.

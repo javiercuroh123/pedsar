@@ -1,3 +1,4 @@
+import { reservaVencida } from "@/config/matricula";
 import type { EstadoCurso, EstadoInscripcion, EstadoPago, MetodoPago, Modalidad, Nivel } from "@/types/dominio";
 
 // Todas las fechas se muestran en hora de Perú, aunque el servidor corra en UTC.
@@ -61,8 +62,12 @@ export const ETIQUETA_METODO: Record<MetodoPago, string> = {
 };
 
 /** Situación de un pago directo (Yape / Plin) pendiente, vista por el estudiante. */
-export function situacionPagoPendiente(pago: { reportado_en: string | null; observacion: string | null }) {
+export function situacionPagoPendiente(
+  pago: { reportado_en: string | null; observacion: string | null },
+  inscripcion: { estado: string; vence_en: string | null },
+) {
   if (pago.reportado_en) return { texto: "pago en validación", accion: "Ver pago" };
+  if (reservaVencida(inscripcion)) return { texto: "tu reserva venció", accion: "Ver detalle" };
   if (pago.observacion) return { texto: "revisa la observación de tu pago", accion: "Corregir pago" };
   return { texto: "falta registrar tu pago", accion: "Registrar pago" };
 }
@@ -77,6 +82,7 @@ export const ETIQUETA_ESTADO: Record<EstadoCurso | EstadoInscripcion | EstadoPag
   APROBADO: "Aprobado",
   RECHAZADO: "Rechazado",
   REEMBOLSADO: "Reembolsado",
+  VENCIDO: "Vencido",
   SOLICITADO: "Solicitado",
   PROCESADO: "Procesado",
 };

@@ -30,8 +30,13 @@ export async function POST(request: Request, ctx: RouteContext<"/api/pagos/webho
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
   if (pago && evento.estado === "APROBADO") {
-    await supabase.from("inscripciones").update({ estado: "CONFIRMADA" }).eq("id", pago.inscripcion_id);
+    await supabase.from("inscripciones").update({ estado: "CONFIRMADA", vence_en: null }).eq("id", pago.inscripcion_id);
     // TODO: emitir comprobante electrónico (SUNAT) y enviar correoConfirmacionMatricula.
+  } else if (pago && evento.estado === "RECHAZADO") {
+    // Secuencia, pasos 23-25: el pago rechazado anula la inscripción pendiente y libera el cupo.
+    await supabase.from("inscripciones").update({ estado: "CANCELADA" }).eq("id", pago.inscripcion_id).eq("estado", "PENDIENTE");
+  } else if (pago && evento.estado === "REEMBOLSADO") {
+    await supabase.from("inscripciones").update({ estado: "CANCELADA" }).eq("id", pago.inscripcion_id);
   }
 
   return NextResponse.json({ recibido: true });
