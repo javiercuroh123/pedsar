@@ -20,15 +20,17 @@ import { BotonEnviar } from "@/components/boton-enviar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { EMPRESA } from "@/config/empresa";
 import { SiglaCurso } from "@/features/catalogo/portada-curso";
 import { formatearSoles } from "@/lib/formato";
 import { cn } from "@/lib/utils";
 import { inscribirse, validarCupon } from "./acciones";
 
+// La tarjeta se habilita con el checkout de la pasarela; mientras tanto se cobra directo por Yape / Plin.
 const METODOS = [
-  { valor: "CULQI", titulo: "Tarjeta", detalle: "Visa, Mastercard, Amex", icono: CreditCardIcon, color: "from-brand-600 to-brand-800" },
-  { valor: "YAPE", titulo: "Yape", detalle: "Código de aprobación", icono: SmartphoneIcon, color: "from-[#742284] to-[#9b3cb0]" },
-  { valor: "PLIN", titulo: "Plin", detalle: "Pago con QR", icono: SmartphoneIcon, color: "from-[#00a7b8] to-[#00c7a0]" },
+  { valor: "YAPE", titulo: "Yape", detalle: "Pago directo a PEDSAR", icono: SmartphoneIcon, color: "from-[#742284] to-[#9b3cb0]", disponible: true },
+  { valor: "PLIN", titulo: "Plin", detalle: "Desde tu app bancaria", icono: SmartphoneIcon, color: "from-[#00a7b8] to-[#00c7a0]", disponible: true },
+  { valor: "CULQI", titulo: "Tarjeta", detalle: "Próximamente", icono: CreditCardIcon, color: "from-brand-600 to-brand-800", disponible: false },
 ] as const;
 
 const PASOS = ["Datos", "Pago", "Confirmación"];
@@ -42,7 +44,7 @@ interface Props {
 
 export function FormularioInscripcion({ curso, perfil, cupoLibre, cupoMaximo }: Props) {
   const [paso, setPaso] = useState(1);
-  const [metodo, setMetodo] = useState<string>("CULQI");
+  const [metodo, setMetodo] = useState<string>("YAPE");
   const [comprobante, setComprobante] = useState<"BOLETA" | "FACTURA">("BOLETA");
   const [cupon, setCupon] = useState<{ codigo: string; porcentaje: number } | null>(null);
   const [textoCupon, setTextoCupon] = useState("");
@@ -209,10 +211,12 @@ export function FormularioInscripcion({ curso, perfil, cupoLibre, cupoMaximo }: 
                   <label
                     key={m.valor}
                     className={cn(
-                      "relative flex cursor-pointer flex-col gap-2 rounded-xl border p-4 transition-all duration-200 has-focus-visible:ring-3 has-focus-visible:ring-ring/50",
-                      metodo === m.valor
-                        ? "border-primary bg-brand-50 ring-1 ring-primary dark:bg-brand-500/10"
-                        : "hover:-translate-y-0.5 hover:border-brand-300 hover:shadow-md",
+                      "relative flex flex-col gap-2 rounded-xl border p-4 transition-all duration-200 has-focus-visible:ring-3 has-focus-visible:ring-ring/50",
+                      !m.disponible
+                        ? "cursor-not-allowed opacity-60"
+                        : metodo === m.valor
+                          ? "cursor-pointer border-primary bg-brand-50 ring-1 ring-primary dark:bg-brand-500/10"
+                          : "cursor-pointer hover:-translate-y-0.5 hover:border-brand-300 hover:shadow-md",
                     )}
                   >
                     <input
@@ -220,6 +224,7 @@ export function FormularioInscripcion({ curso, perfil, cupoLibre, cupoMaximo }: 
                       name="metodo"
                       value={m.valor}
                       checked={metodo === m.valor}
+                      disabled={!m.disponible}
                       onChange={() => setMetodo(m.valor)}
                       className="sr-only"
                     />
@@ -236,21 +241,15 @@ export function FormularioInscripcion({ curso, perfil, cupoLibre, cupoMaximo }: 
                   </label>
                 ))}
               </div>
-              <div className="mt-6 rounded-xl bg-muted/60 p-4 text-sm text-muted-foreground">
-                {metodo === "CULQI" && (
-                  <p className="flex items-start gap-2">
-                    <LockIcon className="mt-0.5 size-4 shrink-0 text-primary" />
-                    Al confirmar se abrirá la pasarela segura para ingresar los datos de tu tarjeta. PEDSAR no almacena los datos de tu
-                    tarjeta.
-                  </p>
-                )}
-                {metodo === "YAPE" && (
-                  <p>
-                    Abre Yape › Menú › <b className="text-foreground">Código de aprobación</b> y tenlo a mano: la pasarela te lo pedirá al
-                    confirmar. El código vence en 2 minutos.
-                  </p>
-                )}
-                {metodo === "PLIN" && <p>Al confirmar verás un código QR para pagar desde tu app bancaria compatible con Plin.</p>}
+              <div className="mt-6 space-y-2 rounded-xl bg-muted/60 p-4 text-sm text-muted-foreground">
+                <p>
+                  {metodo === "YAPE" ? "Yapea" : "Envía por Plin"} <b className="text-foreground tabular-nums">{formatearSoles(total)}</b> al{" "}
+                  <b className="font-mono text-foreground">{EMPRESA.pagoDirecto.celular}</b> ({EMPRESA.pagoDirecto.titular}).
+                </p>
+                <p>
+                  Al confirmar, tu cupo queda reservado. Luego registra el <b className="text-foreground">N.º de operación</b> en «Pagos» y validaremos
+                  tu matrícula.
+                </p>
               </div>
             </fieldset>
 

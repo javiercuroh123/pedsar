@@ -25,6 +25,10 @@ export interface InscripcionEstudiante {
     metodo: MetodoPago;
     estado: EstadoPago;
     fecha_pago: string | null;
+    /** Pago manual (Yape / Plin): N.º de operación informado y observación del administrador. */
+    numero_operacion: string | null;
+    reportado_en: string | null;
+    observacion: string | null;
     comprobante: { tipo: string; serie: string; numero: string; pdf_url: string | null } | null;
   } | null;
   certificado: { codigo_unico: string; fecha_emision: string } | null;
@@ -76,7 +80,7 @@ export async function listarMisInscripciones(estudianteId: string): Promise<Insc
     .select(
       `id, codigo, estado, fecha_inscripcion,
        curso:cursos(id, slug, titulo, modalidad, duracion_horas, categoria:categorias(nombre, slug)),
-       pagos(id, monto, metodo, estado, fecha_pago, comprobantes(tipo, serie, numero, pdf_url)),
+       pagos(id, monto, metodo, estado, fecha_pago, numero_operacion, reportado_en, observacion, comprobantes(tipo, serie, numero, pdf_url)),
        certificados(codigo_unico, fecha_emision)`,
     )
     .eq("estudiante_id", estudianteId)
@@ -105,6 +109,9 @@ export async function listarMisInscripciones(estudianteId: string): Promise<Insc
             metodo: pago.metodo as MetodoPago,
             estado: pago.estado as EstadoPago,
             fecha_pago: pago.fecha_pago as string | null,
+            numero_operacion: pago.numero_operacion as string | null,
+            reportado_en: pago.reportado_en as string | null,
+            observacion: pago.observacion as string | null,
             comprobante: uno(pago.comprobantes),
           }
         : null,
