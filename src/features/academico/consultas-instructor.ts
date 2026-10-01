@@ -38,6 +38,8 @@ export interface EstudianteCurso {
   estudianteId: string;
   nombre: string;
   correo: string;
+  /** Contacto para el reporte del instructor (HU-42). */
+  telefono: string | null;
   avatar: string | null;
 }
 
@@ -49,14 +51,21 @@ export interface EstudianteCurso {
 export async function listarEstudiantesDelCurso(cursoId: string): Promise<EstudianteCurso[]> {
   const { data } = await createAdminClient()
     .from("inscripciones")
-    .select("id, estudiante:perfiles(id, nombres, apellidos, correo, avatar_url)")
+    .select("id, estudiante:perfiles(id, nombres, apellidos, correo, telefono, avatar_url)")
     .eq("curso_id", cursoId)
     .eq("estado", "CONFIRMADA");
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   return ((data ?? []) as any[])
     .map((i) => {
-      const e = uno<{ id: string; nombres: string; apellidos: string; correo: string; avatar_url: string | null }>(i.estudiante)!;
-      return { inscripcionId: i.id, estudianteId: e.id, nombre: nombreCompleto(e) || e.correo, correo: e.correo, avatar: e.avatar_url };
+      const e = uno<{ id: string; nombres: string; apellidos: string; correo: string; telefono: string | null; avatar_url: string | null }>(i.estudiante)!;
+      return {
+        inscripcionId: i.id,
+        estudianteId: e.id,
+        nombre: nombreCompleto(e) || e.correo,
+        correo: e.correo,
+        telefono: e.telefono,
+        avatar: e.avatar_url,
+      };
     })
     .sort((a, b) => a.nombre.localeCompare(b.nombre, "es"));
 }
