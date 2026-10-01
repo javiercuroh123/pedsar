@@ -3,6 +3,7 @@ import { CheckCircle2Icon, ReceiptIcon, WalletIcon } from "lucide-react";
 import { EncabezadoPagina, EstadoBadge, EstadoVacio, PanelTabla, TarjetaKpi, tabla } from "@/components/comunes";
 import { listarMisInscripciones } from "@/features/academico/consultas";
 import { DialogoReembolso } from "@/features/academico/dialogo-reembolso";
+import { PagoManual } from "@/features/matricula/pago-manual";
 import { requireRol } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { ETIQUETA_METODO, formatearFecha, formatearSoles } from "@/lib/formato";
@@ -33,6 +34,10 @@ export default async function EstudiantePagosPage({ searchParams }: PageProps<"/
     .filter((i) => i.pago?.estado === "APROBADO" && !(reembolsos ?? []).some((r) => r.pago_id === i.pago!.id && r.estado !== "RECHAZADO"))
     .map((i) => ({ id: i.pago!.id, etiqueta: `${i.curso.titulo} · ${formatearSoles(i.pago!.monto)}` }));
   const recien = typeof nueva === "string" ? inscripciones.find((i) => i.codigo === nueva) : undefined;
+  // Pagos directos por Yape / Plin que el estudiante debe registrar (o que están en validación); el recién creado va primero.
+  const porCompletar = inscripciones
+    .filter((i) => i.estado === "PENDIENTE" && i.pago?.estado === "PENDIENTE" && (i.pago.metodo === "YAPE" || i.pago.metodo === "PLIN"))
+    .sort((a, b) => Number(b.codigo === nueva) - Number(a.codigo === nueva));
 
   return (
     <div className="space-y-6">
@@ -44,11 +49,29 @@ export default async function EstudiantePagosPage({ searchParams }: PageProps<"/
           <div>
             <p className="font-semibold text-green-900 dark:text-green-200">¡Inscripción registrada! · {recien.curso.titulo}</p>
             <p className="mt-1 text-sm text-green-800/80 dark:text-green-200/70">
-              N.º <span className="font-mono">{recien.codigo}</span>. Tu cupo se confirmará en cuanto se valide el pago; te avisaremos por correo.
+              N.º <span className="font-mono">{recien.codigo}</span>. Tu cupo queda reservado: realiza el pago y registra el N.º de operación para confirmar tu
+              matrícula.
             </p>
           </div>
         </div>
       )}
+
+      {porCompletar.map((i) => (
+        <PagoManual
+          key={i.id}
+          estudianteId={usuario.id}
+          curso={i.curso.titulo}
+          codigo={i.codigo}
+          pago={{
+            id: i.pago!.id,
+            metodo: i.pago!.metodo as "YAPE" | "PLIN",
+            monto: i.pago!.monto,
+            numero_operacion: i.pago!.numero_operacion,
+            reportado_en: i.pago!.reportado_en,
+            observacion: i.pago!.observacion,
+          }}
+        />
+      ))}
 
       <div className="escalonado grid gap-4 sm:grid-cols-3">
         <TarjetaKpi etiqueta="Total pagado" valor={formatearSoles(pagado)} icono={WalletIcon} tono="turquesa" />
@@ -79,7 +102,10 @@ export default async function EstudiantePagosPage({ searchParams }: PageProps<"/
                       {i.curso.titulo}
                       <span className="block font-mono text-xs font-normal text-muted-foreground">{i.codigo}</span>
                     </td>
-                    <td className={tabla.td}>{ETIQUETA_METODO[p.metodo]}</td>
+                    <td className={tabla.td}>
+                      {ETIQUETA_METODO[p.metodo]}
+                      {p.numero_operacion && <span className="block font-mono text-xs text-muted-foreground">Op. {p.numero_operacion}</span>}
+                    </td>
                     <td className={`${tabla.td} text-right tabular-nums`}>{formatearSoles(p.monto)}</td>
                     <td className={tabla.td}>
                       <EstadoBadge estado={p.estado} />

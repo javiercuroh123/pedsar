@@ -16,7 +16,16 @@ import { buttonVariants } from "@/components/ui/button";
 import { listarEvaluacionesEstudiante, listarMisInscripciones, listarSesionesProximas } from "@/features/academico/consultas";
 import { SiglaCurso } from "@/features/catalogo/portada-curso";
 import { requireRol } from "@/lib/auth";
-import { ETIQUETA_METODO, formatearDiaSemana, formatearFechaCorta, formatearHora, formatearSoles, horaFin, hoyISO } from "@/lib/formato";
+import {
+  ETIQUETA_METODO,
+  formatearDiaSemana,
+  formatearFechaCorta,
+  formatearHora,
+  formatearSoles,
+  horaFin,
+  hoyISO,
+  situacionPagoPendiente,
+} from "@/lib/formato";
 
 export const metadata: Metadata = { title: "Inicio" };
 
@@ -114,11 +123,12 @@ export default async function EstudiantePage() {
               <div className="flex-1">
                 <p className="font-semibold text-amber-900 dark:text-amber-200">Pago pendiente · {i.curso.titulo}</p>
                 <p className="mt-0.5 text-amber-800/80 dark:text-amber-200/70">
-                  {i.pago ? `${ETIQUETA_METODO[i.pago.metodo]} · ${formatearSoles(i.pago.monto)}. ` : ""}Tu cupo se confirmará cuando se valide el pago.
+                  {i.pago ? `${ETIQUETA_METODO[i.pago.metodo]} · ${formatearSoles(i.pago.monto)} · ${situacionPagoPendiente(i.pago).texto}. ` : ""}Tu cupo se
+                  confirmará cuando se valide el pago.
                 </p>
               </div>
               <Link href="/estudiante/pagos" className={buttonVariants({ variant: "outline", size: "sm" })}>
-                Ver pago
+                {i.pago ? situacionPagoPendiente(i.pago).accion : "Ver pago"}
               </Link>
             </div>
           ))}

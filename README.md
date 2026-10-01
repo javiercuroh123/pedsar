@@ -97,8 +97,13 @@ Todas las pantallas del prototipo están implementadas y conectadas a Supabase:
 - **Cuenta:** perfil con foto, contraseña, exportación de datos (JSON) y notificaciones.
 - Modo claro/oscuro, alto contraste y tamaño de fuente ajustable (RNF-08).
 
-Pendiente: cobro real con el checkout de la pasarela (hoy el pago queda PENDIENTE y el
-administrador lo valida), emisión de comprobantes SUNAT y reembolso automático en la pasarela.
+**Pagos:** mientras se activa la pasarela, el cobro es directo por Yape o Plin (contingencia
+de la Tabla 12). El estudiante registra el N.º de operación y la captura en «Pagos» (bucket
+privado `vouchers`) y el administrador valida en «Inscripciones y pagos»: confirma, observa
+(devuelve para corregir) o rechaza. El celular de cobro se configura en `src/config/empresa.ts`.
+
+Pendiente: cobro con tarjeta mediante el checkout de la pasarela, emisión de comprobantes SUNAT
+y reembolso automático en la pasarela.
 Varias funciones (pagos, evaluaciones, notificaciones, auditoría) requieren `SUPABASE_SECRET_KEY`.
 
 ## Scripts

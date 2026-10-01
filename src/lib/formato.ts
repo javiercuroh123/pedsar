@@ -60,6 +60,13 @@ export const ETIQUETA_METODO: Record<MetodoPago, string> = {
   PLIN: "Plin",
 };
 
+/** Situación de un pago directo (Yape / Plin) pendiente, vista por el estudiante. */
+export function situacionPagoPendiente(pago: { reportado_en: string | null; observacion: string | null }) {
+  if (pago.reportado_en) return { texto: "pago en validación", accion: "Ver pago" };
+  if (pago.observacion) return { texto: "revisa la observación de tu pago", accion: "Corregir pago" };
+  return { texto: "falta registrar tu pago", accion: "Registrar pago" };
+}
+
 export const ETIQUETA_ESTADO: Record<EstadoCurso | EstadoInscripcion | EstadoPago | string, string> = {
   PUBLICADO: "Publicado",
   BORRADOR: "Borrador",

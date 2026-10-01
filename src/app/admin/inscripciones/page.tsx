@@ -5,7 +5,9 @@ import { BotonAccion } from "@/components/boton-accion";
 import { EncabezadoPagina, EstadoBadge, EstadoVacio, PanelTabla, PestanasEnlace, Pildora, TarjetaKpi, tabla } from "@/components/comunes";
 import { uno } from "@/features/academico/consultas";
 import { resolverPago, resolverReembolso } from "@/features/administracion/acciones";
+import { DialogoObservarPago } from "@/features/administracion/dialogos";
 import { requireRol } from "@/lib/auth";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { ETIQUETA_METODO, formatearFecha, formatearSoles, hoyISO, nombreCompleto } from "@/lib/formato";
 import { cn } from "@/lib/utils";
@@ -15,6 +17,16 @@ import type { MetodoPago } from "@/types/dominio";
 export const metadata: Metadata = { title: "Inscripciones y pagos" };
 
 type Persona = { nombres: string; apellidos: string; correo: string };
+type PagoFila = {
+  monto: number;
+  metodo: MetodoPago;
+  estado: string;
+  numero_operacion: string | null;
+  voucher_ruta: string | null;
+  reportado_en: string | null;
+  observacion: string | null;
+  comprobantes: unknown;
+};
 
 // HU-07 · HU-17 · HU-12 · HU-31 · Inscripciones, pagos y reembolsos
 export default async function AdminInscripcionesPage({ searchParams }: PageProps<"/admin/inscripciones">) {
@@ -27,24 +39,34 @@ export default async function AdminInscripcionesPage({ searchParams }: PageProps
 
   let consulta = supabase
     .from("inscripciones")
-    .select("id, codigo, estado, fecha_inscripcion, estudiante:perfiles(nombres, apellidos, correo), curso:cursos(titulo), pagos(monto, metodo, estado, fecha_pago, comprobantes(serie, numero))")
+    .select(
+      "id, codigo, estado, fecha_inscripcion, estudiante:perfiles(nombres, apellidos, correo), curso:cursos(titulo), pagos(monto, metodo, estado, fecha_pago, numero_operacion, voucher_ruta, reportado_en, observacion, comprobantes(serie, numero))",
+    )
     .order("fecha_inscripcion", { ascending: false })
     .limit(200);
   if (filtro) consulta = consulta.eq("estado", filtro);
 
-  const [{ data }, { count: pendientes }, { data: pagosMes }, { data: reembolsos }] = await Promise.all([
+  const [{ data }, { count: pendientes }, { count: reportados }, { data: pagosMes }, { data: reembolsos }] = await Promise.all([
     consulta,
     supabase.from("inscripciones").select("id", { head: true, count: "exact" }).eq("estado", "PENDIENTE"),
+    supabase.from("pagos").select("id", { head: true, count: "exact" }).eq("estado", "PENDIENTE").not("reportado_en", "is", null),
     supabase.from("pagos").select("monto").eq("estado", "APROBADO").gte("fecha_pago", inicioMes),
     supabase
       .from("reembolsos")
       .select("id, motivo, monto, estado, fecha_solicitud, pago:pagos(inscripcion:inscripciones(estudiante:perfiles(nombres, apellidos, correo), curso:cursos(titulo)))")
       .order("fecha_solicitud", { ascending: false }),
   ]);
+  // Los pagos ya reportados por el estudiante (por validar) van primero.
+  const porValidar = (x: { estado: string; pagos: unknown }) => x.estado === "PENDIENTE" && Boolean(uno<PagoFila>(x.pagos)?.reportado_en);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const filas = (data ?? []) as any[];
+  const filas = ((data ?? []) as any[]).sort((a, b) => Number(porValidar(b)) - Number(porValidar(a)));
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const listaReembolsos = (reembolsos ?? []) as any[];
+
+  // Capturas de Yape / Plin: bucket privado, se muestran con URLs firmadas de corta duración.
+  const rutas = filas.map((x) => uno<PagoFila>(x.pagos)?.voucher_ruta).filter((r): r is string => Boolean(r));
+  const { data: firmadas } = rutas.length ? await createAdminClient().storage.from("vouchers").createSignedUrls(rutas, 60 * 10) : { data: [] };
+  const urlCaptura = new Map((firmadas ?? []).filter((f) => f.path && f.signedUrl).map((f) => [f.path as string, f.signedUrl]));
   const solicitados = listaReembolsos.filter((r) => r.estado === "SOLICITADO").length;
   const ingresosMes = (pagosMes ?? []).reduce((a: number, p: { monto: number }) => a + Number(p.monto), 0);
 
@@ -53,7 +75,13 @@ export default async function AdminInscripcionesPage({ searchParams }: PageProps
       <EncabezadoPagina eyebrow="Comercial" titulo="Inscripciones y pagos" descripcion="Confirma matrículas, verifica pagos y gestiona reembolsos." />
 
       <div className="escalonado grid gap-4 sm:grid-cols-3">
-        <TarjetaKpi etiqueta="Pendientes de verificación" valor={pendientes ?? 0} icono={ClockIcon} tono="ambar" />
+        <TarjetaKpi
+          etiqueta="Pendientes de verificación"
+          valor={pendientes ?? 0}
+          icono={ClockIcon}
+          tono="ambar"
+          detalle={reportados ? `${reportados} con pago reportado por validar` : "Ningún pago reportado por validar"}
+        />
         <TarjetaKpi etiqueta="Ingresos del mes" valor={formatearSoles(ingresosMes)} icono={WalletIcon} tono="turquesa" />
         <TarjetaKpi etiqueta="Reembolsos por atender" valor={solicitados} icono={ReceiptIcon} tono="rosa" />
       </div>
@@ -107,7 +135,9 @@ export default async function AdminInscripcionesPage({ searchParams }: PageProps
                 <tbody>
                   {filas.map((x) => {
                     const e = uno<Persona>(x.estudiante);
-                    const pago = uno<{ monto: number; metodo: MetodoPago; estado: string; comprobantes: unknown }>(x.pagos);
+                    const pago = uno<PagoFila>(x.pagos);
+                    const captura = pago?.voucher_ruta ? urlCaptura.get(pago.voucher_ruta) : undefined;
+                    const reportado = x.estado === "PENDIENTE" && Boolean(pago?.reportado_en);
                     const comp = uno<{ serie: string; numero: string }>(pago?.comprobantes);
                     return (
                       <tr key={x.id} className={tabla.tr}>
@@ -120,16 +150,44 @@ export default async function AdminInscripcionesPage({ searchParams }: PageProps
                         <td className={cn(tabla.td, "whitespace-nowrap text-muted-foreground")}>{formatearFecha(x.fecha_inscripcion)}</td>
                         <td className={cn(tabla.td, "whitespace-nowrap")}>{pago ? ETIQUETA_METODO[pago.metodo] : "—"}</td>
                         <td className={cn(tabla.td, "text-right tabular-nums")}>{pago ? formatearSoles(Number(pago.monto)) : "—"}</td>
-                        <td className={tabla.td}>{pago ? <EstadoBadge estado={pago.estado} /> : "—"}</td>
+                        <td className={tabla.td}>
+                          {pago ? <EstadoBadge estado={pago.estado} /> : "—"}
+                          {pago?.numero_operacion && (
+                            <span className="mt-1 block font-mono text-xs" title="N.º de operación informado por el estudiante">
+                              Op. {pago.numero_operacion}
+                            </span>
+                          )}
+                          {captura && (
+                            <a href={captura} target="_blank" rel="noreferrer" className="block text-xs font-medium text-primary hover:underline">
+                              Ver captura
+                            </a>
+                          )}
+                          {reportado ? (
+                            <span className="block text-xs text-muted-foreground">Reportado {formatearFecha(pago!.reportado_en!)}</span>
+                          ) : x.estado === "PENDIENTE" && pago?.estado === "PENDIENTE" ? (
+                            <span className="block text-xs text-muted-foreground">{pago.observacion ? "Observado · esperando corrección" : "Sin reportar"}</span>
+                          ) : null}
+                        </td>
                         <td className={tabla.td}>
                           <EstadoBadge estado={x.estado} />
                         </td>
                         <td className={cn(tabla.td, "text-right whitespace-nowrap")}>
                           {x.estado === "PENDIENTE" ? (
                             <>
-                              <BotonAccion accion={resolverPago} campos={{ inscripcionId: x.id, decision: "rechazar" }} confirmar={`¿Rechazar el pago de ${x.codigo}?`} variant="ghost" size="sm">
+                              <BotonAccion
+                                accion={resolverPago}
+                                campos={{ inscripcionId: x.id, decision: "rechazar" }}
+                                confirmar={`¿Rechazar el pago de ${x.codigo}? La inscripción se cancelará.`}
+                                variant="ghost"
+                                size="sm"
+                              >
                                 Rechazar
                               </BotonAccion>{" "}
+                              {reportado && (
+                                <>
+                                  <DialogoObservarPago inscripcionId={x.id} codigo={x.codigo} />{" "}
+                                </>
+                              )}
                               <BotonAccion accion={resolverPago} campos={{ inscripcionId: x.id, decision: "aprobar" }} size="sm">
                                 Confirmar
                               </BotonAccion>

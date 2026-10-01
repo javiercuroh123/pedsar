@@ -540,8 +540,12 @@ export type Database = {
           inscripcion_id: string
           metodo: Database["public"]["Enums"]["metodo_pago"]
           monto: number
+          numero_operacion: string | null
+          observacion: string | null
           referencia_pasarela: string | null
+          reportado_en: string | null
           respuesta_pasarela: Json | null
+          voucher_ruta: string | null
         }
         Insert: {
           cupon_id?: number | null
@@ -551,8 +555,12 @@ export type Database = {
           inscripcion_id: string
           metodo: Database["public"]["Enums"]["metodo_pago"]
           monto: number
+          numero_operacion?: string | null
+          observacion?: string | null
           referencia_pasarela?: string | null
+          reportado_en?: string | null
           respuesta_pasarela?: Json | null
+          voucher_ruta?: string | null
         }
         Update: {
           cupon_id?: number | null
@@ -562,8 +570,12 @@ export type Database = {
           inscripcion_id?: string
           metodo?: Database["public"]["Enums"]["metodo_pago"]
           monto?: number
+          numero_operacion?: string | null
+          observacion?: string | null
           referencia_pasarela?: string | null
+          reportado_en?: string | null
           respuesta_pasarela?: Json | null
+          voucher_ruta?: string | null
         }
         Relationships: [
           {

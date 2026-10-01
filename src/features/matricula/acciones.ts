@@ -3,15 +3,19 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
+import { uno } from "@/features/academico/consultas";
+import { notificarAdministradores } from "@/features/notificaciones/enviar";
+import type { EstadoFormulario } from "@/features/usuarios/esquemas";
 import { registrarActividad } from "@/lib/auditoria";
 import { requireRol } from "@/lib/auth";
-import { hoyISO } from "@/lib/formato";
+import { ETIQUETA_METODO, hoyISO } from "@/lib/formato";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 
 const inscripcionSchema = z.object({
   cursoId: z.uuid(),
-  metodo: z.enum(["CULQI", "IZIPAY", "NIUBIZ", "YAPE", "PLIN"]),
+  // Mientras no esté el checkout de la pasarela, solo se acepta el pago directo por Yape / Plin.
+  metodo: z.enum(["YAPE", "PLIN"], "Por ahora solo aceptamos pagos por Yape o Plin"),
   cupon: z.string().trim().toUpperCase().optional(),
   telefono: z.string().trim().max(20).optional(),
   documento: z.string().trim().max(12).optional(),
@@ -103,8 +107,70 @@ export async function inscribirse(formData: FormData) {
     ...(datos.comprobante === "FACTURA" ? { ruc: datos.ruc, razon_social: datos.razonSocial } : {}),
   });
 
-  // TODO: cobrar con getPasarela().cobrar(...) usando el token del checkout de la pasarela
+  // TODO: con la pasarela activa, cobrar con getPasarela().cobrar(...) usando el token del checkout
   // y emitir el comprobante electrónico (SUNAT) cuando el pago se apruebe.
   revalidatePath("/estudiante", "layout");
   redirect(`/estudiante/pagos?inscripcion=${inscripcion.codigo}`);
+}
+
+const pagoManualSchema = z.object({
+  pagoId: z.uuid(),
+  // Se quitan los espacios: en la constancia el número suele mostrarse agrupado.
+  numeroOperacion: z.preprocess(
+    (v) => (typeof v === "string" ? v.replace(/\s+/g, "").toUpperCase() : v),
+    z.string().regex(/^[A-Z0-9-]{4,30}$/, "Escribe el N.º de operación tal como aparece en tu app (solo letras y números)"),
+  ),
+  voucher: z.preprocess((v) => (v === "" ? undefined : v), z.string().max(200).optional()),
+});
+
+/**
+ * CU «Registrar pago manual» · el estudiante informa el N.º de operación de Yape / Plin
+ * y, si quiere, la captura, que el navegador sube antes al bucket privado "vouchers".
+ * El administrador lo valida en Inscripciones y pagos (CU «Validar comprobantes»).
+ */
+export async function registrarPagoManual(_: EstadoFormulario, formData: FormData): Promise<EstadoFormulario> {
+  const estudiante = await requireRol("estudiante");
+  const d = pagoManualSchema.safeParse(Object.fromEntries(formData));
+  if (!d.success) return { ok: false, mensaje: d.error.issues[0]?.message ?? "Datos no válidos" };
+  const { pagoId, numeroOperacion, voucher } = d.data;
+  // La captura debe estar en la carpeta del propio estudiante, con el nombre que genera el formulario.
+  if (voucher && !new RegExp(`^${estudiante.id}/[\\w-]+\\.(jpg|png|webp|pdf)$`).test(voucher)) {
+    return { ok: false, mensaje: "La captura no es válida; vuelve a adjuntarla" };
+  }
+
+  // Se lee con la sesión del estudiante: RLS garantiza que el pago es suyo.
+  const supabase = await createClient();
+  const { data: pago } = await supabase
+    .from("pagos")
+    .select("id, metodo, estado, inscripcion:inscripciones(codigo, estado, curso:cursos(titulo))")
+    .eq("id", pagoId)
+    .maybeSingle();
+  const inscripcion = uno<{ codigo: string; estado: string; curso: unknown }>(pago?.inscripcion);
+  if (!pago || !inscripcion) return { ok: false, mensaje: "No encontramos ese pago" };
+  if (pago.estado !== "PENDIENTE" || inscripcion.estado !== "PENDIENTE") return { ok: false, mensaje: "Este pago ya fue validado" };
+  if (pago.metodo !== "YAPE" && pago.metodo !== "PLIN") return { ok: false, mensaje: "Este pago se procesa por la pasarela" };
+
+  // Los pagos solo los escribe el servidor (sin política de actualización para estudiantes).
+  const { error } = await createAdminClient()
+    .from("pagos")
+    .update({
+      numero_operacion: numeroOperacion,
+      reportado_en: new Date().toISOString(),
+      observacion: null,
+      ...(voucher ? { voucher_ruta: voucher } : {}),
+    })
+    .eq("id", pago.id);
+  if (error) {
+    return { ok: false, mensaje: error.code === "23505" ? "Ese N.º de operación ya fue registrado en otro pago" : error.message };
+  }
+
+  const curso = uno<{ titulo: string }>(inscripcion.curso)?.titulo ?? "un curso";
+  await notificarAdministradores(
+    `Pago por validar · ${curso} · ${ETIQUETA_METODO[pago.metodo]} op. ${numeroOperacion}`,
+    "/admin/inscripciones?estado=PENDIENTE",
+  );
+  await registrarActividad(estudiante.id, "REPORTAR_PAGO", { inscripcion: inscripcion.codigo, metodo: pago.metodo, numero_operacion: numeroOperacion });
+  revalidatePath("/estudiante", "layout");
+  revalidatePath("/admin/inscripciones");
+  return { ok: true, mensaje: "¡Listo! Validaremos tu pago y te avisaremos." };
 }

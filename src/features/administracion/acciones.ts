@@ -8,6 +8,8 @@ import { generarCodigoCertificado } from "@/lib/certificados";
 import { publicEnv } from "@/lib/env";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
+import { uno } from "@/features/academico/consultas";
+import { notificarUsuario as notificar } from "@/features/notificaciones/enviar";
 import type { EstadoFormulario } from "@/features/usuarios/esquemas";
 
 /**
@@ -17,10 +19,6 @@ import type { EstadoFormulario } from "@/features/usuarios/esquemas";
 const admin = () => requireRol("administrador");
 const fallo = (e: z.ZodError): EstadoFormulario => ({ ok: false, mensaje: e.issues[0]?.message ?? "Datos no válidos" });
 const vacioANull = (v: unknown) => (v === "" ? null : v);
-
-async function notificar(usuarioId: string, mensaje: string, enlace?: string) {
-  await createAdminClient().from("notificaciones").insert({ usuario_id: usuarioId, mensaje, enlace: enlace ?? null, tipo: "IN_APP" });
-}
 
 const slugDe = (texto: string) =>
   texto
@@ -181,7 +179,7 @@ export async function resolverPago(formData: FormData) {
   if (!ins) return;
   await db
     .from("pagos")
-    .update({ estado: aprobar ? "APROBADO" : "RECHAZADO", fecha_pago: aprobar ? new Date().toISOString() : null })
+    .update(aprobar ? { estado: "APROBADO", fecha_pago: new Date().toISOString(), observacion: null } : { estado: "RECHAZADO", fecha_pago: null })
     .eq("inscripcion_id", inscripcionId);
   await db.from("inscripciones").update({ estado: aprobar ? "CONFIRMADA" : "CANCELADA" }).eq("id", inscripcionId);
 
@@ -196,6 +194,43 @@ export async function resolverPago(formData: FormData) {
   await registrarActividad(usuario.id, aprobar ? "CONFIRMAR_PAGO" : "RECHAZAR_PAGO", { inscripcion: ins.codigo });
   // TODO: emitir comprobante electrónico (SUNAT) al aprobar.
   revalidatePath("/admin", "layout");
+}
+
+const observacionSchema = z.object({
+  inscripcionId: z.uuid(),
+  motivo: z.string().trim().min(5, "Indica qué debe corregir el estudiante").max(300),
+});
+
+/**
+ * Validar comprobantes · devuelve un pago manual al estudiante para que corrija
+ * el N.º de operación o la captura, sin cancelar su inscripción (que bloquearía
+ * una nueva matrícula en el mismo curso).
+ */
+export async function observarPago(_: EstadoFormulario, formData: FormData): Promise<EstadoFormulario> {
+  const usuario = await admin();
+  const d = observacionSchema.safeParse(Object.fromEntries(formData));
+  if (!d.success) return fallo(d.error);
+  const db = createAdminClient();
+
+  const { data: ins } = await db
+    .from("inscripciones")
+    .select("id, codigo, estado, estudiante_id, curso:cursos(titulo), pagos(id, estado, numero_operacion)")
+    .eq("id", d.data.inscripcionId)
+    .single();
+  const pago = uno<{ id: string; estado: string; numero_operacion: string | null }>(ins?.pagos);
+  if (!ins || !pago || ins.estado !== "PENDIENTE" || pago.estado !== "PENDIENTE") return { ok: false, mensaje: "El pago ya no está pendiente" };
+
+  const { error } = await db
+    .from("pagos")
+    .update({ observacion: d.data.motivo, numero_operacion: null, voucher_ruta: null, reportado_en: null })
+    .eq("id", pago.id);
+  if (error) return { ok: false, mensaje: error.message };
+
+  const curso = uno<{ titulo: string }>(ins.curso);
+  await notificar(ins.estudiante_id, `Revisamos tu pago de ${curso?.titulo ?? "tu curso"}: ${d.data.motivo}. Corrígelo en «Pagos».`, "/estudiante/pagos");
+  await registrarActividad(usuario.id, "OBSERVAR_PAGO", { inscripcion: ins.codigo, numero_operacion: pago.numero_operacion, motivo: d.data.motivo });
+  revalidatePath("/admin", "layout");
+  return { ok: true, mensaje: "Pago devuelto al estudiante para corrección" };
 }
 
 export async function resolverReembolso(formData: FormData) {
