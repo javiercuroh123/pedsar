@@ -105,8 +105,13 @@ Cada inscripción pendiente reserva el cupo 48 horas (`PLAZO_PAGO_HORAS`). Si no
 pago a tiempo, deja de contar en el cupo y una tarea de pg_cron (cada 15 min) la cancela, marca el
 pago como VENCIDO y avisa al estudiante. Una inscripción cancelada no impide volver a inscribirse.
 
-Pendiente: cobro con tarjeta mediante el checkout de la pasarela, emisión de comprobantes SUNAT
-y reembolso automático en la pasarela.
+**Correos (HU-21):** al inscribirse (instrucciones de pago y plazo), al observar, confirmar o
+rechazar un pago y al emitir un certificado. Se envían con Resend después de responder
+(`after`), sin demorar la acción; sin `RESEND_API_KEY` solo se muestran en la consola del
+servidor. Para producción hay que verificar el dominio de `EMAIL_FROM` en Resend.
+
+Pendiente: cobro con tarjeta mediante el checkout de la pasarela, emisión de comprobantes SUNAT,
+reembolso automático en la pasarela y recordatorios programados de sesiones y evaluaciones.
 Varias funciones (pagos, evaluaciones, notificaciones, auditoría) requieren `SUPABASE_SECRET_KEY`.
 
 ## Scripts
