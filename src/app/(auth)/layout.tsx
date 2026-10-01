@@ -4,7 +4,7 @@ import { BotonTema, MenuAccesibilidad } from "@/components/preferencias";
 
 const VENTAJAS = [
   { icono: BadgeCheckIcon, texto: "Certificados con código verificable" },
-  { icono: WalletIcon, texto: "Paga con Yape, Plin o tarjeta" },
+  { icono: WalletIcon, texto: "Paga con Yape o Plin" },
   { icono: Clock3Icon, texto: "Accede a tus clases 24/7" },
 ];
 

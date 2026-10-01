@@ -33,7 +33,8 @@ const PASOS = [
 
 const BENEFICIOS = [
   { icono: CalendarClockIcon, titulo: "Inscripción 24/7", texto: "Sin colas ni fichas físicas: matricúlate desde cualquier dispositivo." },
-  { icono: WalletIcon, titulo: "Pagos locales", texto: "Yape, Plin o tarjeta, con comprobante electrónico al instante." },
+  // TODO: volver a mencionar la tarjeta y el comprobante electrónico cuando estén activos (pasarela y SUNAT).
+  { icono: WalletIcon, titulo: "Pagos locales", texto: "Yape o Plin desde tu celular; validamos tu pago y te confirmamos por correo." },
   { icono: LineChartIcon, titulo: "Progreso al día", texto: "Asistencia, notas y avance de cada curso en tiempo real." },
   { icono: ShieldCheckIcon, titulo: "Certificados verificables", texto: "Empleadores validan tu certificado con su código único." },
 ];
@@ -78,7 +79,7 @@ export default async function InicioPage() {
               Aprende tecnología con <span className="texto-degradado">certificación verificable</span>
             </h1>
             <p className="animar-entrada mt-6 max-w-xl text-lg text-muted-foreground [--i:2]">
-              Cursos de programación, redes, ofimática e IA en Ica. Inscríbete en línea las 24 horas, paga con Yape, Plin o tarjeta y
+              Cursos de programación, redes, ofimática e IA en Ica. Inscríbete en línea las 24 horas, paga con Yape o Plin y
               recibe tu certificado digital.
             </p>
             <form
