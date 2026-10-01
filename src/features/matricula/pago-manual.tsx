@@ -1,16 +1,18 @@
 "use client";
 
-import { CircleAlertIcon, ClockIcon, ImageUpIcon, SmartphoneIcon } from "lucide-react";
+import { CircleAlertIcon, ClockIcon, ImageUpIcon, SmartphoneIcon, TimerOffIcon } from "lucide-react";
+import Link from "next/link";
 import { useActionState, useState } from "react";
 import { toast } from "sonner";
 import { BotonCopiar } from "@/components/boton-copiar";
 import { Pildora } from "@/components/comunes";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { EMPRESA } from "@/config/empresa";
+import { reservaVencida } from "@/config/matricula";
 import type { EstadoFormulario } from "@/features/usuarios/esquemas";
-import { formatearFecha, formatearSoles } from "@/lib/formato";
+import { formatearFecha, formatearFechaHora, formatearSoles } from "@/lib/formato";
 import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
 import { registrarPagoManual } from "./acciones";
@@ -26,6 +28,8 @@ export interface PagoPorCompletar {
   numero_operacion: string | null;
   reportado_en: string | null;
   observacion: string | null;
+  /** Plazo de la reserva (de la inscripción). */
+  vence_en: string | null;
 }
 
 function Paso({ n, children }: { n: number; children: React.ReactNode }) {
@@ -43,8 +47,19 @@ function Paso({ n, children }: { n: number; children: React.ReactNode }) {
  * del navegador al bucket privado "vouchers" (carpeta del estudiante) y la Server
  * Action solo registra su ruta.
  */
-export function PagoManual({ estudianteId, pago, curso, codigo }: { estudianteId: string; pago: PagoPorCompletar; curso: string; codigo: string }) {
+export function PagoManual({
+  estudianteId,
+  pago,
+  curso,
+  codigo,
+}: {
+  estudianteId: string;
+  pago: PagoPorCompletar;
+  curso: { titulo: string; slug: string };
+  codigo: string;
+}) {
   const reportado = Boolean(pago.reportado_en);
+  const vencida = !reportado && reservaVencida({ estado: "PENDIENTE", vence_en: pago.vence_en });
   const [editando, setEditando] = useState(!reportado);
   const [archivo, setArchivo] = useState<File | null>(null);
   const app = pago.metodo === "YAPE" ? "Yape" : "Plin";
@@ -88,7 +103,7 @@ export function PagoManual({ estudianteId, pago, curso, codigo }: { estudianteId
           </span>
           <div>
             <h2 id={`pago-${pago.id}`} className="font-semibold">
-              {reportado ? "Pago en validación" : "Completa tu pago"} · {curso}
+              {reportado ? "Pago en validación" : vencida ? "Reserva vencida" : "Completa tu pago"} · {curso.titulo}
             </h2>
             <p className="text-sm text-muted-foreground">
               Inscripción <span className="font-mono">{codigo}</span> · {app} · {formatearSoles(pago.monto)}
@@ -99,12 +114,28 @@ export function PagoManual({ estudianteId, pago, curso, codigo }: { estudianteId
           <Pildora color="indigo">
             <ClockIcon /> En validación
           </Pildora>
+        ) : vencida ? (
+          <Pildora color="gris">
+            <TimerOffIcon /> Vencida
+          </Pildora>
         ) : (
-          <Pildora color="ambar">Falta registrar el pago</Pildora>
+          <Pildora color="ambar">{pago.vence_en ? `Paga antes del ${formatearFechaHora(pago.vence_en)}` : "Falta registrar el pago"}</Pildora>
         )}
       </div>
 
-      {pago.observacion && !reportado && (
+      {vencida ? (
+        <div className="flex flex-wrap items-center justify-between gap-3 p-5 text-sm">
+          <p className="max-w-prose text-muted-foreground">
+            El plazo para registrar el pago terminó el {formatearFechaHora(pago.vence_en!)} y liberamos tu cupo. Si aún hay vacantes, vuelve a
+            inscribirte; si ya habías pagado, registra el N.º de operación en la nueva inscripción.
+          </p>
+          <Link href={`/cursos/${curso.slug}/inscripcion`} className={buttonVariants({ size: "sm" })}>
+            Volver a inscribirme
+          </Link>
+        </div>
+      ) : null}
+
+      {!vencida && pago.observacion && !reportado && (
         <p role="alert" className="mx-5 mt-5 flex items-start gap-2 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:bg-amber-500/10 dark:text-amber-300">
           <CircleAlertIcon className="mt-0.5 size-4 shrink-0" />
           <span>
@@ -113,7 +144,7 @@ export function PagoManual({ estudianteId, pago, curso, codigo }: { estudianteId
         </p>
       )}
 
-      {reportado && !editando ? (
+      {vencida ? null : reportado && !editando ? (
         <div className="flex flex-wrap items-center justify-between gap-3 p-5 text-sm">
           <p className="text-muted-foreground">
             Registraste la operación <span className="font-mono font-medium text-foreground">{pago.numero_operacion}</span> el{" "}

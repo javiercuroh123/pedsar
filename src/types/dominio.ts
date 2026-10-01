@@ -9,7 +9,7 @@ export type Nivel = "BASICO" | "INTERMEDIO" | "AVANZADO";
 export type TipoContenido = "PDF" | "VIDEO" | "ENLACE";
 export type EstadoInscripcion = "PENDIENTE" | "CONFIRMADA" | "CANCELADA";
 export type MetodoPago = "CULQI" | "IZIPAY" | "NIUBIZ" | "YAPE" | "PLIN";
-export type EstadoPago = "PENDIENTE" | "APROBADO" | "RECHAZADO" | "REEMBOLSADO";
+export type EstadoPago = "PENDIENTE" | "APROBADO" | "RECHAZADO" | "REEMBOLSADO" | "VENCIDO";
 export type EstadoAsistencia = "PRESENTE" | "AUSENTE" | "TARDANZA";
 
 export interface Perfil {

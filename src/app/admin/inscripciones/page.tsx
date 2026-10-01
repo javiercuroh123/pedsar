@@ -9,7 +9,8 @@ import { DialogoObservarPago } from "@/features/administracion/dialogos";
 import { requireRol } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
-import { ETIQUETA_METODO, formatearFecha, formatearSoles, hoyISO, nombreCompleto } from "@/lib/formato";
+import { reservaVencida } from "@/config/matricula";
+import { ETIQUETA_METODO, formatearFecha, formatearFechaHora, formatearSoles, hoyISO, nombreCompleto } from "@/lib/formato";
 import { cn } from "@/lib/utils";
 import { Constants } from "@/types/database";
 import type { MetodoPago } from "@/types/dominio";
@@ -40,7 +41,7 @@ export default async function AdminInscripcionesPage({ searchParams }: PageProps
   let consulta = supabase
     .from("inscripciones")
     .select(
-      "id, codigo, estado, fecha_inscripcion, estudiante:perfiles(nombres, apellidos, correo), curso:cursos(titulo), pagos(monto, metodo, estado, fecha_pago, numero_operacion, voucher_ruta, reportado_en, observacion, comprobantes(serie, numero))",
+      "id, codigo, estado, fecha_inscripcion, vence_en, estudiante:perfiles(nombres, apellidos, correo), curso:cursos(titulo), pagos(monto, metodo, estado, fecha_pago, numero_operacion, voucher_ruta, reportado_en, observacion, comprobantes(serie, numero))",
     )
     .order("fecha_inscripcion", { ascending: false })
     .limit(200);
@@ -165,7 +166,11 @@ export default async function AdminInscripcionesPage({ searchParams }: PageProps
                           {reportado ? (
                             <span className="block text-xs text-muted-foreground">Reportado {formatearFecha(pago!.reportado_en!)}</span>
                           ) : x.estado === "PENDIENTE" && pago?.estado === "PENDIENTE" ? (
-                            <span className="block text-xs text-muted-foreground">{pago.observacion ? "Observado · esperando corrección" : "Sin reportar"}</span>
+                            <span className="block text-xs text-muted-foreground">
+                              {reservaVencida(x)
+                                ? "Reserva vencida · se cancelará en breve"
+                                : `${pago.observacion ? "Observado · esperando corrección" : "Sin reportar"}${x.vence_en ? ` · vence ${formatearFechaHora(x.vence_en)}` : ""}`}
+                            </span>
                           ) : null}
                         </td>
                         <td className={tabla.td}>

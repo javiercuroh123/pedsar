@@ -21,6 +21,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { EMPRESA } from "@/config/empresa";
+import { PLAZO_PAGO_HORAS } from "@/config/matricula";
 import { SiglaCurso } from "@/features/catalogo/portada-curso";
 import { formatearSoles } from "@/lib/formato";
 import { cn } from "@/lib/utils";
@@ -247,8 +248,8 @@ export function FormularioInscripcion({ curso, perfil, cupoLibre, cupoMaximo }: 
                   <b className="font-mono text-foreground">{EMPRESA.pagoDirecto.celular}</b> ({EMPRESA.pagoDirecto.titular}).
                 </p>
                 <p>
-                  Al confirmar, tu cupo queda reservado. Luego registra el <b className="text-foreground">N.º de operación</b> en «Pagos» y validaremos
-                  tu matrícula.
+                  Al confirmar, tu cupo queda reservado por {PLAZO_PAGO_HORAS} horas. En ese plazo registra el{" "}
+                  <b className="text-foreground">N.º de operación</b> en «Pagos» y validaremos tu matrícula.
                 </p>
               </div>
             </fieldset>

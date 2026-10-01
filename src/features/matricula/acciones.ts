@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
+import { reservaVencida } from "@/config/matricula";
 import { uno } from "@/features/academico/consultas";
 import { notificarAdministradores } from "@/features/notificaciones/enviar";
 import type { EstadoFormulario } from "@/features/usuarios/esquemas";
@@ -142,16 +143,20 @@ export async function registrarPagoManual(_: EstadoFormulario, formData: FormDat
   const supabase = await createClient();
   const { data: pago } = await supabase
     .from("pagos")
-    .select("id, metodo, estado, inscripcion:inscripciones(codigo, estado, curso:cursos(titulo))")
+    .select("id, metodo, estado, inscripcion:inscripciones(id, codigo, estado, vence_en, curso:cursos(titulo))")
     .eq("id", pagoId)
     .maybeSingle();
-  const inscripcion = uno<{ codigo: string; estado: string; curso: unknown }>(pago?.inscripcion);
+  const inscripcion = uno<{ id: string; codigo: string; estado: string; vence_en: string | null; curso: unknown }>(pago?.inscripcion);
   if (!pago || !inscripcion) return { ok: false, mensaje: "No encontramos ese pago" };
+  if (reservaVencida(inscripcion)) {
+    return { ok: false, mensaje: "Tu reserva venció. Vuelve a inscribirte y registra el pago en la nueva inscripción." };
+  }
   if (pago.estado !== "PENDIENTE" || inscripcion.estado !== "PENDIENTE") return { ok: false, mensaje: "Este pago ya fue validado" };
   if (pago.metodo !== "YAPE" && pago.metodo !== "PLIN") return { ok: false, mensaje: "Este pago se procesa por la pasarela" };
 
-  // Los pagos solo los escribe el servidor (sin política de actualización para estudiantes).
-  const { error } = await createAdminClient()
+  // Pagos e inscripciones solo los escribe el servidor (sin políticas de actualización para estudiantes).
+  const db = createAdminClient();
+  const { error } = await db
     .from("pagos")
     .update({
       numero_operacion: numeroOperacion,
@@ -163,6 +168,8 @@ export async function registrarPagoManual(_: EstadoFormulario, formData: FormDat
   if (error) {
     return { ok: false, mensaje: error.code === "23505" ? "Ese N.º de operación ya fue registrado en otro pago" : error.message };
   }
+  // Con el pago en validación, la reserva deja de vencer.
+  await db.from("inscripciones").update({ vence_en: null }).eq("id", inscripcion.id);
 
   const curso = uno<{ titulo: string }>(inscripcion.curso)?.titulo ?? "un curso";
   await notificarAdministradores(

@@ -385,6 +385,7 @@ export type Database = {
           estudiante_id: string
           fecha_inscripcion: string
           id: string
+          vence_en: string | null
         }
         Insert: {
           codigo?: string
@@ -393,6 +394,7 @@ export type Database = {
           estudiante_id: string
           fecha_inscripcion?: string
           id?: string
+          vence_en?: string | null
         }
         Update: {
           codigo?: string
@@ -401,6 +403,7 @@ export type Database = {
           estudiante_id?: string
           fecha_inscripcion?: string
           id?: string
+          vence_en?: string | null
         }
         Relationships: [
           {
@@ -872,7 +875,12 @@ export type Database = {
       estado_asistencia: "PRESENTE" | "AUSENTE" | "TARDANZA"
       estado_curso: "BORRADOR" | "PUBLICADO" | "DESPUBLICADO"
       estado_inscripcion: "PENDIENTE" | "CONFIRMADA" | "CANCELADA"
-      estado_pago: "PENDIENTE" | "APROBADO" | "RECHAZADO" | "REEMBOLSADO"
+      estado_pago:
+        | "PENDIENTE"
+        | "APROBADO"
+        | "RECHAZADO"
+        | "REEMBOLSADO"
+        | "VENCIDO"
       estado_reembolso: "SOLICITADO" | "APROBADO" | "RECHAZADO" | "PROCESADO"
       metodo_pago: "CULQI" | "IZIPAY" | "NIUBIZ" | "YAPE" | "PLIN"
       modalidad_curso: "PRESENCIAL" | "VIRTUAL" | "SEMIPRESENCIAL"
@@ -1014,7 +1022,13 @@ export const Constants = {
       estado_asistencia: ["PRESENTE", "AUSENTE", "TARDANZA"],
       estado_curso: ["BORRADOR", "PUBLICADO", "DESPUBLICADO"],
       estado_inscripcion: ["PENDIENTE", "CONFIRMADA", "CANCELADA"],
-      estado_pago: ["PENDIENTE", "APROBADO", "RECHAZADO", "REEMBOLSADO"],
+      estado_pago: [
+        "PENDIENTE",
+        "APROBADO",
+        "RECHAZADO",
+        "REEMBOLSADO",
+        "VENCIDO",
+      ],
       estado_reembolso: ["SOLICITADO", "APROBADO", "RECHAZADO", "PROCESADO"],
       metodo_pago: ["CULQI", "IZIPAY", "NIUBIZ", "YAPE", "PLIN"],
       modalidad_curso: ["PRESENCIAL", "VIRTUAL", "SEMIPRESENCIAL"],

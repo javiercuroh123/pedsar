@@ -11,6 +11,8 @@ export interface InscripcionEstudiante {
   codigo: string;
   estado: EstadoInscripcion;
   fecha_inscripcion: string;
+  /** Fin del plazo para registrar el pago (solo inscripciones pendientes). */
+  vence_en: string | null;
   curso: {
     id: string;
     slug: string;
@@ -78,7 +80,7 @@ export async function listarMisInscripciones(estudianteId: string): Promise<Insc
   const { data, error } = await supabase
     .from("inscripciones")
     .select(
-      `id, codigo, estado, fecha_inscripcion,
+      `id, codigo, estado, fecha_inscripcion, vence_en,
        curso:cursos(id, slug, titulo, modalidad, duracion_horas, categoria:categorias(nombre, slug)),
        pagos(id, monto, metodo, estado, fecha_pago, numero_operacion, reportado_en, observacion, comprobantes(tipo, serie, numero, pdf_url)),
        certificados(codigo_unico, fecha_emision)`,
@@ -101,6 +103,7 @@ export async function listarMisInscripciones(estudianteId: string): Promise<Insc
       codigo: f.codigo,
       estado: f.estado,
       fecha_inscripcion: f.fecha_inscripcion,
+      vence_en: f.vence_en,
       curso: { ...curso, categoria: uno(curso.categoria) },
       pago: pago
         ? {

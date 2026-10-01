@@ -5,6 +5,8 @@ import { z } from "zod";
 import { registrarActividad } from "@/lib/auditoria";
 import { requireRol } from "@/lib/auth";
 import { generarCodigoCertificado } from "@/lib/certificados";
+import { formatearFechaHora } from "@/lib/formato";
+import { PLAZO_PAGO_HORAS } from "@/config/matricula";
 import { publicEnv } from "@/lib/env";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
@@ -225,9 +227,16 @@ export async function observarPago(_: EstadoFormulario, formData: FormData): Pro
     .update({ observacion: d.data.motivo, numero_operacion: null, voucher_ruta: null, reportado_en: null })
     .eq("id", pago.id);
   if (error) return { ok: false, mensaje: error.message };
+  // El estudiante tiene de nuevo el plazo completo para corregir el pago.
+  const venceEn = new Date(Date.now() + PLAZO_PAGO_HORAS * 3600 * 1000);
+  await db.from("inscripciones").update({ vence_en: venceEn.toISOString() }).eq("id", ins.id);
 
   const curso = uno<{ titulo: string }>(ins.curso);
-  await notificar(ins.estudiante_id, `Revisamos tu pago de ${curso?.titulo ?? "tu curso"}: ${d.data.motivo}. Corrígelo en «Pagos».`, "/estudiante/pagos");
+  await notificar(
+    ins.estudiante_id,
+    `Revisamos tu pago de ${curso?.titulo ?? "tu curso"}: ${d.data.motivo}. Corrígelo en «Pagos» antes del ${formatearFechaHora(venceEn)}.`,
+    "/estudiante/pagos",
+  );
   await registrarActividad(usuario.id, "OBSERVAR_PAGO", { inscripcion: ins.codigo, numero_operacion: pago.numero_operacion, motivo: d.data.motivo });
   revalidatePath("/admin", "layout");
   return { ok: true, mensaje: "Pago devuelto al estudiante para corrección" };
