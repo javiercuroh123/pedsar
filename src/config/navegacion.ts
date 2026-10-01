@@ -115,4 +115,6 @@ export const RUTAS_PROTEGIDAS: { prefijo: string; roles: Rol[] | "cualquiera" }[
   { prefijo: "/instructor", roles: ["instructor", "administrador"] },
   { prefijo: "/estudiante", roles: ["estudiante"] },
   { prefijo: "/cuenta", roles: "cualquiera" },
+  // PDF de certificados: RLS decide quién lo descarga (estudiante, instructor del curso o admin).
+  { prefijo: "/certificados", roles: "cualquiera" },
 ];

@@ -89,11 +89,11 @@ Todas las pantallas del prototipo están implementadas y conectadas a Supabase:
 - **Sitio público:** inicio, catálogo con filtros instantáneos, detalle de curso, inscripción
   en 3 pasos con cupones, verificación de certificados, nosotros, contacto y privacidad.
 - **Estudiante:** panel, mis cursos, aula virtual (video/PDF/enlace y progreso), evaluaciones
-  con temporizador y calificación en el servidor, pagos/reembolsos y certificados imprimibles.
+  con temporizador y calificación en el servidor, pagos/reembolsos y certificados en PDF con QR de verificación.
 - **Instructor:** panel, contenidos (subida directa a Storage), sesiones, asistencia,
-  constructor de evaluaciones y notas.
+  constructor de evaluaciones y notas con reporte del curso en Excel y PDF (HU-42).
 - **Administrador:** dashboard, cursos, categorías, inscripciones y pagos, reembolsos, cupones,
-  certificados (emisión masiva), usuarios y roles, reportes (exportación CSV para Excel) y auditoría.
+  certificados (emisión masiva), usuarios y roles, reportes de usuarios, inscripciones e ingresos en Excel y PDF (RF-10) y auditoría.
 - **Cuenta:** perfil con foto, contraseña, exportación de datos (JSON) y notificaciones.
 - Modo claro/oscuro, alto contraste y tamaño de fuente ajustable (RNF-08).
 
@@ -112,6 +112,11 @@ como excepción, con un motivo que queda en la auditoría. Al emitir se congelan
 horas, instructor y nota. El PDF (A4, con QR a `/verificar`) se genera al vuelo en
 `/certificados/[codigo]/pdf` con pdf-lib y uqr; la verificación pública muestra la nota solo en
 los certificados de aprobación.
+
+**Reportes (RF-10, HU-42):** el administrador exporta usuarios, inscripciones e ingresos por
+curso, método de pago y mes; el instructor, el reporte de su curso (estudiantes con contacto,
+calificaciones y asistencia por sesión), ambos en Excel (`write-excel-file`, `src/lib/excel.ts`)
+y PDF (`pdf-lib`, `src/lib/pdf/reporte.ts`).
 
 **Correos (HU-21):** al inscribirse (instrucciones de pago y plazo), al observar, confirmar o
 rechazar un pago y al emitir un certificado. Se envían con Resend después de responder
