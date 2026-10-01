@@ -22,7 +22,7 @@ insert into auth.users (id, email, raw_user_meta_data) values
 update public.perfiles set rol = 'instructor' where id = 'a0000000-0000-4000-8000-000000000001';
 
 insert into public.cursos (id, slug, titulo, precio, duracion_horas, estado, instructor_id) values
-  ('c0000000-0000-4000-8000-000000000001', 'excel', 'Excel', 180, 24, 'PUBLICADO', 'a0000000-0000-4000-8000-000000000001');
+  ('c0000000-0000-4000-8000-000000000001', 'prueba-excel', 'Excel', 180, 24, 'PUBLICADO', 'a0000000-0000-4000-8000-000000000001');
 insert into public.inscripciones (id, estudiante_id, curso_id) values
   ('e0000000-0000-4000-8000-000000000002', 'a0000000-0000-4000-8000-000000000002', 'c0000000-0000-4000-8000-000000000001'),
   ('e0000000-0000-4000-8000-000000000003', 'a0000000-0000-4000-8000-000000000003', 'c0000000-0000-4000-8000-000000000001');
@@ -30,25 +30,25 @@ update public.inscripciones set estado = 'CONFIRMADA', vence_en = null;
 
 -- Dos evaluaciones (sobre 20 y sobre 10), dos sesiones dictadas y una futura, tres contenidos.
 insert into public.evaluaciones (id, curso_id, titulo, puntaje_total, intentos_permitidos) overriding system value values
-  (1, 'c0000000-0000-4000-8000-000000000001', 'Parcial', 20, 2),
-  (2, 'c0000000-0000-4000-8000-000000000001', 'Final', 10, 1);
+  (90001, 'c0000000-0000-4000-8000-000000000001', 'Parcial', 20, 2),
+  (90002, 'c0000000-0000-4000-8000-000000000001', 'Final', 10, 1);
 insert into public.intentos_evaluacion (inscripcion_id, evaluacion_id, numero_intento, puntaje_obtenido) values
-  ('e0000000-0000-4000-8000-000000000002', 1, 1, 11),
-  ('e0000000-0000-4000-8000-000000000002', 1, 2, 16),
-  ('e0000000-0000-4000-8000-000000000002', 2, 1, 8),
-  ('e0000000-0000-4000-8000-000000000003', 1, 1, 18);
+  ('e0000000-0000-4000-8000-000000000002', 90001, 1, 11),
+  ('e0000000-0000-4000-8000-000000000002', 90001, 2, 16),
+  ('e0000000-0000-4000-8000-000000000002', 90002, 1, 8),
+  ('e0000000-0000-4000-8000-000000000003', 90001, 1, 18);
 insert into public.sesiones (id, curso_id, fecha, hora_inicio) overriding system value values
-  (1, 'c0000000-0000-4000-8000-000000000001', current_date - 7, '19:00'),
-  (2, 'c0000000-0000-4000-8000-000000000001', current_date - 1, '19:00'),
-  (3, 'c0000000-0000-4000-8000-000000000001', current_date + 7, '19:00');
+  (90001, 'c0000000-0000-4000-8000-000000000001', current_date - 7, '19:00'),
+  (90002, 'c0000000-0000-4000-8000-000000000001', current_date - 1, '19:00'),
+  (90003, 'c0000000-0000-4000-8000-000000000001', current_date + 7, '19:00');
 insert into public.asistencias (inscripcion_id, sesion_id, estado) values
-  ('e0000000-0000-4000-8000-000000000002', 1, 'PRESENTE'),
-  ('e0000000-0000-4000-8000-000000000002', 2, 'TARDANZA'),
-  ('e0000000-0000-4000-8000-000000000003', 1, 'AUSENTE');
-insert into public.modulos (id, curso_id, titulo) overriding system value values (1, 'c0000000-0000-4000-8000-000000000001', 'M1');
+  ('e0000000-0000-4000-8000-000000000002', 90001, 'PRESENTE'),
+  ('e0000000-0000-4000-8000-000000000002', 90002, 'TARDANZA'),
+  ('e0000000-0000-4000-8000-000000000003', 90001, 'AUSENTE');
+insert into public.modulos (id, curso_id, titulo) overriding system value values (90001, 'c0000000-0000-4000-8000-000000000001', 'M1');
 insert into public.contenidos (id, modulo_id, titulo, tipo, url_archivo) overriding system value values
-  (1, 1, 'A', 'PDF', 'a.pdf'), (2, 1, 'B', 'PDF', 'b.pdf'), (3, 1, 'C', 'VIDEO', 'https://v');
-insert into public.contenidos_completados (inscripcion_id, contenido_id) values ('e0000000-0000-4000-8000-000000000002', 1);
+  (90001, 90001, 'A', 'PDF', 'a.pdf'), (90002, 90001, 'B', 'PDF', 'b.pdf'), (90003, 90001, 'C', 'VIDEO', 'https://v');
+insert into public.contenidos_completados (inscripcion_id, contenido_id) values ('e0000000-0000-4000-8000-000000000002', 90001);
 
 -- ---------- resultado_academico ----------
 create temp table r as select * from public.resultado_academico(array['e0000000-0000-4000-8000-000000000002'::uuid, 'e0000000-0000-4000-8000-000000000003'::uuid]);
