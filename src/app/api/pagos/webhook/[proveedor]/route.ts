@@ -1,4 +1,8 @@
 import { NextResponse } from "next/server";
+import { uno } from "@/features/academico/consultas";
+import { programarCorreo } from "@/lib/email";
+import { correoConfirmacionMatricula } from "@/lib/email/plantillas";
+import { publicEnv } from "@/lib/env";
 import { esPasarelaValida, getPasarela } from "@/lib/pagos";
 import { createAdminClient } from "@/lib/supabase/admin";
 
@@ -30,8 +34,27 @@ export async function POST(request: Request, ctx: RouteContext<"/api/pagos/webho
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
   if (pago && evento.estado === "APROBADO") {
-    await supabase.from("inscripciones").update({ estado: "CONFIRMADA", vence_en: null }).eq("id", pago.inscripcion_id);
-    // TODO: emitir comprobante electrónico (SUNAT) y enviar correoConfirmacionMatricula.
+    const { data: ins } = await supabase
+      .from("inscripciones")
+      .update({ estado: "CONFIRMADA", vence_en: null })
+      .eq("id", pago.inscripcion_id)
+      .select("codigo, estudiante:perfiles(nombres, correo), curso:cursos(titulo)")
+      .single();
+    // Secuencia, pasos 20-21: correo de confirmación al estudiante.
+    const estudiante = uno<{ nombres: string; correo: string }>(ins?.estudiante);
+    const curso = uno<{ titulo: string }>(ins?.curso);
+    if (ins && estudiante?.correo && curso) {
+      programarCorreo({
+        para: estudiante.correo,
+        ...correoConfirmacionMatricula({
+          nombre: estudiante.nombres || "estudiante",
+          curso: curso.titulo,
+          codigo: ins.codigo,
+          url: `${publicEnv.NEXT_PUBLIC_SITE_URL}/estudiante/cursos`,
+        }),
+      });
+    }
+    // TODO: emitir comprobante electrónico (SUNAT).
   } else if (pago && evento.estado === "RECHAZADO") {
     // Secuencia, pasos 23-25: el pago rechazado anula la inscripción pendiente y libera el cupo.
     await supabase.from("inscripciones").update({ estado: "CANCELADA" }).eq("id", pago.inscripcion_id).eq("estado", "PENDIENTE");

@@ -3,13 +3,17 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
-import { reservaVencida } from "@/config/matricula";
+import { EMPRESA } from "@/config/empresa";
+import { PLAZO_PAGO_HORAS, reservaVencida } from "@/config/matricula";
 import { uno } from "@/features/academico/consultas";
 import { notificarAdministradores } from "@/features/notificaciones/enviar";
 import type { EstadoFormulario } from "@/features/usuarios/esquemas";
 import { registrarActividad } from "@/lib/auditoria";
 import { requireRol } from "@/lib/auth";
-import { ETIQUETA_METODO, hoyISO } from "@/lib/formato";
+import { programarCorreo } from "@/lib/email";
+import { correoInscripcionRegistrada } from "@/lib/email/plantillas";
+import { publicEnv } from "@/lib/env";
+import { ETIQUETA_METODO, formatearFechaHora, formatearSoles, hoyISO } from "@/lib/formato";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 
@@ -69,7 +73,7 @@ export async function inscribirse(formData: FormData) {
   const datos = inscripcionSchema.parse(Object.fromEntries(formData));
   const supabase = await createClient();
 
-  const { data: curso } = await supabase.from("cursos").select("id, precio, slug").eq("id", datos.cursoId).single();
+  const { data: curso } = await supabase.from("cursos").select("id, titulo, precio, slug").eq("id", datos.cursoId).single();
   if (!curso) redirect("/cursos");
 
   if (datos.telefono || datos.documento) {
@@ -82,7 +86,7 @@ export async function inscribirse(formData: FormData) {
   const { data: inscripcion, error } = await supabase
     .from("inscripciones")
     .insert({ estudiante_id: estudiante.id, curso_id: datos.cursoId })
-    .select("id, codigo")
+    .select("id, codigo, vence_en")
     .single();
 
   if (error) {
@@ -106,6 +110,22 @@ export async function inscribirse(formData: FormData) {
     cupon: cupon ? datos.cupon : null,
     comprobante: datos.comprobante,
     ...(datos.comprobante === "FACTURA" ? { ruc: datos.ruc, razon_social: datos.razonSocial } : {}),
+  });
+
+  // HU-21 · Confirmación de la inscripción con las instrucciones de pago y el plazo de la reserva.
+  programarCorreo({
+    para: estudiante.correo,
+    ...correoInscripcionRegistrada({
+      nombre: estudiante.nombres || "estudiante",
+      curso: curso.titulo,
+      codigo: inscripcion.codigo,
+      monto: formatearSoles(monto),
+      app: datos.metodo === "YAPE" ? "Yape" : "Plin",
+      celular: EMPRESA.pagoDirecto.celular,
+      titular: EMPRESA.pagoDirecto.titular,
+      venceEn: inscripcion.vence_en ? formatearFechaHora(inscripcion.vence_en) : `${PLAZO_PAGO_HORAS} horas`,
+      url: `${publicEnv.NEXT_PUBLIC_SITE_URL}/estudiante/pagos`,
+    }),
   });
 
   // TODO: con la pasarela activa, cobrar con getPasarela().cobrar(...) usando el token del checkout

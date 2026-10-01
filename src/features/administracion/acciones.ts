@@ -5,6 +5,8 @@ import { z } from "zod";
 import { registrarActividad } from "@/lib/auditoria";
 import { requireRol } from "@/lib/auth";
 import { generarCodigoCertificado } from "@/lib/certificados";
+import { programarCorreo } from "@/lib/email";
+import { correoCertificadoEmitido, correoConfirmacionMatricula, correoPagoObservado, correoPagoRechazado } from "@/lib/email/plantillas";
 import { formatearFechaHora } from "@/lib/formato";
 import { PLAZO_PAGO_HORAS } from "@/config/matricula";
 import { publicEnv } from "@/lib/env";
@@ -177,22 +179,37 @@ export async function resolverPago(formData: FormData) {
   const aprobar = formData.get("decision") === "aprobar";
   const db = createAdminClient();
 
-  const { data: ins } = await db.from("inscripciones").select("id, codigo, estudiante_id, curso:cursos(titulo)").eq("id", inscripcionId).single();
-  if (!ins) return;
+  const { data: ins } = await db
+    .from("inscripciones")
+    .select("id, codigo, estado, estudiante_id, estudiante:perfiles(nombres, correo), curso:cursos(titulo, slug)")
+    .eq("id", inscripcionId)
+    .single();
+  // Solo se resuelve una vez (evita confirmar dos veces y duplicar correos).
+  if (!ins || ins.estado !== "PENDIENTE") return;
   await db
     .from("pagos")
     .update(aprobar ? { estado: "APROBADO", fecha_pago: new Date().toISOString(), observacion: null } : { estado: "RECHAZADO", fecha_pago: null })
     .eq("inscripcion_id", inscripcionId);
   await db.from("inscripciones").update({ estado: aprobar ? "CONFIRMADA" : "CANCELADA" }).eq("id", inscripcionId);
 
-  const curso = (Array.isArray(ins.curso) ? ins.curso[0] : ins.curso) as { titulo: string } | null;
+  const curso = uno<{ titulo: string; slug: string }>(ins.curso);
+  const estudiante = uno<{ nombres: string; correo: string }>(ins.estudiante);
   await notificar(
     ins.estudiante_id,
     aprobar
       ? `¡Tu inscripción en ${curso?.titulo ?? "el curso"} fue confirmada! Ya puedes ingresar al aula virtual.`
-      : `No pudimos validar el pago de tu inscripción ${ins.codigo}. Comunícate con nosotros.`,
+      : `No pudimos validar el pago de tu inscripción ${ins.codigo}. Si aún hay cupos, puedes volver a inscribirte.`,
     aprobar ? "/estudiante/cursos" : "/estudiante/pagos",
   );
+  if (estudiante?.correo && curso) {
+    const datos = { nombre: estudiante.nombres || "estudiante", curso: curso.titulo, codigo: ins.codigo };
+    programarCorreo({
+      para: estudiante.correo,
+      ...(aprobar
+        ? correoConfirmacionMatricula({ ...datos, url: `${publicEnv.NEXT_PUBLIC_SITE_URL}/estudiante/cursos` })
+        : correoPagoRechazado({ ...datos, url: `${publicEnv.NEXT_PUBLIC_SITE_URL}/cursos/${curso.slug}` })),
+    });
+  }
   await registrarActividad(usuario.id, aprobar ? "CONFIRMAR_PAGO" : "RECHAZAR_PAGO", { inscripcion: ins.codigo });
   // TODO: emitir comprobante electrónico (SUNAT) al aprobar.
   revalidatePath("/admin", "layout");
@@ -216,7 +233,7 @@ export async function observarPago(_: EstadoFormulario, formData: FormData): Pro
 
   const { data: ins } = await db
     .from("inscripciones")
-    .select("id, codigo, estado, estudiante_id, curso:cursos(titulo), pagos(id, estado, numero_operacion)")
+    .select("id, codigo, estado, estudiante_id, estudiante:perfiles(nombres, correo), curso:cursos(titulo), pagos(id, estado, numero_operacion)")
     .eq("id", d.data.inscripcionId)
     .single();
   const pago = uno<{ id: string; estado: string; numero_operacion: string | null }>(ins?.pagos);
@@ -237,6 +254,19 @@ export async function observarPago(_: EstadoFormulario, formData: FormData): Pro
     `Revisamos tu pago de ${curso?.titulo ?? "tu curso"}: ${d.data.motivo}. Corrígelo en «Pagos» antes del ${formatearFechaHora(venceEn)}.`,
     "/estudiante/pagos",
   );
+  const estudiante = uno<{ nombres: string; correo: string }>(ins.estudiante);
+  if (estudiante?.correo) {
+    programarCorreo({
+      para: estudiante.correo,
+      ...correoPagoObservado({
+        nombre: estudiante.nombres || "estudiante",
+        curso: curso?.titulo ?? "tu curso",
+        motivo: d.data.motivo,
+        venceEn: formatearFechaHora(venceEn),
+        url: `${publicEnv.NEXT_PUBLIC_SITE_URL}/estudiante/pagos`,
+      }),
+    });
+  }
   await registrarActividad(usuario.id, "OBSERVAR_PAGO", { inscripcion: ins.codigo, numero_operacion: pago.numero_operacion, motivo: d.data.motivo });
   revalidatePath("/admin", "layout");
   return { ok: true, mensaje: "Pago devuelto al estudiante para corrección" };
@@ -304,7 +334,11 @@ export async function emitirCertificados(formData: FormData): Promise<EstadoForm
   const ids = z.array(z.uuid()).min(1, "Selecciona al menos un estudiante").safeParse(formData.getAll("inscripcion"));
   if (!ids.success) return fallo(ids.error);
   const supabase = await createClient();
-  const { data: filas } = await supabase.from("inscripciones").select("id, estudiante_id, curso:cursos(titulo)").in("id", ids.data).eq("estado", "CONFIRMADA");
+  const { data: filas } = await supabase
+    .from("inscripciones")
+    .select("id, estudiante_id, estudiante:perfiles(nombres, correo), curso:cursos(titulo)")
+    .in("id", ids.data)
+    .eq("estado", "CONFIRMADA");
 
   let emitidos = 0;
   for (const ins of filas ?? []) {
@@ -314,6 +348,18 @@ export async function emitirCertificados(formData: FormData): Promise<EstadoForm
     emitidos++;
     const curso = (Array.isArray(ins.curso) ? ins.curso[0] : ins.curso) as { titulo: string } | null;
     await notificar(ins.estudiante_id, `¡Felicidades! Ya puedes descargar tu certificado de ${curso?.titulo ?? "tu curso"}.`, "/estudiante/certificados");
+    const estudiante = uno<{ nombres: string; correo: string }>(ins.estudiante);
+    if (estudiante?.correo) {
+      programarCorreo({
+        para: estudiante.correo,
+        ...correoCertificadoEmitido({
+          nombre: estudiante.nombres || "estudiante",
+          curso: curso?.titulo ?? "tu curso",
+          codigo,
+          url: `${publicEnv.NEXT_PUBLIC_SITE_URL}/verificar?codigo=${codigo}`,
+        }),
+      });
+    }
     await registrarActividad(usuario.id, "EMITIR_CERTIFICADO", { codigo, inscripcion: ins.id });
   }
   revalidatePath("/admin/certificados");
