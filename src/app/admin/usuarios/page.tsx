@@ -9,6 +9,7 @@ import { requireRol } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { formatearFecha, nombreCompleto } from "@/lib/formato";
 import { cn } from "@/lib/utils";
+import { Constants } from "@/types/database";
 
 export const metadata: Metadata = { title: "Usuarios y roles" };
 
@@ -34,7 +35,7 @@ const COLOR_PERMISO = (x: string): ColorPildora => (x === "Gestionar" || x === "
 export default async function AdminUsuariosPage({ searchParams }: PageProps<"/admin/usuarios">) {
   const actual = await requireRol("administrador");
   const { rol, q } = await searchParams;
-  const pestana = PESTANAS.some((p) => p.v === rol) ? (rol as string) : "todos";
+  const pestana = Constants.public.Enums.rol_usuario.find((r) => r === rol) ?? "todos";
   // Se quitan los caracteres con significado en los filtros de PostgREST.
   const texto = typeof q === "string" ? q.replace(/[,()*%]/g, " ").trim() : "";
   const supabase = await createClient();

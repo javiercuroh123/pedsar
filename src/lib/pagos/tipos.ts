@@ -1,3 +1,4 @@
+import type { Json } from "@/types/database";
 import type { MetodoPago } from "@/types/dominio";
 
 export interface SolicitudCobro {
@@ -14,13 +15,13 @@ export interface ResultadoCobro {
   aprobado: boolean;
   referencia: string | null;
   mensaje: string;
-  respuesta: unknown;
+  respuesta: Json;
 }
 
 export interface EventoWebhook {
   referencia: string;
   estado: "APROBADO" | "RECHAZADO" | "REEMBOLSADO";
-  respuesta: unknown;
+  respuesta: Json;
 }
 
 /**
