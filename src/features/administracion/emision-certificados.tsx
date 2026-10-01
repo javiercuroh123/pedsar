@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import type { ResultadoAcademico } from "@/config/academico";
+import { formatearAsistencia, formatearNota, type ResultadoAcademico } from "@/config/academico";
 import { cn } from "@/lib/utils";
 import { emitirCertificados } from "./acciones";
 
@@ -118,7 +118,7 @@ export function EmisionCertificados({ candidatos }: { candidatos: Candidato[] })
                     <td className={cn(tabla.td, "whitespace-nowrap")}>
                       {r?.evaluaciones ? (
                         <>
-                          <span className="font-mono">{(r.nota_final ?? 0).toFixed(1)}/20</span>
+                          <span className="font-mono">{formatearNota(r.nota_final ?? 0)}/20</span>
                           <span className="block text-xs text-muted-foreground">
                             {r.rendidas} de {r.evaluaciones} rendidas
                           </span>
@@ -130,7 +130,7 @@ export function EmisionCertificados({ candidatos }: { candidatos: Candidato[] })
                     <td className={cn(tabla.td, "whitespace-nowrap")}>
                       {r?.sesiones ? (
                         <>
-                          <span className="font-mono">{Math.round(r.asistencia ?? 0)} %</span>
+                          <span className="font-mono">{formatearAsistencia(r.asistencia ?? 0)} %</span>
                           <span className="block text-xs text-muted-foreground">
                             {r.presentes} de {r.sesiones} sesiones
                           </span>

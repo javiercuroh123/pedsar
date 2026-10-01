@@ -3,7 +3,7 @@ import { FileSpreadsheetIcon, FileTextIcon, GraduationCapIcon, UsersIcon } from 
 import { AvatarIniciales, BarraProgreso, EncabezadoPagina, EstadoVacio, PanelTabla, Pildora, tabla, type ColorPildora } from "@/components/comunes";
 import { SelectorUrl } from "@/components/selector-url";
 import { buttonVariants } from "@/components/ui/button";
-import { ASISTENCIA_MINIMA, NOTA_MINIMA } from "@/config/academico";
+import { ASISTENCIA_MINIMA, formatearAsistencia, formatearNota, NOTA_MINIMA } from "@/config/academico";
 import { elegirCurso, listarCursosDelInstructor } from "@/features/academico/consultas-instructor";
 import { ETIQUETA_ESTADO_ACADEMICO, reporteDelCurso, type EstadoAcademico } from "@/features/academico/reporte-instructor";
 import { requireRol } from "@/lib/auth";
@@ -84,7 +84,7 @@ export default async function InstructorNotasPage({ searchParams }: PageProps<"/
                     </div>
                   </td>
                   <td className={cn(tabla.td, "font-mono text-xs", s.asistencia !== null && s.asistencia < ASISTENCIA_MINIMA && "text-red-600 dark:text-red-400")}>
-                    {s.asistencia !== null ? `${Math.round(s.asistencia)}%` : "—"}
+                    {s.asistencia !== null ? `${formatearAsistencia(s.asistencia)}%` : "—"}
                   </td>
                   {s.notas.map((n, i) => (
                     <td key={evs[i].id} className={cn(tabla.td, "text-center font-mono", n === null && "text-muted-foreground")}>
@@ -92,9 +92,9 @@ export default async function InstructorNotasPage({ searchParams }: PageProps<"/
                     </td>
                   ))}
                   <td className={cn(tabla.td, "text-center")}>
-                    <span className="font-mono font-bold">{s.notaFinal !== null ? s.notaFinal.toFixed(1) : "—"}</span>
+                    <span className="font-mono font-bold">{s.notaFinal !== null ? formatearNota(s.notaFinal) : "—"}</span>
                     {s.rendidas < evs.length && s.notaParcial !== null && (
-                      <span className="block text-xs text-muted-foreground">parcial {s.notaParcial.toFixed(1)}</span>
+                      <span className="block text-xs text-muted-foreground">parcial {formatearNota(s.notaParcial)}</span>
                     )}
                   </td>
                   <td className={tabla.td} title={s.motivos.join("\n") || undefined}>

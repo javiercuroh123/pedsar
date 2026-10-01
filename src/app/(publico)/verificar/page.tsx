@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { BadgeCheckIcon, QrCodeIcon, SearchIcon, ShieldCheckIcon, ShieldXIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { esCertificadoDeAprobacion } from "@/config/academico";
+import { esCertificadoDeAprobacion, formatearNota } from "@/config/academico";
 import { verificarCertificado } from "@/features/certificacion/consultas";
 import { VistaCertificado } from "@/features/certificacion/vista-certificado";
 import { formatearFecha } from "@/lib/formato";
@@ -68,7 +68,7 @@ export default async function VerificarPage({ searchParams }: PageProps<"/verifi
                       ["Curso", certificado.curso],
                       ["Duración", `${certificado.duracion_horas} horas`],
                       // Figura 15: la nota final se publica solo en los certificados de aprobación.
-                      ["Resultado", esCertificadoDeAprobacion(certificado.nota_final) ? `Aprobado · nota final ${certificado.nota_final!.toFixed(1)}/20` : "Participación"],
+                      ["Resultado", esCertificadoDeAprobacion(certificado.nota_final) ? `Aprobado · nota final ${formatearNota(certificado.nota_final!)}/20` : "Participación"],
                       ...(certificado.instructor ? [["Instructor(a)", certificado.instructor]] : []),
                       ["Fecha de emisión", formatearFecha(certificado.fecha_emision)],
                     ].map(([k, v]) => (

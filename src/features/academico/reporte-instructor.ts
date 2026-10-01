@@ -60,7 +60,8 @@ export async function reporteDelCurso(curso: CursoInstructor): Promise<ReporteCu
       return propias.length ? Math.max(...propias.map((t) => Number(t.puntaje_obtenido))) : null;
     });
     const vigesimales = notas.flatMap((n, i) => (n === null || !evs[i].puntaje_total ? [] : [(n / evs[i].puntaje_total) * 20]));
-    const notaParcial = vigesimales.length ? vigesimales.reduce((a, b) => a + b, 0) / vigesimales.length : null;
+    // Con 2 decimales, como la nota final de la BD: el riesgo se decide con la misma cifra que se muestra.
+    const notaParcial = vigesimales.length ? Math.round((vigesimales.reduce((a, b) => a + b, 0) / vigesimales.length) * 100) / 100 : null;
     const r = resultados.get(s.inscripcionId);
     const { apto, motivos } = evaluarAptitud(r);
     const riesgo =

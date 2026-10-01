@@ -1,6 +1,6 @@
 import "server-only";
 import { PDFDocument, StandardFonts, type PDFFont, type PDFPage } from "pdf-lib";
-import { esCertificadoDeAprobacion } from "@/config/academico";
+import { esCertificadoDeAprobacion, formatearNota } from "@/config/academico";
 import { EMPRESA } from "@/config/empresa";
 import { aWinAnsi, centrado, COLOR, dibujarIsotipo, partir, tamanoQueEntra } from "@/lib/pdf/comun";
 import { trazadoQr } from "./qr";
@@ -85,7 +85,7 @@ export async function generarPdfCertificado(d: DatosPdfCertificado): Promise<Uin
     centrado(pagina, linea, y, negrita, 18, COLOR.grafito);
     y -= 23;
   }
-  const detalle = `con una duración de ${d.duracion_horas} horas académicas${aprobacion ? ` y una nota final de ${d.nota_final!.toFixed(1)} sobre 20` : ""}.`;
+  const detalle = `con una duración de ${d.duracion_horas} horas académicas${aprobacion ? ` y una nota final de ${formatearNota(d.nota_final!)} sobre 20` : ""}.`;
   centrado(pagina, detalle, y - 2, normal, 12.5);
   centrado(pagina, `Ica, ${fechaLarga(d.fecha_emision)}.`, y - 22, normal, 12.5, COLOR.suave);
 

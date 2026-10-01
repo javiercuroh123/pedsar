@@ -3,7 +3,7 @@ import Link from "next/link";
 import { AwardIcon, DownloadIcon } from "lucide-react";
 import { EncabezadoPagina, PanelTabla, Pildora, tabla } from "@/components/comunes";
 import { buttonVariants } from "@/components/ui/button";
-import { ASISTENCIA_MINIMA, esCertificadoDeAprobacion, evaluarAptitud, NOTA_MINIMA } from "@/config/academico";
+import { ASISTENCIA_MINIMA, esCertificadoDeAprobacion, evaluarAptitud, formatearNota, NOTA_MINIMA } from "@/config/academico";
 import { uno } from "@/features/academico/consultas";
 import { EmisionCertificados, type Candidato } from "@/features/administracion/emision-certificados";
 import { obtenerResultados } from "@/features/certificacion/consultas";
@@ -86,7 +86,7 @@ export default async function AdminCertificadosPage() {
                   </td>
                   <td className={cn(tabla.td, "text-muted-foreground")}>{c.curso_titulo}</td>
                   <td className={cn(tabla.td, "font-mono text-xs")}>
-                    {c.nota_final !== null ? `${Number(c.nota_final).toFixed(1)}/20` : "—"}
+                    {c.nota_final !== null ? `${formatearNota(Number(c.nota_final))}/20` : "—"}
                     {!esCertificadoDeAprobacion(c.nota_final === null ? null : Number(c.nota_final)) && (
                       <span className="block font-sans text-muted-foreground">Participación</span>
                     )}

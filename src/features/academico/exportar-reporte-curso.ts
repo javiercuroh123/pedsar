@@ -1,5 +1,5 @@
 import "server-only";
-import { ASISTENCIA_MINIMA, NOTA_MINIMA } from "@/config/academico";
+import { ASISTENCIA_MINIMA, formatearAsistencia, formatearNota, NOTA_MINIMA } from "@/config/academico";
 import { hojaExcel, libroExcel } from "@/lib/excel";
 import { formatearFecha, formatearFechaCorta, hoyISO } from "@/lib/formato";
 import { generarPdfReporte, type SeccionPdf } from "@/lib/pdf/reporte";
@@ -7,8 +7,8 @@ import type { EstadoAsistencia } from "@/types/dominio";
 import { ETIQUETA_ESTADO_ACADEMICO, type ReporteCurso } from "./reporte-instructor";
 
 const SIGLA_ASISTENCIA: Record<EstadoAsistencia, string> = { PRESENTE: "P", TARDANZA: "T", AUSENTE: "A" };
-const nota = (n: number | null) => (n === null ? "—" : n.toFixed(1));
-const porcentaje = (n: number | null) => (n === null ? "—" : `${Math.round(n)} %`);
+const nota = (n: number | null) => (n === null ? "—" : formatearNota(n));
+const porcentaje = (n: number | null) => (n === null ? "—" : `${formatearAsistencia(n)} %`);
 const NOTA_CALCULO = `Nota final: promedio en escala vigesimal de la mejor nota de cada evaluación; las no rendidas cuentan 0. Apto: rindió todas las evaluaciones con nota final ≥ ${NOTA_MINIMA} y asistió al ${ASISTENCIA_MINIMA} % de las sesiones dictadas. En riesgo: asistencia o promedio parcial por debajo del mínimo. Asistencia: P presente, T tardanza (cuenta como asistencia), A ausente.`;
 
 /** HU-42 · Reporte académico del curso en Excel: estudiantes con contacto, calificaciones y asistencia. */
@@ -24,8 +24,8 @@ export async function reporteCursoAExcel(r: ReporteCurso): Promise<Buffer> {
         { titulo: "Correo", ancho: 32 },
         { titulo: "Teléfono", ancho: 14 },
         { titulo: "Avance", ancho: 9, formato: "porcentaje" },
-        { titulo: "Asistencia", ancho: 11, formato: "porcentaje" },
-        { titulo: "Nota final", ancho: 10, formato: "decimal" },
+        { titulo: "Asistencia", ancho: 11, formato: "asistencia" },
+        { titulo: "Nota final", ancho: 10, formato: "nota" },
         { titulo: "Evaluaciones rendidas", ancho: 12 },
         { titulo: "Estado", ancho: 11 },
         { titulo: "Pendiente para el certificado", ancho: 60 },
@@ -49,9 +49,9 @@ export async function reporteCursoAExcel(r: ReporteCurso): Promise<Buffer> {
       subtitulo: "Mejor puntaje de cada evaluación (sobre su puntaje total)",
       columnas: [
         { titulo: "Estudiante", ancho: 32 },
-        ...r.evaluaciones.map((e) => ({ titulo: `${e.titulo} (/${e.puntaje_total})`, ancho: Math.min(Math.max(e.titulo.length + 6, 12), 28), formato: "decimal" as const })),
-        { titulo: "Promedio parcial (/20)", ancho: 14, formato: "decimal" },
-        { titulo: "Nota final (/20)", ancho: 12, formato: "decimal" },
+        ...r.evaluaciones.map((e) => ({ titulo: `${e.titulo} (/${e.puntaje_total})`, ancho: Math.min(Math.max(e.titulo.length + 6, 12), 28), formato: "nota" as const })),
+        { titulo: "Promedio parcial (/20)", ancho: 14, formato: "nota" },
+        { titulo: "Nota final (/20)", ancho: 12, formato: "nota" },
       ],
       filas: r.estudiantes.map((e) => [e.nombre, ...e.notas, e.notaParcial, e.notaFinal]),
       nota: NOTA_CALCULO,
@@ -64,7 +64,7 @@ export async function reporteCursoAExcel(r: ReporteCurso): Promise<Buffer> {
         { titulo: "Estudiante", ancho: 32 },
         ...r.sesiones.map((s) => ({ titulo: formatearFechaCorta(s.fecha), ancho: 8 })),
         { titulo: "Asistencias", ancho: 11, formato: "entero" },
-        { titulo: "Asistencia", ancho: 11, formato: "porcentaje" },
+        { titulo: "Asistencia", ancho: 11, formato: "asistencia" },
       ],
       filas: r.estudiantes.map((e) => [
         e.nombre,
