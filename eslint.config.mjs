@@ -12,6 +12,8 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Informe de cobertura de las pruebas (npm run test:cobertura).
+    "coverage/**",
     // Worktrees de Claude Code: copias del repo con su propio .next (git ya las excluye).
     ".claude/**",
   ]),

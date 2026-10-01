@@ -127,12 +127,51 @@ Pendiente: cobro con tarjeta mediante el checkout de la pasarela, emisión de co
 reembolso automático en la pasarela y recordatorios programados de sesiones y evaluaciones.
 Varias funciones (pagos, evaluaciones, notificaciones, auditoría) requieren `SUPABASE_SECRET_KEY`.
 
+## Pruebas (Definición de Terminado)
+
+```bash
+npm test                  # pruebas unitarias (Vitest)
+npm run test:cobertura    # con informe de cobertura en coverage/ (mínimo exigido: 70 %)
+npm run test:db           # pruebas de la BD con pgTAP (requiere `npm run db:start`)
+```
+
+- **Unitarias** (`tests/unidad`): reglas de aprobación y plazos, acciones de servidor
+  (inscripción, pago manual, validación de pagos, emisión de certificados, evaluaciones,
+  asistencia…), consultas, rutas (webhook, PDF, exportaciones), PDF y Excel generados
+  (se abren y se leen sus textos y celdas) y correos. Supabase se simula con
+  `tests/apoyo/supabase-falso.ts`, que registra cada consulta para comprobar qué se leyó o
+  escribió. La cobertura se mide sobre la lógica (`src/lib`, `src/config`, `src/features/**/*.ts`,
+  rutas y proxy); el umbral de 70 % está en `vitest.config.mts` y hace fallar la ejecución.
+- **Base de datos** (`supabase/tests`): RLS por rol (visitante, estudiante, instructor,
+  administrador), cupo y reservas de 48 h, vencimiento por pg_cron, reinscripción, N.º de
+  operación único, `resultado_academico` y verificación pública de certificados. Cada archivo
+  corre en una transacción que se revierte.
+- **CI** (`.github/workflows/calidad.yml`): en cada push y pull request ejecuta lint, tipos,
+  pruebas con cobertura, `next build` y las pruebas de la BD contra un Supabase local.
+
+## Despliegue (Vercel)
+
+El repositorio está enlazado a Vercel: cada push a una rama crea un despliegue de
+**staging** (preview) y `main` es **producción**. Las funciones corren en `iad1`, la misma
+zona que la BD de Supabase (us-east-1).
+
+1. Variables en Vercel → Project → Settings → Environment Variables (ver `.env.example`):
+   `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_SECRET_KEY`
+   (marcarla como *Sensitive*), `RESEND_API_KEY`, `EMAIL_FROM` y `NEXT_PUBLIC_SENTRY_DSN`.
+   `NEXT_PUBLIC_SITE_URL` solo hace falta con un dominio propio: si no está, se usa el dominio
+   de producción o el de la rama.
+2. Supabase → Authentication → URL Configuration: Site URL = dominio de producción y, en
+   Redirect URLs, `https://<dominio>/**` y el patrón de los previews de Vercel.
+3. Verificación: `GET /api/salud` responde `{"estado":"ok"}` si la app llega a la BD.
+
 ## Scripts
 
 | Script | Uso |
 |---|---|
 | `dev` / `build` / `start` | Desarrollo / compilación / producción |
 | `lint` / `typecheck` | Calidad de código |
+| `test` / `test:cobertura` | Pruebas unitarias / con cobertura |
+| `test:db` | Pruebas de la base de datos (pgTAP, Supabase local) |
 | `db:start` / `db:stop` | Supabase local |
 | `db:reset` | Recrear la BD con migraciones + seed |
 | `db:migration <nombre>` | Nueva migración |
