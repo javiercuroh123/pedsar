@@ -24,8 +24,11 @@ export const COLOR = {
  * fuera de ese juego se reemplaza por su letra base («ș» → «s») para que nunca falle el PDF.
  */
 const EXTRA_WINANSI = new Set("€‚ƒ„…†‡ˆ‰Š‹ŒŽ‘’“”•–—˜™š›œžŸ");
-/** Símbolos frecuentes sin equivalente en WinAnsi. */
-const EQUIVALENTES: Record<string, string> = { "≥": ">=", "≤": "<=", "≠": "!=", "→": "->", "←": "<-", "✓": "v", "✔": "v", "−": "-" };
+/** Símbolos frecuentes sin equivalente en WinAnsi, y letras que no se descomponen en base + tilde (Đ, ł…). */
+const EQUIVALENTES: Record<string, string> = {
+  "≥": ">=", "≤": "<=", "≠": "!=", "→": "->", "←": "<-", "✓": "v", "✔": "v", "−": "-", "ʼ": "'",
+  Đ: "D", đ: "d", Ł: "L", ł: "l", ı: "i", Ħ: "H", ħ: "h", Ŧ: "T", ŧ: "t",
+};
 const enWinAnsi = (c: string) => {
   const n = c.codePointAt(0)!;
   return (n >= 0x20 && n <= 0x7e) || (n >= 0xa0 && n <= 0xff) || EXTRA_WINANSI.has(c);

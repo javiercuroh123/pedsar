@@ -13,6 +13,14 @@ export const aprobado = (puntaje: number, total: number) => total > 0 && puntaje
  */
 export const esCertificadoDeAprobacion = (notaFinal: number | null | undefined) => notaFinal != null && notaFinal >= NOTA_MINIMA;
 
+/**
+ * Nota (un decimal) y asistencia (entero) truncadas, no redondeadas: así la cifra que se
+ * muestra solo alcanza el mínimo si la real lo alcanza (12,96 se ve «12.9», no «13.0»).
+ * El margen corrige errores de coma flotante (14.3 × 10 = 142.99…).
+ */
+export const formatearNota = (nota: number) => (Math.floor(nota * 10 + 1e-9) / 10).toFixed(1);
+export const formatearAsistencia = (porcentaje: number) => String(Math.floor(porcentaje + 1e-9));
+
 /** Fila de la función resultado_academico de la base de datos (una por inscripción). */
 export interface ResultadoAcademico {
   inscripcion_id: string;
@@ -40,10 +48,10 @@ export function evaluarAptitud(r: ResultadoAcademico | undefined): { apto: boole
   const motivos: string[] = [];
   if (r.evaluaciones > 0) {
     if (r.rendidas < r.evaluaciones) motivos.push(`Faltan rendir ${r.evaluaciones - r.rendidas} de ${r.evaluaciones} evaluaciones`);
-    else if ((r.nota_final ?? 0) < NOTA_MINIMA) motivos.push(`Nota final ${(r.nota_final ?? 0).toFixed(1)}/20 (mínimo ${NOTA_MINIMA})`);
+    else if ((r.nota_final ?? 0) < NOTA_MINIMA) motivos.push(`Nota final ${formatearNota(r.nota_final ?? 0)}/20 (mínimo ${NOTA_MINIMA})`);
   }
   if (r.sesiones > 0 && (r.asistencia ?? 0) < ASISTENCIA_MINIMA) {
-    motivos.push(`Asistencia ${Math.round(r.asistencia ?? 0)} % (mínimo ${ASISTENCIA_MINIMA} %)`);
+    motivos.push(`Asistencia ${formatearAsistencia(r.asistencia ?? 0)} % (mínimo ${ASISTENCIA_MINIMA} %)`);
   }
   if (r.evaluaciones === 0 && r.sesiones === 0) motivos.push("Aún no hay evaluaciones ni sesiones dictadas que acrediten el curso");
   return { apto: motivos.length === 0, motivos };

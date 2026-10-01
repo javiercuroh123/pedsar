@@ -1,5 +1,5 @@
 import { GraduationCapIcon } from "lucide-react";
-import { esCertificadoDeAprobacion } from "@/config/academico";
+import { esCertificadoDeAprobacion, formatearNota } from "@/config/academico";
 import { publicEnv } from "@/lib/env";
 import { formatearFecha } from "@/lib/formato";
 import { trazadoQr, urlVerificacion } from "./qr";
@@ -54,7 +54,7 @@ export function VistaCertificado({ datos }: { datos: DatosCertificado }) {
           <p className="mx-auto text-zinc-600" style={{ fontSize: "1.7cqw", maxWidth: "80%", marginTop: "1.6cqw" }}>
             {aprobacion ? "por haber aprobado el curso" : "por haber participado en el curso"} <b className="text-zinc-900">{datos.curso}</b>, con una
             duración de {datos.duracion_horas} horas académicas
-            {aprobacion && ` y una nota final de ${datos.nota_final!.toFixed(1)} sobre 20`}. Ica, {formatearFecha(datos.fecha_emision)}.
+            {aprobacion && ` y una nota final de ${formatearNota(datos.nota_final!)} sobre 20`}. Ica, {formatearFecha(datos.fecha_emision)}.
           </p>
         </div>
         <div className="grid w-full grid-cols-3 items-end" style={{ fontSize: "1.4cqw", gap: "4cqw" }}>

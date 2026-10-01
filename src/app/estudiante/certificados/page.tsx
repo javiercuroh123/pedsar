@@ -4,7 +4,7 @@ import { AwardIcon, BadgeCheckIcon, CircleCheckIcon, DownloadIcon, EyeIcon, Lock
 import { BarraProgreso, EncabezadoPagina, EstadoVacio, Pildora } from "@/components/comunes";
 import { BotonCopiar } from "@/components/boton-copiar";
 import { buttonVariants } from "@/components/ui/button";
-import { ASISTENCIA_MINIMA, evaluarAptitud, NOTA_MINIMA } from "@/config/academico";
+import { ASISTENCIA_MINIMA, evaluarAptitud, formatearAsistencia, formatearNota, NOTA_MINIMA } from "@/config/academico";
 import { listarMisInscripciones } from "@/features/academico/consultas";
 import { datosCertificado, obtenerResultados } from "@/features/certificacion/consultas";
 import { urlVerificacion } from "@/features/certificacion/qr";
@@ -97,11 +97,11 @@ export default async function EstudianteCertificadosPage() {
                 <dl className="mt-4 grid grid-cols-3 gap-3 text-xs">
                   <div>
                     <dt className="text-muted-foreground">Nota final</dt>
-                    <dd className="font-mono font-medium">{r?.evaluaciones ? `${(r.nota_final ?? 0).toFixed(1)}/20` : "—"}</dd>
+                    <dd className="font-mono font-medium">{r?.evaluaciones ? `${formatearNota(r.nota_final ?? 0)}/20` : "—"}</dd>
                   </div>
                   <div>
                     <dt className="text-muted-foreground">Asistencia</dt>
-                    <dd className="font-mono font-medium">{r?.sesiones ? `${Math.round(r.asistencia ?? 0)} %` : "—"}</dd>
+                    <dd className="font-mono font-medium">{r?.sesiones ? `${formatearAsistencia(r.asistencia ?? 0)} %` : "—"}</dd>
                   </div>
                   <div>
                     <dt className="text-muted-foreground">Avance</dt>
