@@ -11,7 +11,7 @@ insert into auth.users (id, email) values
   ('a0000000-0000-4000-8000-000000000002', 'beto@pedsar.test'),
   ('a0000000-0000-4000-8000-000000000003', 'carla@pedsar.test');
 insert into public.cursos (id, slug, titulo, precio, cupo_maximo, estado) values
-  ('c0000000-0000-4000-8000-000000000001', 'excel', 'Excel', 180, 2, 'PUBLICADO');
+  ('c0000000-0000-4000-8000-000000000001', 'prueba-excel', 'Excel', 180, 2, 'PUBLICADO');
 
 -- ---------- Reserva con plazo ----------
 insert into public.inscripciones (id, estudiante_id, curso_id) values
@@ -41,7 +41,7 @@ select is((select estado::text from public.inscripciones where id = 'e0000000-00
   'Al inscribirse otro estudiante, la reserva vencida se cancela');
 select is((select estado::text from public.pagos where inscripcion_id = 'e0000000-0000-4000-8000-000000000001'), 'VENCIDO',
   'Su pago pendiente queda VENCIDO');
-select is((select count(*)::int from public.notificaciones where usuario_id = 'a0000000-0000-4000-8000-000000000001' and enlace = '/cursos/excel'), 1,
+select is((select count(*)::int from public.notificaciones where usuario_id = 'a0000000-0000-4000-8000-000000000001' and enlace = '/cursos/prueba-excel'), 1,
   'Se avisa al estudiante que su reserva venció');
 select is((select count(*)::int from public.registro_actividad where accion = 'VENCER_RESERVA'), 1, 'El vencimiento queda en la auditoría');
 

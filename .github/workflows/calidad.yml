@@ -53,4 +53,11 @@ jobs:
           version: 2.118.0 # la misma del devDependency «supabase»
       # Solo los servicios que necesitan las migraciones (auth, storage) y la BD.
       - run: supabase start -x studio,imgproxy,edge-runtime,logflare,vector,supavisor,realtime,postgres-meta
-      - run: supabase test db
+      - name: Pruebas pgTAP
+        run: |
+          set -o pipefail
+          supabase test db 2>&1 | tee pgtap.log
+      # Los fallos quedan como anotaciones del commit (visibles sin abrir el log).
+      - name: Fallos de pgTAP
+        if: failure()
+        run: grep -E "not ok|# +(Failed|Looks like)|ERROR|psql:" pgtap.log | head -40 | sed 's/^/::error title=pgTAP::/'

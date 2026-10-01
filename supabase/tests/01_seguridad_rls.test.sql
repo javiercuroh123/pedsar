@@ -32,10 +32,10 @@ update public.perfiles set rol = 'administrador' where id = 'a0000000-0000-4000-
 update public.perfiles set rol = 'instructor' where id = 'a0000000-0000-4000-8000-000000000002';
 
 insert into public.cursos (id, slug, titulo, precio, cupo_maximo, estado, instructor_id) values
-  ('c0000000-0000-4000-8000-000000000001', 'excel', 'Excel', 180, 30, 'PUBLICADO', 'a0000000-0000-4000-8000-000000000002'),
-  ('c0000000-0000-4000-8000-000000000002', 'borrador', 'Curso en borrador', 100, 30, 'BORRADOR', null);
-insert into public.evaluaciones (id, curso_id, titulo) overriding system value values (1, 'c0000000-0000-4000-8000-000000000001', 'Final');
-insert into public.preguntas (evaluacion_id, enunciado, opciones, respuesta_correcta) values (1, '¿Capital?', '["Lima","Cusco"]', 'Lima');
+  ('c0000000-0000-4000-8000-000000000001', 'prueba-excel', 'Excel', 180, 30, 'PUBLICADO', 'a0000000-0000-4000-8000-000000000002'),
+  ('c0000000-0000-4000-8000-000000000002', 'prueba-borrador', 'Curso en borrador', 100, 30, 'BORRADOR', null);
+insert into public.evaluaciones (id, curso_id, titulo) overriding system value values (90001, 'c0000000-0000-4000-8000-000000000001', 'Final');
+insert into public.preguntas (evaluacion_id, enunciado, opciones, respuesta_correcta) values (90001, '¿Capital?', '["Lima","Cusco"]', 'Lima');
 insert into public.cupones (codigo, porcentaje_descuento, fecha_vigencia) values ('PROMO', 10, '2999-12-31');
 -- Beto ya está inscrito (lo crea el sistema, con su pago).
 insert into public.inscripciones (id, estudiante_id, curso_id) values
@@ -44,7 +44,9 @@ insert into public.pagos (inscripcion_id, monto, metodo) values ('e0000000-0000-
 
 -- ---------- Visitante (anon) ----------
 select pruebas.como_visitante();
-select results_eq($$select slug from public.cursos$$, array['excel'], 'El visitante solo ve los cursos publicados');
+-- (El seed de Supabase local trae otros cursos publicados: se miran solo los de la prueba.)
+select results_eq($$select slug from public.cursos where id in ('c0000000-0000-4000-8000-000000000001', 'c0000000-0000-4000-8000-000000000002')$$,
+  array['prueba-excel'], 'El visitante solo ve los cursos publicados');
 select is_empty($$select 1 from public.perfiles$$, 'El visitante no ve perfiles');
 select is(public.cupo_disponible('c0000000-0000-4000-8000-000000000001'), 29, 'El visitante consulta el cupo disponible');
 select results_eq($$select nombres from public.instructores_publicos(array['a0000000-0000-4000-8000-000000000002'::uuid, 'a0000000-0000-4000-8000-000000000003'::uuid])$$,
