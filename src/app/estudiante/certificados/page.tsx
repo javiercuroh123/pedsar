@@ -41,7 +41,7 @@ export default async function EstudianteCertificadosPage() {
             const linkedin = `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(urlVerificar)}`;
             return (
               <div key={i.id} className="overflow-hidden rounded-2xl border bg-card shadow-xs">
-                <div className="bg-linear-to-br from-brand-100 via-fuchsia-50 to-orange-100 p-5 dark:from-brand-500/15 dark:via-transparent dark:to-orange-500/10">
+                <div className="bg-linear-to-b from-card to-brand-50 p-5 dark:from-transparent dark:to-brand-500/10">
                   <VistaCertificado
                     datos={{
                       estudiante: nombre,

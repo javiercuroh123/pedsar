@@ -77,7 +77,7 @@ export function RendirEvaluacion({
     const pct = resultado.total ? (resultado.puntaje! / resultado.total) * 100 : 0;
     return (
       <div className="mx-auto max-w-xl">
-        <div className="rounded-3xl border bg-card p-8 text-center shadow-xl shadow-brand-900/5">
+        <div className="animar-escala rounded-2xl border bg-card p-8 text-center shadow-(--sombra-lg)">
           <div
             className="mx-auto grid size-36 place-items-center rounded-full"
             style={{ background: `conic-gradient(${resultado.aprobado ? "#10b981" : "#f43f5e"} ${pct}%, color-mix(in oklch, var(--muted-foreground) 20%, transparent) 0)` }}
@@ -91,7 +91,7 @@ export function RendirEvaluacion({
               </div>
             </div>
           </div>
-          <h1 className={cn("mt-6 text-2xl font-bold", resultado.aprobado ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400")}>
+          <h1 className={cn("mt-6 text-2xl font-bold", resultado.aprobado ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400")}>
             {resultado.aprobado ? "¡Evaluación aprobada!" : "Evaluación no aprobada"}
           </h1>
           <p className="mt-2 text-sm text-muted-foreground">
@@ -138,7 +138,7 @@ export function RendirEvaluacion({
           <div
             className={cn(
               "flex items-center gap-2 rounded-xl border bg-card px-4 py-2 shadow-xs",
-              restante < 120 && "border-rose-300 bg-rose-50 text-rose-700 dark:border-rose-500/40 dark:bg-rose-500/10 dark:text-rose-300",
+              restante < 120 && "border-red-300 bg-red-50 text-red-700 dark:border-red-500/40 dark:bg-red-500/10 dark:text-red-300",
             )}
             role="timer"
             aria-label="Tiempo restante"
@@ -213,7 +213,7 @@ export function RendirEvaluacion({
                 className={cn(
                   "grid h-9 place-items-center rounded-lg border font-mono text-sm transition",
                   k === i && "ring-2 ring-primary",
-                  resp[q.id] ? "border-transparent bg-linear-to-br from-brand-500 to-violet-600 text-white" : "hover:bg-muted",
+                  resp[q.id] ? "border-transparent bg-primary text-primary-foreground" : "hover:bg-muted",
                 )}
               >
                 {k + 1}

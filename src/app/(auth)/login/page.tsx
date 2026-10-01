@@ -15,10 +15,10 @@ export default async function LoginPage({ searchParams }: PageProps<"/login">) {
   const mensajeError = typeof error === "string" ? ERRORES[error] : undefined;
   return (
     <>
-      <h1 className="text-3xl font-extrabold tracking-tight">Bienvenido de nuevo</h1>
+      <h1 className="text-[1.875rem] leading-tight font-semibold tracking-tight">Bienvenido de nuevo</h1>
       <p className="mt-2 mb-8 text-sm text-muted-foreground">Accede a tus cursos, pagos y certificados.</p>
       {mensajeError && (
-        <p className="mb-4 flex items-start gap-2 rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700 dark:bg-rose-500/10 dark:text-rose-300">
+        <p className="mb-4 flex items-start gap-2 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700 dark:bg-red-500/10 dark:text-red-300">
           <CircleAlertIcon className="mt-0.5 size-4 shrink-0" />
           {mensajeError}
         </p>

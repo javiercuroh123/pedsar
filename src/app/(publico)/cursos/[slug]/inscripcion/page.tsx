@@ -30,7 +30,7 @@ export default async function InscripcionPage({ params }: PageProps<"/cursos/[sl
         <Link href={`/cursos/${curso.slug}`} className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground">
           <ArrowLeftIcon className="size-4" /> Volver al curso
         </Link>
-        <h1 className="mt-4 text-3xl font-extrabold tracking-tight">Inscripción en línea</h1>
+        <h1 className="animar-entrada mt-4 text-[1.875rem] font-semibold tracking-tight">Completa tu inscripción</h1>
         <FormularioInscripcion
           curso={{
             id: curso.id,

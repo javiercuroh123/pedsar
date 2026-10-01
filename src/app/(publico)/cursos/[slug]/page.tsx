@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import {
+  ArrowRightIcon,
   AwardIcon,
   CalendarDaysIcon,
   CheckCircle2Icon,
@@ -16,7 +17,7 @@ import { AvatarIniciales, EstadoVacio, tabla } from "@/components/comunes";
 import { buttonVariants } from "@/components/ui/button";
 import { obtenerCursoPorSlug } from "@/features/catalogo/consultas";
 import { IndicadorCupo } from "@/features/catalogo/curso-card";
-import { degradadoCategoria, ICONO_MODALIDAD, PortadaCurso } from "@/features/catalogo/portada-curso";
+import { ICONO_MODALIDAD, PortadaCurso } from "@/features/catalogo/portada-curso";
 import { getUsuarioActual } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import {
@@ -66,11 +67,10 @@ export default async function CursoPage({ params }: PageProps<"/cursos/[slug]">)
 
   return (
     <>
-      <section className={cn("relative overflow-hidden bg-linear-to-br text-white", degradadoCategoria(curso.categoria?.slug))}>
-        <div className="fondo-puntos pointer-events-none absolute inset-0 text-white/15" />
-        <div className="pointer-events-none absolute inset-0 bg-linear-to-t from-black/30 to-transparent" />
+      <section className="fondo-marca relative overflow-hidden text-white">
+        <div className="fondo-puntos pointer-events-none absolute inset-0 text-white/[0.06]" />
         <div className="relative mx-auto max-w-7xl px-4 pt-8 pb-12 sm:px-6 lg:px-8 lg:pb-16">
-          <nav className="flex items-center gap-1.5 text-sm text-white/80" aria-label="Ruta">
+          <nav className="animar-entrada flex items-center gap-1.5 text-sm text-zinc-400" aria-label="Ruta">
             <Link href="/cursos" className="hover:text-white">
               Catálogo
             </Link>
@@ -84,16 +84,17 @@ export default async function CursoPage({ params }: PageProps<"/cursos/[slug]">)
             )}
           </nav>
           <div className="max-w-3xl lg:max-w-[calc(100%-400px)]">
-            <div className="mt-6 flex flex-wrap gap-2 text-xs font-semibold">
-              <span className="rounded-full bg-white/20 px-2.5 py-1 backdrop-blur">{ETIQUETA_NIVEL[curso.nivel]}</span>
-              <span className="inline-flex items-center gap-1 rounded-full bg-white/20 px-2.5 py-1 backdrop-blur">
+            <div className="animar-entrada mt-6 flex flex-wrap gap-2 text-xs font-medium [--i:1]">
+              {curso.destacado && <span className="rounded-full bg-rose-50 px-2.5 py-1 text-rose-700">Destacado</span>}
+              <span className="rounded-full bg-brand-50 px-2.5 py-1 text-brand-800">{ETIQUETA_NIVEL[curso.nivel]}</span>
+              <span className="inline-flex items-center gap-1 rounded-full bg-violet-50 px-2.5 py-1 text-violet-700">
                 <IconoModalidad className="size-3" />
                 {ETIQUETA_MODALIDAD[curso.modalidad]}
               </span>
             </div>
-            <h1 className="mt-4 text-3xl font-extrabold tracking-tight sm:text-4xl lg:text-5xl">{curso.titulo}</h1>
-            {curso.descripcion && <p className="mt-4 text-lg text-white/85">{curso.descripcion}</p>}
-            <div className="mt-6 flex flex-wrap gap-x-6 gap-y-2 text-sm text-white/90">
+            <h1 className="animar-entrada mt-4 text-3xl font-bold tracking-tight [--i:2] sm:text-4xl lg:text-[2.75rem] lg:leading-[1.15]">{curso.titulo}</h1>
+            {curso.descripcion && <p className="animar-entrada mt-4 text-lg text-zinc-300 [--i:3]">{curso.descripcion}</p>}
+            <div className="animar-entrada mt-6 flex flex-wrap gap-x-6 gap-y-2 text-sm text-zinc-300 [--i:4]">
               <span className="flex items-center gap-1.5">
                 <ClockIcon className="size-4" />
                 {curso.duracion_horas} horas académicas
@@ -186,11 +187,18 @@ export default async function CursoPage({ params }: PageProps<"/cursos/[slug]">)
           )}
         </div>
 
-        <aside className="lg:sticky lg:top-24 lg:-mt-40 lg:self-start">
-          <div className="overflow-hidden rounded-3xl border bg-card shadow-xl shadow-brand-900/10">
-            <PortadaCurso titulo={curso.titulo} imagen={curso.imagen_url} categoria={curso.categoria} modalidad={curso.modalidad} sinCupo={sinCupo} />
+        <aside className="animar-escala lg:sticky lg:top-24 lg:-mt-40 lg:self-start [--i:3]">
+          <div className="overflow-hidden rounded-2xl border bg-card shadow-(--sombra-lg)">
+            <PortadaCurso
+              titulo={curso.titulo}
+              imagen={curso.imagen_url}
+              categoria={curso.categoria}
+              modalidad={curso.modalidad}
+              sinCupo={sinCupo}
+              destacado={curso.destacado}
+            />
             <div className="p-6">
-              <p className="text-3xl font-extrabold tabular-nums">{formatearSoles(curso.precio)}</p>
+              <p className="text-[2.5rem] leading-none font-bold tracking-tight tabular-nums">{formatearSoles(curso.precio)}</p>
               <p className="text-xs text-muted-foreground">Pago único · incluye certificado</p>
               <div className="mt-4">
                 <IndicadorCupo disponible={curso.cupo_disponible} maximo={curso.cupo_maximo} />
@@ -205,11 +213,10 @@ export default async function CursoPage({ params }: PageProps<"/cursos/[slug]">)
               ) : (
                 <Link
                   href={`/cursos/${curso.slug}/inscripcion`}
-                  className={buttonVariants({
-                    className: "mt-5 h-11 w-full bg-linear-to-r from-brand-600 to-violet-600 text-base shadow-lg shadow-brand-600/25 hover:opacity-90",
-                  })}
+                  className={buttonVariants({ size: "lg", className: "group mt-5 w-full" })}
                 >
                   Inscribirme ahora
+                  <ArrowRightIcon className="transition-transform group-hover:translate-x-1" />
                 </Link>
               )}
               <dl className="mt-6 space-y-3 border-t pt-5 text-sm">
@@ -228,15 +235,15 @@ export default async function CursoPage({ params }: PageProps<"/cursos/[slug]">)
               </dl>
               <ul className="mt-5 space-y-2 rounded-xl bg-muted/60 p-4 text-sm">
                 <li className="flex items-center gap-2">
-                  <AwardIcon className="size-4 text-orange-500" />
+                  <AwardIcon className="size-4 text-rose-500" />
                   Certificado digital verificable
                 </li>
                 <li className="flex items-center gap-2">
-                  <FolderDownIcon className="size-4 text-teal-500" />
+                  <FolderDownIcon className="size-4 text-violet-600 dark:text-violet-400" />
                   Materiales descargables
                 </li>
                 <li className="flex items-center gap-2">
-                  <ReceiptIcon className="size-4 text-brand-500" />
+                  <ReceiptIcon className="size-4 text-brand-600 dark:text-brand-400" />
                   Boleta o factura electrónica
                 </li>
               </ul>

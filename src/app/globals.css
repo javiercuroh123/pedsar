@@ -34,115 +34,122 @@
   --color-secondary-foreground: var(--secondary-foreground);
   --color-secondary: var(--secondary);
   --color-primary-foreground: var(--primary-foreground);
+  --color-primary-hover: var(--primary-hover);
   --color-primary: var(--primary);
   --color-popover-foreground: var(--popover-foreground);
   --color-popover: var(--popover);
   --color-card-foreground: var(--card-foreground);
   --color-card: var(--card);
-  /* Identidad PEDSAR: índigo (marca) + coral (acento cálido) + turquesa (éxito/datos) */
-  --color-brand-50: oklch(0.97 0.02 277);
-  --color-brand-100: oklch(0.93 0.045 277);
-  --color-brand-200: oklch(0.87 0.08 277);
-  --color-brand-300: oklch(0.78 0.13 277);
-  --color-brand-400: oklch(0.68 0.18 277);
-  --color-brand-500: oklch(0.585 0.22 277);
-  --color-brand-600: oklch(0.51 0.23 277);
-  --color-brand-700: oklch(0.45 0.21 277);
-  --color-brand-800: oklch(0.38 0.17 277);
-  --color-brand-900: oklch(0.31 0.12 277);
-  --color-brand-950: oklch(0.21 0.08 277);
-  --color-coral-400: oklch(0.75 0.16 40);
-  --color-coral-500: oklch(0.68 0.19 38);
-  --color-coral-600: oklch(0.6 0.2 35);
+  /* Identidad PEDSAR «Grafito y cian»: cian (marca y acciones) + rosa (acento) sobre neutros grafito. */
+  --color-brand-50: #ecfeff;
+  --color-brand-100: #cffafe;
+  --color-brand-200: #a5f3fc;
+  --color-brand-300: #67e8f9;
+  --color-brand-400: #22d3ee;
+  --color-brand-500: #06b6d4;
+  --color-brand-600: #0891b2;
+  --color-brand-700: #0e7490;
+  --color-brand-800: #155e75;
+  --color-brand-900: #164e63;
+  --color-brand-950: #083344;
+  --color-coral-400: #fb7185;
+  --color-coral-500: #f43f5e;
+  --color-coral-600: #e11d48;
+  --ease-salida: cubic-bezier(0.22, 1, 0.36, 1);
   --radius-sm: calc(var(--radius) * 0.6);
   --radius-md: calc(var(--radius) * 0.8);
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) * 1.4);
-  --radius-2xl: calc(var(--radius) * 1.8);
-  --radius-3xl: calc(var(--radius) * 2.2);
-  --radius-4xl: calc(var(--radius) * 2.6);
+  --radius-2xl: calc(var(--radius) * 2);
+  --radius-3xl: calc(var(--radius) * 2.5);
+  --radius-4xl: calc(var(--radius) * 3);
 }
 
 :root {
-  --background: oklch(0.985 0.004 277);
-  --foreground: oklch(0.2 0.03 277);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.2 0.03 277);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.2 0.03 277);
-  --primary: oklch(0.51 0.23 277);
-  --primary-foreground: oklch(0.99 0 0);
-  --secondary: oklch(0.955 0.015 277);
-  --secondary-foreground: oklch(0.3 0.08 277);
-  --muted: oklch(0.96 0.008 277);
-  --muted-foreground: oklch(0.5 0.025 277);
-  --accent: oklch(0.95 0.025 277);
-  --accent-foreground: oklch(0.35 0.12 277);
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.915 0.012 277);
-  --input: oklch(0.88 0.015 277);
-  --ring: oklch(0.585 0.22 277);
-  --chart-1: oklch(0.51 0.23 277);
-  --chart-2: oklch(0.68 0.19 38);
-  --chart-3: oklch(0.7 0.13 185);
-  --chart-4: oklch(0.72 0.17 330);
-  --chart-5: oklch(0.8 0.15 85);
-  --radius: 0.7rem;
-  /* Barra lateral de los portales: azul noche con acentos índigo */
-  --sidebar: oklch(0.22 0.06 277);
-  --sidebar-foreground: oklch(0.86 0.03 277);
-  --sidebar-primary: oklch(0.68 0.18 277);
-  --sidebar-primary-foreground: oklch(0.99 0 0);
-  --sidebar-accent: oklch(0.3 0.08 277);
-  --sidebar-accent-foreground: oklch(0.99 0 0);
-  --sidebar-border: oklch(1 0 0 / 9%);
-  --sidebar-ring: oklch(0.68 0.18 277);
+  --background: #fafafa;
+  --foreground: #18181b;
+  --card: #ffffff;
+  --card-foreground: #18181b;
+  --popover: #ffffff;
+  --popover-foreground: #18181b;
+  /* Cian 700 para acciones: contraste 5.4:1 con texto blanco (WCAG AA). */
+  --primary: #0e7490;
+  --primary-hover: #155e75;
+  --primary-foreground: #ffffff;
+  --secondary: #f4f4f5;
+  --secondary-foreground: #18181b;
+  --muted: #f4f4f5;
+  --muted-foreground: #52525b;
+  --accent: #ecfeff;
+  --accent-foreground: #155e75;
+  --destructive: #dc2626;
+  --border: #e4e4e7;
+  --input: #d4d4d8;
+  --ring: #06b6d4;
+  --chart-1: #0891b2;
+  --chart-2: #f43f5e;
+  --chart-3: #7c3aed;
+  --chart-4: #f59e0b;
+  --chart-5: #3f3f46;
+  --radius: 0.5rem;
+  --sombra-lg: 0 2px 6px rgb(9 9 11 / 0.05), 0 24px 48px -12px rgb(9 9 11 / 0.18);
+  /* Barra lateral de los portales: grafito 900 con acentos cian */
+  --sidebar: #18181b;
+  --sidebar-foreground: #d4d4d8;
+  --sidebar-primary: #22d3ee;
+  --sidebar-primary-foreground: #083344;
+  --sidebar-accent: #27272a;
+  --sidebar-accent-foreground: #ffffff;
+  --sidebar-border: rgb(255 255 255 / 8%);
+  --sidebar-ring: #22d3ee;
 }
 
 .dark {
-  --background: oklch(0.16 0.025 277);
-  --foreground: oklch(0.96 0.01 277);
-  --card: oklch(0.205 0.03 277);
-  --card-foreground: oklch(0.96 0.01 277);
-  --popover: oklch(0.22 0.032 277);
-  --popover-foreground: oklch(0.96 0.01 277);
-  --primary: oklch(0.64 0.2 277);
-  --primary-foreground: oklch(0.99 0 0);
-  --secondary: oklch(0.27 0.04 277);
-  --secondary-foreground: oklch(0.94 0.02 277);
-  --muted: oklch(0.25 0.03 277);
-  --muted-foreground: oklch(0.72 0.03 277);
-  --accent: oklch(0.28 0.06 277);
-  --accent-foreground: oklch(0.92 0.05 277);
-  --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 9%);
-  --input: oklch(1 0 0 / 14%);
-  --ring: oklch(0.68 0.18 277);
-  --chart-1: oklch(0.68 0.18 277);
-  --chart-2: oklch(0.75 0.16 40);
-  --chart-3: oklch(0.76 0.12 185);
-  --chart-4: oklch(0.76 0.15 330);
-  --chart-5: oklch(0.84 0.14 85);
-  --sidebar: oklch(0.18 0.035 277);
-  --sidebar-foreground: oklch(0.82 0.03 277);
-  --sidebar-primary: oklch(0.68 0.18 277);
-  --sidebar-primary-foreground: oklch(0.99 0 0);
-  --sidebar-accent: oklch(0.26 0.05 277);
-  --sidebar-accent-foreground: oklch(0.99 0 0);
-  --sidebar-border: oklch(1 0 0 / 8%);
-  --sidebar-ring: oklch(0.68 0.18 277);
+  --background: #09090b;
+  --foreground: #fafafa;
+  --card: #18181b;
+  --card-foreground: #fafafa;
+  --popover: #18181b;
+  --popover-foreground: #fafafa;
+  --primary: #22d3ee;
+  --primary-hover: #67e8f9;
+  --primary-foreground: #083344;
+  --secondary: #27272a;
+  --secondary-foreground: #fafafa;
+  --muted: #27272a;
+  --muted-foreground: #a1a1aa;
+  --accent: rgb(6 182 212 / 12%);
+  --accent-foreground: #a5f3fc;
+  --destructive: #f87171;
+  --border: rgb(255 255 255 / 10%);
+  --input: rgb(255 255 255 / 15%);
+  --ring: #22d3ee;
+  --chart-1: #22d3ee;
+  --chart-2: #fb7185;
+  --chart-3: #a78bfa;
+  --chart-4: #fbbf24;
+  --chart-5: #a1a1aa;
+  --sombra-lg: 0 2px 6px rgb(0 0 0 / 0.3), 0 24px 48px -12px rgb(0 0 0 / 0.6);
+  --sidebar: #111113;
+  --sidebar-foreground: #d4d4d8;
+  --sidebar-primary: #22d3ee;
+  --sidebar-primary-foreground: #083344;
+  --sidebar-accent: #27272a;
+  --sidebar-accent-foreground: #ffffff;
+  --sidebar-border: rgb(255 255 255 / 8%);
+  --sidebar-ring: #22d3ee;
 }
 
 /* Alto contraste (RNF-08): bordes y textos secundarios más marcados */
 .alto-contraste {
-  --muted-foreground: oklch(0.32 0.03 277);
-  --border: oklch(0.55 0.03 277);
-  --input: oklch(0.45 0.03 277);
+  --muted-foreground: #3f3f46;
+  --border: #71717a;
+  --input: #52525b;
 }
 .dark.alto-contraste {
-  --muted-foreground: oklch(0.9 0.02 277);
-  --border: oklch(1 0 0 / 45%);
-  --input: oklch(1 0 0 / 55%);
+  --muted-foreground: #e4e4e7;
+  --border: rgb(255 255 255 / 45%);
+  --input: rgb(255 255 255 / 55%);
 }
 
 @layer base {
@@ -175,12 +182,12 @@
 }
 
 @utility texto-degradado {
-  background-image: linear-gradient(100deg, var(--color-brand-600), oklch(0.58 0.24 305) 55%, var(--color-coral-500));
+  background-image: linear-gradient(100deg, var(--color-brand-700), var(--color-brand-500) 60%, var(--color-brand-400));
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
   &:is(.dark *) {
-    background-image: linear-gradient(100deg, var(--color-brand-300), oklch(0.75 0.17 305) 55%, var(--color-coral-400));
+    background-image: linear-gradient(100deg, var(--color-brand-300), var(--color-brand-200));
   }
 }
 
@@ -189,9 +196,188 @@
   background-size: 16px 16px;
 }
 
+/* Degradado profundo de marca (héroes, panel de acceso, cabeceras oscuras). */
 @utility fondo-marca {
   background-image:
-    radial-gradient(60% 80% at 10% 0%, oklch(0.6 0.24 290 / 0.55), transparent 60%),
-    radial-gradient(50% 70% at 100% 100%, oklch(0.68 0.19 38 / 0.45), transparent 60%),
-    linear-gradient(135deg, var(--color-brand-700), var(--color-brand-900));
+    radial-gradient(60% 80% at 85% 0%, rgb(6 182 212 / 0.35), transparent 60%),
+    radial-gradient(50% 70% at 100% 100%, rgb(244 63 94 / 0.16), transparent 60%),
+    linear-gradient(135deg, var(--color-brand-900), #09090b);
+}
+
+/* ---------- Animaciones (se desactivan con «reducir movimiento») ---------- */
+@keyframes aparecer {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+}
+@keyframes aparecer-escala {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+}
+@keyframes llenar {
+  from {
+    width: 0;
+  }
+}
+@keyframes crecer-y {
+  from {
+    transform: scaleY(0);
+  }
+}
+@keyframes flotar {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}
+@keyframes latido {
+  0% {
+    box-shadow: 0 0 0 0 rgb(244 63 94 / 0.55);
+  }
+  70%,
+  100% {
+    box-shadow: 0 0 0 7px rgb(244 63 94 / 0);
+  }
+}
+@keyframes wiggle {
+  0%,
+  100% {
+    transform: rotate(0);
+  }
+  25% {
+    transform: rotate(-14deg);
+  }
+  50% {
+    transform: rotate(10deg);
+  }
+  75% {
+    transform: rotate(-6deg);
+  }
+}
+@keyframes destello {
+  from {
+    background-position: 200% 0;
+  }
+  to {
+    background-position: -200% 0;
+  }
+}
+
+/* Entrada de cada página (se reproduce en cada navegación gracias a template.tsx). */
+@utility animar-pagina {
+  animation: aparecer 0.5s var(--ease-salida) both;
+}
+/* Entrada individual; --i permite escalonar manualmente. */
+@utility animar-entrada {
+  animation: aparecer 0.6s var(--ease-salida) both;
+  animation-delay: calc(var(--i, 0) * 80ms);
+}
+@utility animar-escala {
+  animation: aparecer-escala 0.5s var(--ease-salida) both;
+  animation-delay: calc(var(--i, 0) * 80ms);
+}
+/* Hijos que aparecen uno tras otro (tarjetas, KPI, listas). */
+@utility escalonado {
+  & > * {
+    animation: aparecer 0.55s var(--ease-salida) both;
+  }
+  & > :nth-child(2) {
+    animation-delay: 60ms;
+  }
+  & > :nth-child(3) {
+    animation-delay: 120ms;
+  }
+  & > :nth-child(4) {
+    animation-delay: 180ms;
+  }
+  & > :nth-child(5) {
+    animation-delay: 240ms;
+  }
+  & > :nth-child(6) {
+    animation-delay: 300ms;
+  }
+  & > :nth-child(7) {
+    animation-delay: 360ms;
+  }
+  & > :nth-child(8) {
+    animation-delay: 420ms;
+  }
+  & > :nth-child(n + 9) {
+    animation-delay: 480ms;
+  }
+}
+/* Barras de progreso que se llenan hasta su ancho final. */
+@utility animar-barra {
+  animation: llenar 1.1s var(--ease-salida) 0.15s both;
+}
+/* Columnas de gráficos que crecen desde la base. */
+@utility animar-columna {
+  transform-origin: bottom;
+  animation: crecer-y 0.8s var(--ease-salida) both;
+  animation-delay: calc(var(--i, 0) * 45ms + 150ms);
+}
+/* Segmentos de gráficos SVG que se trazan desde cero (--c = circunferencia). */
+@keyframes trazar {
+  from {
+    stroke-dasharray: 0 var(--c);
+  }
+}
+@utility animar-trazo {
+  animation: trazar 1s var(--ease-salida) both;
+  animation-delay: calc(var(--i, 0) * 150ms + 200ms);
+}
+@utility flotar {
+  animation: flotar 6s ease-in-out infinite;
+}
+@utility latido {
+  animation: latido 2s ease-out infinite;
+}
+/* Tarjeta que se eleva al pasar el cursor. */
+@utility elevar {
+  transition:
+    transform 0.3s var(--ease-salida),
+    box-shadow 0.3s var(--ease-salida),
+    border-color 0.3s;
+  &:hover {
+    transform: translateY(-4px);
+    box-shadow: var(--sombra-lg);
+  }
+}
+/* Destello de carga para los esqueletos. */
+@utility brillo-carga {
+  background-image: linear-gradient(90deg, transparent 0%, rgb(255 255 255 / 0.55) 50%, transparent 100%);
+  background-size: 200% 100%;
+  animation: destello 1.6s linear infinite;
+  &:is(.dark *) {
+    background-image: linear-gradient(90deg, transparent 0%, rgb(255 255 255 / 0.08) 50%, transparent 100%);
+  }
+}
+
+/* Aparición al hacer scroll (mejora progresiva: sin soporte, el contenido se ve igual). */
+@utility revelar {
+  @media (prefers-reduced-motion: no-preference) {
+    @supports (animation-timeline: view()) {
+      animation: aparecer linear both;
+      animation-timeline: view();
+      animation-range: entry 0% entry 60%;
+    }
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  ::before,
+  ::after {
+    animation-duration: 0.01ms !important;
+    animation-delay: 0ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }

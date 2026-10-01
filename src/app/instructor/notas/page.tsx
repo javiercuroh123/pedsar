@@ -105,7 +105,7 @@ export default async function InstructorNotasPage({ searchParams }: PageProps<"/
                         <span className="font-mono text-xs">{p}%</span>
                       </div>
                     </td>
-                    <td className={cn(tabla.td, "font-mono text-xs", as !== null && as < ASISTENCIA_MINIMA && "text-rose-600 dark:text-rose-400")}>{as !== null ? `${as}%` : "—"}</td>
+                    <td className={cn(tabla.td, "font-mono text-xs", as !== null && as < ASISTENCIA_MINIMA && "text-red-600 dark:text-red-400")}>{as !== null ? `${as}%` : "—"}</td>
                     {notas.map(({ e, n }) => (
                       <td key={e.id} className={cn(tabla.td, "text-center font-mono", n === null && "text-muted-foreground")}>
                         {n !== null ? n : "—"}

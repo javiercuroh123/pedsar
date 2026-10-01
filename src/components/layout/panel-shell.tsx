@@ -23,24 +23,26 @@ export async function PanelShell({ usuario, portal, children }: { usuario: Perfi
   const [recientes, noLeidas] = await Promise.all([listarNotificaciones(usuario.id, 6), contarNoLeidas(usuario.id)]);
   const grupos = NAV_POR_ROL[portal];
   const nombre = nombreCompleto(usuario) || usuario.correo;
+  const lateral = { nombre, correo: usuario.correo, avatar: usuario.avatar_url };
 
   return (
-    <div className="min-h-screen lg:pl-64 print:pl-0">
-      <aside className="fixed inset-y-0 left-0 z-40 hidden w-64 lg:block print:hidden">
-        <ContenidoLateral grupos={grupos} etiquetaPortal={TITULO_PORTAL[portal]} noLeidas={noLeidas} />
+    <div className="min-h-screen lg:pl-70 print:pl-0">
+      <aside className="fixed inset-y-0 left-0 z-40 hidden w-70 lg:block print:hidden">
+        <ContenidoLateral grupos={grupos} etiquetaPortal={TITULO_PORTAL[portal]} noLeidas={noLeidas} usuario={lateral} />
       </aside>
 
       <div className="flex min-h-screen min-w-0 flex-col">
-        <header className="sticky top-0 z-30 flex print:hidden h-16 items-center gap-2 border-b bg-background/80 px-4 backdrop-blur-lg sm:px-6 lg:px-8">
-          <MenuMovilPanel grupos={grupos} etiquetaPortal={TITULO_PORTAL[portal]} noLeidas={noLeidas} />
+        <header className="sticky top-0 z-30 flex h-16 items-center gap-2 border-b bg-card/85 px-4 backdrop-blur-xl sm:px-6 lg:px-8 print:hidden">
+          <MenuMovilPanel grupos={grupos} etiquetaPortal={TITULO_PORTAL[portal]} noLeidas={noLeidas} usuario={lateral} />
           <p className="truncate text-sm text-muted-foreground">
             <span className="hidden sm:inline">{TITULO_PORTAL[portal]} · </span>
             <span className="font-medium text-foreground">PEDSAR</span>
           </p>
-          <div className="ml-auto flex items-center gap-1">
+          <div className="ml-auto flex items-center gap-1.5">
             <MenuAccesibilidad />
             <BotonTema />
             <CampanaNotificaciones recientes={recientes} noLeidas={noLeidas} />
+            <span className="mx-1.5 hidden h-7 w-px bg-border sm:block" aria-hidden />
             <MenuUsuario nombre={nombre} correo={usuario.correo} avatar={usuario.avatar_url} rol={ETIQUETA_ROL[usuario.rol]} />
           </div>
         </header>

@@ -131,7 +131,7 @@ export async function obtenerCursoPorSlug(slug: string) {
   const { data, error } = await supabase
     .from("cursos")
     .select(
-      `id, slug, titulo, descripcion, imagen_url, nivel, modalidad, precio, cupo_maximo, duracion_horas, instructor_id,
+      `id, slug, titulo, descripcion, imagen_url, nivel, modalidad, precio, cupo_maximo, duracion_horas, destacado, instructor_id,
        categoria:categorias(nombre, slug),
        modulos(id, titulo, orden),
        sesiones(id, fecha, hora_inicio, duracion_minutos, modalidad)`,

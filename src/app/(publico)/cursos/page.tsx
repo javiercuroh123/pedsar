@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { SearchXIcon, XIcon } from "lucide-react";
+import { ChevronRightIcon, SearchXIcon, XIcon } from "lucide-react";
 import { EstadoVacio } from "@/components/comunes";
 import { buttonVariants } from "@/components/ui/button";
 import { listarCategorias, listarCursosPublicados, type OrdenCatalogo } from "@/features/catalogo/consultas";
@@ -54,12 +54,18 @@ export default async function CatalogoPage({ searchParams }: PageProps<"/cursos"
 
   return (
     <>
-      <section className="relative overflow-hidden border-b bg-linear-to-br from-brand-50 via-background to-orange-50/60 dark:from-brand-950/60 dark:via-background dark:to-background">
-        <div className="fondo-puntos pointer-events-none absolute inset-0 text-brand-900/[0.05] dark:text-white/[0.04]" />
+      <section className="relative overflow-hidden border-b bg-card">
+        <div className="pointer-events-none absolute -top-32 -right-24 size-96 rounded-full bg-brand-300/20 blur-3xl dark:bg-brand-600/10" />
         <div className="relative mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
-          <p className="text-xs font-semibold tracking-[0.14em] text-primary uppercase">Oferta formativa</p>
-          <h1 className="mt-2 text-3xl font-extrabold tracking-tight sm:text-4xl">Catálogo de cursos</h1>
-          <p className="mt-2 max-w-xl text-muted-foreground">
+          <nav aria-label="Ruta" className="animar-entrada flex items-center gap-1.5 text-sm text-muted-foreground">
+            <Link href="/" className="transition-colors hover:text-foreground">
+              Inicio
+            </Link>
+            <ChevronRightIcon className="size-3.5" aria-hidden />
+            <span className="font-medium text-foreground">Cursos</span>
+          </nav>
+          <h1 className="animar-entrada mt-3 text-4xl font-bold tracking-tight [--i:1] sm:text-[2.5rem]">Catálogo de cursos</h1>
+          <p className="animar-entrada mt-2 max-w-xl text-lg text-muted-foreground [--i:2]">
             Busca por nombre o instructor y filtra por categoría, nivel, modalidad y precio.
           </p>
         </div>
@@ -81,7 +87,7 @@ export default async function CatalogoPage({ searchParams }: PageProps<"/cursos"
                 key={`${c.k}-${c.v}`}
                 href={sin(c.k, c.v)}
                 scroll={false}
-                className="inline-flex items-center gap-1 rounded-full bg-brand-50 py-1 pr-2 pl-3 text-xs font-medium text-brand-700 ring-1 ring-brand-200 transition hover:bg-brand-100 dark:bg-brand-500/10 dark:text-brand-200 dark:ring-brand-500/30"
+                className="animar-escala inline-flex items-center gap-1.5 rounded-full bg-brand-50 py-1 pr-2 pl-3 text-sm font-medium text-brand-800 ring-1 ring-brand-200 transition hover:bg-brand-100 dark:bg-brand-500/10 dark:text-brand-200 dark:ring-brand-500/30"
                 aria-label={`Quitar filtro ${c.t}`}
               >
                 {c.t}
@@ -90,7 +96,7 @@ export default async function CatalogoPage({ searchParams }: PageProps<"/cursos"
             ))}
           </div>
           {cursos.length > 0 ? (
-            <div className="mt-5 grid gap-6 sm:grid-cols-2 xl:grid-cols-3">
+            <div className="escalonado mt-5 grid gap-6 sm:grid-cols-2 xl:grid-cols-3">
               {cursos.map((c) => (
                 <CursoCard key={c.id} curso={c} />
               ))}

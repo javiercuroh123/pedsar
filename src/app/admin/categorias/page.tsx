@@ -5,7 +5,7 @@ import { BotonAccion } from "@/components/boton-accion";
 import { EncabezadoPagina, EstadoVacio } from "@/components/comunes";
 import { eliminarCategoria } from "@/features/administracion/acciones";
 import { DialogoCategoria } from "@/features/administracion/dialogos";
-import { degradadoCategoria } from "@/features/catalogo/portada-curso";
+import { degradadoCategoria, IconoCategoria } from "@/features/catalogo/portada-curso";
 import { requireRol } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { cn } from "@/lib/utils";
@@ -26,13 +26,13 @@ export default async function AdminCategoriasPage() {
         <DialogoCategoria />
       </EncabezadoPagina>
       {categorias.length ? (
-        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+        <div className="escalonado grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
           {categorias.map((c) => {
             const n = c.cursos?.[0]?.count ?? 0;
             return (
-              <div key={c.id} className="flex items-start gap-4 rounded-2xl border bg-card p-5 shadow-xs">
-                <span className={cn("grid size-12 shrink-0 place-items-center rounded-xl bg-linear-to-br font-mono text-sm font-bold text-white shadow-sm", degradadoCategoria(c.slug))}>
-                  {c.nombre.slice(0, 2).toUpperCase()}
+              <div key={c.id} className="elevar flex items-start gap-4 rounded-2xl border bg-card p-5 shadow-xs">
+                <span className={cn("grid size-12 shrink-0 place-items-center rounded-xl bg-linear-to-br text-brand-100 shadow-sm", degradadoCategoria(c.slug))}>
+                  <IconoCategoria slug={c.slug} className="size-5.5" />
                 </span>
                 <div className="min-w-0 flex-1">
                   <p className="font-semibold">{c.nombre}</p>
@@ -49,7 +49,7 @@ export default async function AdminCategoriasPage() {
                     confirmar={`¿Eliminar "${c.nombre}"? Sus cursos quedarán sin categoría.`}
                     variant="ghost"
                     size="icon-sm"
-                    className="text-rose-600 dark:text-rose-400"
+                    className="text-red-600 dark:text-red-400"
                     aria-label="Eliminar categoría"
                   >
                     <Trash2Icon />

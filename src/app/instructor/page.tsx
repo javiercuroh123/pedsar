@@ -62,7 +62,7 @@ export default async function InstructorPage() {
         </Link>
       </EncabezadoPagina>
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="escalonado grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <TarjetaKpi etiqueta="Cursos a cargo" valor={cursos.length} icono={BookOpenIcon} tono="indigo" detalle={`${cursos.filter((c) => c.estado === "PUBLICADO").length} publicados`} />
         <TarjetaKpi etiqueta="Estudiantes activos" valor={filas.length} icono={UsersIcon} tono="turquesa" detalle="Inscripciones confirmadas" />
         <TarjetaKpi etiqueta="Sesiones esta semana" valor={semana.length} icono={CalendarDaysIcon} tono="coral" detalle={semana[0] ? `Próxima: ${formatearFecha(semana[0].fecha)}` : "Sin sesiones"} />
@@ -125,7 +125,7 @@ export default async function InstructorPage() {
         </PanelTabla>
 
         <section className="overflow-hidden rounded-2xl border bg-card shadow-xs">
-          <div className="border-b bg-linear-to-r from-orange-50 to-transparent px-5 py-4 dark:from-orange-500/10">
+          <div className="border-b bg-red-50/60 px-5 py-4 dark:bg-red-500/10">
             <h2 className="font-semibold">Agenda de hoy</h2>
             <p className="text-xs text-muted-foreground">{formatearFecha(hoy)}</p>
           </div>

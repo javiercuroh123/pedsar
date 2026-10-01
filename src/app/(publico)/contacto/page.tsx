@@ -19,15 +19,15 @@ export default async function ContactoPage({ searchParams }: PageProps<"/contact
 
   return (
     <div className="relative">
-      <div className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-80 bg-linear-to-b from-brand-50 via-orange-50/40 to-transparent dark:from-brand-950/50 dark:via-transparent" />
+      <div className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-80 bg-linear-to-b from-brand-50 to-transparent dark:from-brand-950/40" />
       <div className="mx-auto max-w-7xl px-4 py-14 sm:px-6 lg:px-8">
-        <p className="text-xs font-semibold tracking-[0.14em] text-primary uppercase">Contacto</p>
-        <h1 className="mt-2 text-3xl font-extrabold tracking-tight sm:text-4xl">¿Hablamos?</h1>
-        <p className="mt-3 max-w-xl text-muted-foreground">
+        <p className="animar-entrada text-xs font-semibold tracking-[0.08em] text-brand-700 uppercase dark:text-brand-300">Contacto</p>
+        <h1 className="animar-entrada mt-2 text-4xl font-bold tracking-tight [--i:1] sm:text-[2.5rem]">Hablemos</h1>
+        <p className="animar-entrada mt-3 max-w-xl text-lg text-muted-foreground [--i:2]">
           Resolvemos tus dudas sobre cursos, inscripciones, pagos y capacitaciones para empresas.
         </p>
         <div className="mt-10 grid gap-8 lg:grid-cols-[1fr_minmax(0,1.4fr)]">
-          <ul className="space-y-3">
+          <ul className="escalonado space-y-3">
             {canales.map((c) => {
               const contenido = (
                 <>
@@ -41,18 +41,18 @@ export default async function ContactoPage({ searchParams }: PageProps<"/contact
               return (
                 <li key={c.titulo}>
                   {c.href ? (
-                    <a href={c.href} target={c.href.startsWith("http") ? "_blank" : undefined} rel="noreferrer" className="flex items-center gap-4 rounded-2xl border bg-card p-4 transition hover:border-brand-300 hover:shadow-md">
+                    <a href={c.href} target={c.href.startsWith("http") ? "_blank" : undefined} rel="noreferrer" className="elevar flex items-center gap-4 rounded-xl border bg-card p-4 shadow-xs hover:border-brand-200">
                       {contenido}
                     </a>
                   ) : (
-                    <div className="flex items-center gap-4 rounded-2xl border bg-card p-4">{contenido}</div>
+                    <div className="flex items-center gap-4 rounded-xl border bg-card p-4 shadow-xs">{contenido}</div>
                   )}
                 </li>
               );
             })}
           </ul>
-          <div className="rounded-3xl border bg-card p-6 shadow-xl shadow-brand-900/5 sm:p-8">
-            <h2 className="text-lg font-bold">Escríbenos</h2>
+          <div className="animar-escala rounded-2xl border bg-card p-6 shadow-sm [--i:2] sm:p-8">
+            <h2 className="text-[1.375rem] font-semibold tracking-tight">Escríbenos</h2>
             <p className="mb-6 text-sm text-muted-foreground">Te responderemos en menos de 24 horas hábiles.</p>
             <FormularioContacto asunto={typeof asunto === "string" ? asunto : undefined} />
           </div>

@@ -26,10 +26,10 @@ export function GraficoBarras({ datos, etiqueta }: { datos: { clave: string; eti
               <li key={d.clave} className="group flex flex-1 flex-col items-center gap-2">
                 <div className="relative w-full flex-1" tabIndex={0} aria-label={`${d.etiqueta}: ${d.valor}`}>
                   <div
-                    className={`absolute inset-x-0 bottom-0 mx-auto max-w-9 rounded-t-[4px] transition-colors ${
-                      ultimo ? "bg-brand-600 dark:bg-brand-400" : "bg-brand-300 group-hover:bg-brand-500 dark:bg-brand-500/50 dark:group-hover:bg-brand-400"
+                    className={`animar-columna absolute inset-x-0 bottom-0 mx-auto max-w-9 rounded-t-md transition-colors duration-200 ${
+                      ultimo ? "bg-primary" : "bg-brand-200 group-hover:bg-brand-400 dark:bg-brand-500/40 dark:group-hover:bg-brand-400"
                     }`}
-                    style={{ height: `${(d.valor / tope) * 100}%` }}
+                    style={{ height: `${(d.valor / tope) * 100}%`, "--i": i } as React.CSSProperties}
                   >
                     <span
                       className={`absolute -top-6 left-1/2 -translate-x-1/2 rounded bg-foreground px-1.5 py-0.5 font-mono text-[11px] font-semibold whitespace-nowrap text-background ${

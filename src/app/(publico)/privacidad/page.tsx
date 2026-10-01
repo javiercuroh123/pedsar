@@ -69,7 +69,7 @@ export default function PrivacidadPage() {
       </nav>
       <article>
         <p className="text-xs font-semibold tracking-[0.14em] text-primary uppercase">Legal</p>
-        <h1 className="mt-2 text-3xl font-extrabold tracking-tight sm:text-4xl">Política de privacidad y términos</h1>
+        <h1 className="mt-2 text-3xl font-bold tracking-tight sm:text-4xl">Política de privacidad y términos</h1>
         <p className="mt-3 text-muted-foreground">
           Tratamiento de datos personales conforme a la Ley N.º 29733 y su reglamento.
         </p>

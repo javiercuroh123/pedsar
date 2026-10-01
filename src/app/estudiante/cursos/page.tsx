@@ -93,7 +93,7 @@ export default async function EstudianteCursosPage({ searchParams }: PageProps<"
       </EncabezadoPagina>
 
       {typeof error === "string" && (
-        <p className="flex items-center gap-2 rounded-xl bg-rose-50 px-4 py-3 text-sm text-rose-700 dark:bg-rose-500/10 dark:text-rose-300" role="alert">
+        <p className="flex items-center gap-2 rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700 dark:bg-red-500/10 dark:text-red-300" role="alert">
           <CircleAlertIcon className="size-4 shrink-0" />
           {error}
         </p>

@@ -57,7 +57,7 @@ export function InterruptorUsuario({ id, activo, deshabilitado }: { id: string; 
             toast.success(activo ? "Usuario desactivado" : "Usuario activado");
           });
         }}
-        className={cn("relative inline-flex h-5 w-9 items-center rounded-full transition-colors disabled:opacity-50", activo ? "bg-emerald-500" : "bg-input")}
+        className={cn("relative inline-flex h-5 w-9 items-center rounded-full transition-colors disabled:opacity-50", activo ? "bg-green-500" : "bg-input")}
       >
         <span className={cn("absolute left-0.5 size-4 rounded-full bg-white shadow transition-transform", activo && "translate-x-4")} />
       </button>

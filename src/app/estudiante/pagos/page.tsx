@@ -39,18 +39,18 @@ export default async function EstudiantePagosPage({ searchParams }: PageProps<"/
       <EncabezadoPagina titulo="Pagos y comprobantes" descripcion="Historial de pagos y comprobantes electrónicos emitidos." eyebrow="Cuenta" />
 
       {recien && (
-        <div className="flex items-start gap-3 rounded-2xl border border-emerald-200 bg-linear-to-r from-emerald-50 to-teal-50 p-5 dark:border-emerald-500/25 dark:from-emerald-500/10 dark:to-teal-500/5" role="status">
-          <CheckCircle2Icon className="mt-0.5 size-6 shrink-0 text-emerald-600 dark:text-emerald-400" />
+        <div className="flex items-start gap-3 animar-escala rounded-2xl border border-green-100 bg-green-50 p-5 dark:border-green-500/25 dark:bg-green-500/10" role="status">
+          <CheckCircle2Icon className="mt-0.5 size-6 shrink-0 text-green-600 dark:text-green-400" />
           <div>
-            <p className="font-semibold text-emerald-900 dark:text-emerald-200">¡Inscripción registrada! · {recien.curso.titulo}</p>
-            <p className="mt-1 text-sm text-emerald-800/80 dark:text-emerald-200/70">
+            <p className="font-semibold text-green-900 dark:text-green-200">¡Inscripción registrada! · {recien.curso.titulo}</p>
+            <p className="mt-1 text-sm text-green-800/80 dark:text-green-200/70">
               N.º <span className="font-mono">{recien.codigo}</span>. Tu cupo se confirmará en cuanto se valide el pago; te avisaremos por correo.
             </p>
           </div>
         </div>
       )}
 
-      <div className="grid gap-4 sm:grid-cols-3">
+      <div className="escalonado grid gap-4 sm:grid-cols-3">
         <TarjetaKpi etiqueta="Total pagado" valor={formatearSoles(pagado)} icono={WalletIcon} tono="turquesa" />
         <TarjetaKpi etiqueta="Pendiente de validación" valor={formatearSoles(pendiente)} icono={ReceiptIcon} tono="ambar" />
         <TarjetaKpi etiqueta="Comprobantes emitidos" valor={inscripciones.filter((i) => i.pago?.comprobante).length} icono={ReceiptIcon} tono="indigo" />
