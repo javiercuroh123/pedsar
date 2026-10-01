@@ -1,5 +1,8 @@
-import { GraduationCapIcon, QrCodeIcon } from "lucide-react";
+import { GraduationCapIcon } from "lucide-react";
+import { esCertificadoDeAprobacion } from "@/config/academico";
+import { publicEnv } from "@/lib/env";
 import { formatearFecha } from "@/lib/formato";
+import { trazadoQr, urlVerificacion } from "./qr";
 
 export interface DatosCertificado {
   estudiante: string;
@@ -8,13 +11,17 @@ export interface DatosCertificado {
   fecha_emision: string;
   codigo_unico: string;
   instructor?: string | null;
+  nota_final?: number | null;
 }
 
 /**
- * Representación visual del certificado (HU-11). Escala con el ancho del
- * contenedor (unidades cqw), así sirve como miniatura y como vista completa.
+ * Representación visual del certificado (HU-11), con el mismo contenido que el PDF.
+ * Escala con el ancho del contenedor (unidades cqw), así sirve como miniatura y como
+ * vista completa.
  */
 export function VistaCertificado({ datos }: { datos: DatosCertificado }) {
+  const aprobacion = esCertificadoDeAprobacion(datos.nota_final);
+  const qr = trazadoQr(urlVerificacion(publicEnv.NEXT_PUBLIC_SITE_URL, datos.codigo_unico));
   return (
     <div
       className="relative aspect-[1.414/1] w-full overflow-hidden rounded-xl border bg-white text-zinc-900 shadow-sm [container-type:inline-size]"
@@ -36,7 +43,7 @@ export function VistaCertificado({ datos }: { datos: DatosCertificado }) {
         </div>
         <div>
           <p className="font-semibold text-brand-700 uppercase" style={{ fontSize: "1.9cqw", letterSpacing: ".3em" }}>
-            Certificado de aprobación
+            {aprobacion ? "Certificado de aprobación" : "Certificado de participación"}
           </p>
           <p className="text-zinc-500" style={{ fontSize: "1.7cqw", marginTop: "2.2cqw" }}>
             Otorgado a
@@ -45,8 +52,9 @@ export function VistaCertificado({ datos }: { datos: DatosCertificado }) {
             {datos.estudiante}
           </p>
           <p className="mx-auto text-zinc-600" style={{ fontSize: "1.7cqw", maxWidth: "80%", marginTop: "1.6cqw" }}>
-            por haber aprobado el curso <b className="text-zinc-900">{datos.curso}</b>, con una duración de {datos.duracion_horas} horas
-            académicas. Ica, {formatearFecha(datos.fecha_emision)}.
+            {aprobacion ? "por haber aprobado el curso" : "por haber participado en el curso"} <b className="text-zinc-900">{datos.curso}</b>, con una
+            duración de {datos.duracion_horas} horas académicas
+            {aprobacion && ` y una nota final de ${datos.nota_final!.toFixed(1)} sobre 20`}. Ica, {formatearFecha(datos.fecha_emision)}.
           </p>
         </div>
         <div className="grid w-full grid-cols-3 items-end" style={{ fontSize: "1.4cqw", gap: "4cqw" }}>
@@ -57,11 +65,10 @@ export function VistaCertificado({ datos }: { datos: DatosCertificado }) {
             <div className="text-zinc-500">PEDSAR E.I.R.L.</div>
           </div>
           <div className="flex flex-col items-center">
-            <div
-              className="grid place-items-center rounded border border-zinc-200 bg-white text-zinc-900"
-              style={{ width: "9cqw", height: "9cqw" }}
-            >
-              <QrCodeIcon style={{ width: "7cqw", height: "7cqw" }} strokeWidth={1.6} />
+            <div className="grid place-items-center rounded border border-zinc-200 bg-white" style={{ width: "9cqw", height: "9cqw" }}>
+              <svg viewBox={`0 0 ${qr.modulos} ${qr.modulos}`} style={{ width: "7.4cqw", height: "7.4cqw" }} shapeRendering="crispEdges" aria-hidden>
+                <path d={qr.d} fill="#18181b" />
+              </svg>
             </div>
             <div className="font-mono" style={{ marginTop: ".8cqw" }}>
               {datos.codigo_unico}

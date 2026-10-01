@@ -7,8 +7,10 @@ import { requireRol } from "@/lib/auth";
 import { generarCodigoCertificado } from "@/lib/certificados";
 import { programarCorreo } from "@/lib/email";
 import { correoCertificadoEmitido, correoConfirmacionMatricula, correoPagoObservado, correoPagoRechazado } from "@/lib/email/plantillas";
-import { formatearFechaHora } from "@/lib/formato";
+import { formatearFechaHora, nombreCompleto } from "@/lib/formato";
+import { evaluarAptitud } from "@/config/academico";
 import { PLAZO_PAGO_HORAS } from "@/config/matricula";
+import { obtenerResultados } from "@/features/certificacion/consultas";
 import { publicEnv } from "@/lib/env";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
@@ -329,26 +331,64 @@ export async function alternarCupon(formData: FormData) {
 }
 
 // ---------- Certificados (HU-11 · HU-60) ----------
+const emisionSchema = z.object({
+  ids: z.array(z.uuid()).min(1, "Selecciona al menos un estudiante"),
+  // Motivo para emitir a quien no cumple los requisitos (p. ej. faltas justificadas).
+  motivo: z.preprocess((v) => (typeof v === "string" && v.trim() ? v.trim() : undefined), z.string().min(10, "Explica el motivo de la excepción (mínimo 10 caracteres)").max(300).optional()),
+});
+
+/**
+ * Emite los certificados de las inscripciones confirmadas que cumplen los requisitos
+ * (evaluarAptitud). Las que no los cumplen solo se emiten si el administrador indica un
+ * motivo, que queda en el certificado (no se publica) y en la auditoría. Los datos del
+ * documento (nombre, curso, horas, instructor, nota y asistencia) se congelan al emitir.
+ */
 export async function emitirCertificados(formData: FormData): Promise<EstadoFormulario> {
   const usuario = await admin();
-  const ids = z.array(z.uuid()).min(1, "Selecciona al menos un estudiante").safeParse(formData.getAll("inscripcion"));
-  if (!ids.success) return fallo(ids.error);
+  const d = emisionSchema.safeParse({ ids: formData.getAll("inscripcion"), motivo: formData.get("motivo") });
+  if (!d.success) return fallo(d.error);
+  const { ids, motivo } = d.data;
   const supabase = await createClient();
-  const { data: filas } = await supabase
-    .from("inscripciones")
-    .select("id, estudiante_id, estudiante:perfiles(nombres, correo), curso:cursos(titulo)")
-    .in("id", ids.data)
-    .eq("estado", "CONFIRMADA");
+  const [{ data: filas }, resultados] = await Promise.all([
+    supabase
+      .from("inscripciones")
+      .select(
+        "id, estudiante_id, estudiante:perfiles(nombres, apellidos, correo), curso:cursos(titulo, duracion_horas, instructor:perfiles(nombres, apellidos))",
+      )
+      .in("id", ids)
+      .eq("estado", "CONFIRMADA"),
+    obtenerResultados(ids),
+  ]);
 
   let emitidos = 0;
+  let excepciones = 0;
+  const omitidos: string[] = [];
   for (const ins of filas ?? []) {
+    const estudiante = uno<{ nombres: string; apellidos: string; correo: string }>(ins.estudiante);
+    const curso = uno<{ titulo: string; duracion_horas: number; instructor: unknown }>(ins.curso);
+    const resultado = resultados.get(ins.id);
+    const { apto, motivos } = evaluarAptitud(resultado);
+    if (!apto && !motivo) {
+      omitidos.push(`${nombreCompleto(estudiante) || estudiante?.correo}: ${motivos.join("; ")}`);
+      continue;
+    }
+
     const codigo = generarCodigoCertificado();
-    const { error } = await supabase.from("certificados").insert({ inscripcion_id: ins.id, codigo_unico: codigo });
+    const { error } = await supabase.from("certificados").insert({
+      inscripcion_id: ins.id,
+      codigo_unico: codigo,
+      estudiante_nombre: nombreCompleto(estudiante) || estudiante?.correo || "",
+      curso_titulo: curso?.titulo ?? "",
+      duracion_horas: curso?.duracion_horas ?? 0,
+      instructor_nombre: nombreCompleto(uno<{ nombres: string; apellidos: string }>(curso?.instructor)) || null,
+      nota_final: resultado?.nota_final ?? null,
+      asistencia: resultado?.asistencia ?? null,
+      motivo_excepcion: apto ? null : motivo,
+    });
     if (error) continue; // ya tenía certificado (inscripcion_id es único)
     emitidos++;
-    const curso = (Array.isArray(ins.curso) ? ins.curso[0] : ins.curso) as { titulo: string } | null;
+    if (!apto) excepciones++;
     await notificar(ins.estudiante_id, `¡Felicidades! Ya puedes descargar tu certificado de ${curso?.titulo ?? "tu curso"}.`, "/estudiante/certificados");
-    const estudiante = uno<{ nombres: string; correo: string }>(ins.estudiante);
     if (estudiante?.correo) {
       programarCorreo({
         para: estudiante.correo,
@@ -360,10 +400,21 @@ export async function emitirCertificados(formData: FormData): Promise<EstadoForm
         }),
       });
     }
-    await registrarActividad(usuario.id, "EMITIR_CERTIFICADO", { codigo, inscripcion: ins.id });
+    await registrarActividad(usuario.id, apto ? "EMITIR_CERTIFICADO" : "EMITIR_CERTIFICADO_EXCEPCION", {
+      codigo,
+      inscripcion: ins.id,
+      nota_final: resultado?.nota_final ?? null,
+      asistencia: resultado?.asistencia ?? null,
+      ...(apto ? {} : { motivo, requisitos_no_cumplidos: motivos }),
+    });
   }
   revalidatePath("/admin/certificados");
-  return emitidos ? { ok: true, mensaje: `${emitidos} certificado(s) emitido(s)` } : { ok: false, mensaje: "No se emitió ningún certificado" };
+
+  const partes = [
+    emitidos && `${emitidos} certificado(s) emitido(s)${excepciones ? ` (${excepciones} como excepción)` : ""}`,
+    omitidos.length && `${omitidos.length} sin emitir por no cumplir los requisitos — ${omitidos.join(" · ")}`,
+  ].filter(Boolean);
+  return { ok: emitidos > 0, mensaje: partes.join(". ") || "No se emitió ningún certificado" };
 }
 
 // ---------- Usuarios y roles (HU-03 · HU-34 · HU-53) ----------

@@ -33,7 +33,16 @@ export interface InscripcionEstudiante {
     observacion: string | null;
     comprobante: { tipo: string; serie: string; numero: string; pdf_url: string | null } | null;
   } | null;
-  certificado: { codigo_unico: string; fecha_emision: string } | null;
+  /** Datos congelados al emitir (null en los campos si el certificado es anterior a ese cambio). */
+  certificado: {
+    codigo_unico: string;
+    fecha_emision: string;
+    estudiante_nombre: string | null;
+    curso_titulo: string | null;
+    duracion_horas: number | null;
+    instructor_nombre: string | null;
+    nota_final: number | null;
+  } | null;
   progreso: { completadas: number; total: number; porcentaje: number };
 }
 
@@ -83,7 +92,7 @@ export async function listarMisInscripciones(estudianteId: string): Promise<Insc
       `id, codigo, estado, fecha_inscripcion, vence_en,
        curso:cursos(id, slug, titulo, modalidad, duracion_horas, categoria:categorias(nombre, slug)),
        pagos(id, monto, metodo, estado, fecha_pago, numero_operacion, reportado_en, observacion, comprobantes(tipo, serie, numero, pdf_url)),
-       certificados(codigo_unico, fecha_emision)`,
+       certificados(codigo_unico, fecha_emision, estudiante_nombre, curso_titulo, duracion_horas, instructor_nombre, nota_final)`,
     )
     .eq("estudiante_id", estudianteId)
     .order("fecha_inscripcion", { ascending: false });

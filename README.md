@@ -105,6 +105,14 @@ Cada inscripción pendiente reserva el cupo 48 horas (`PLAZO_PAGO_HORAS`). Si no
 pago a tiempo, deja de contar en el cupo y una tarea de pg_cron (cada 15 min) la cancela, marca el
 pago como VENCIDO y avisa al estudiante. Una inscripción cancelada no impide volver a inscribirse.
 
+**Certificados (HU-11):** se emiten a quien rinde todas las evaluaciones con nota final ≥ 13/20 y
+asiste al 75 % de las sesiones dictadas (`src/config/academico.ts`; la función
+`resultado_academico` de la BD calcula nota, asistencia y avance). Quien no cumple solo se emite
+como excepción, con un motivo que queda en la auditoría. Al emitir se congelan nombre, curso,
+horas, instructor y nota. El PDF (A4, con QR a `/verificar`) se genera al vuelo en
+`/certificados/[codigo]/pdf` con pdf-lib y uqr; la verificación pública muestra la nota solo en
+los certificados de aprobación.
+
 **Correos (HU-21):** al inscribirse (instrucciones de pago y plazo), al observar, confirmar o
 rechazar un pago y al emitir un certificado. Se envían con Resend después de responder
 (`after`), sin demorar la acción; sin `RESEND_API_KEY` solo se muestran en la consola del
