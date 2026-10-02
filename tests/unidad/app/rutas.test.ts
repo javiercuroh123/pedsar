@@ -5,6 +5,7 @@ import { GET as exportarReporte } from "@/app/admin/reportes/exportar/route";
 import { GET as salud } from "@/app/api/salud/route";
 import { POST as webhook } from "@/app/api/pagos/webhook/[proveedor]/route";
 import { GET as pdfCertificado } from "@/app/certificados/[codigo]/pdf/route";
+import { GET as pdfComprobante } from "@/app/comprobantes/[id]/pdf/route";
 import { GET as exportarDatos } from "@/app/cuenta/exportar/route";
 import { GET as exportarReporteCurso } from "@/app/instructor/notas/exportar/route";
 import { leerPdf, leerXlsx } from "../../apoyo/archivos";
@@ -101,6 +102,50 @@ describe("webhook de pagos verificado contra la pasarela (secuencia de pago, pas
     pasarelaFalsa.consultar.mockRejectedValueOnce(new Error("No pudimos conectar con la pasarela de pagos"));
     expect((await webhook(aviso(), culqi)).status).toBe(500);
     expect(confirmarPagoFalso).not.toHaveBeenCalled();
+  });
+});
+
+describe("PDF del comprobante: GET /comprobantes/[id]/pdf", () => {
+  const COMPROBANTE = {
+    id: 41,
+    serie: "CP01",
+    numero: "000123",
+    fecha_emision: "2026-10-02",
+    tipo: "BOLETA",
+    cliente_nombre: "Ana Quispe",
+    cliente_documento: "71234567",
+    ruc: null,
+    razon_social: null,
+    concepto: "Excel",
+    subtotal: "180.00",
+    descuento: "36.00",
+    total: "144.00",
+    metodo: "CULQI",
+    medio: "TARJETA",
+    referencia_pasarela: "chr_test_1",
+  };
+
+  it("pide iniciar sesión", async () => {
+    await expect(pdfComprobante(pedido("/comprobantes/41/pdf"), contexto({ id: "41" }))).rejects.toBeInstanceOf(Redireccion);
+  });
+
+  it("RLS decide: un comprobante ajeno, inexistente o con id no válido da 404", async () => {
+    conSesion("estudiante");
+    expect((await pdfComprobante(pedido("/comprobantes/41/pdf"), contexto({ id: "41" }))).status).toBe(404);
+    expect(entorno.servidor.de("comprobantes")[0].filtros).toEqual([["eq", "id", 41]]);
+    expect((await pdfComprobante(pedido("/comprobantes/x/pdf"), contexto({ id: "x" }))).status).toBe(404);
+  });
+
+  it("descarga el comprobante propio con su número", async () => {
+    conSesion("estudiante");
+    responder({ comprobantes: { data: COMPROBANTE } });
+    const r = await pdfComprobante(pedido("/comprobantes/41/pdf"), contexto({ id: "41" }));
+    expect(r.status).toBe(200);
+    expect(r.headers.get("content-type")).toBe("application/pdf");
+    expect(r.headers.get("content-disposition")).toBe('attachment; filename="comprobante-CP01-000123.pdf"');
+    expect(r.headers.get("cache-control")).toBe("private, no-store");
+    const { texto } = await leerPdf(new Uint8Array(await r.arrayBuffer()));
+    expect(texto.replace(/\s+/g, " ")).toContain("Culqi · Tarjeta");
   });
 });
 
