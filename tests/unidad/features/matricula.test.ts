@@ -1,10 +1,18 @@
 import { revalidatePath } from "next/cache";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { requireRol } from "@/lib/auth";
 import { inscribirse, registrarPagoManual, validarCupon } from "@/features/matricula/acciones";
 import { conSesion, ejecutarTareas, entorno, formulario, Redireccion, responder, UUID } from "../../apoyo/entorno";
 
 vi.mock("@/lib/auth", () => import("../../apoyo/auth-falso"));
+
+const disponibilidad = vi.hoisted(() => ({ pasarela: true, manual: true }));
+vi.mock("@/lib/pagos", async (original) => ({
+  ...(await original<typeof import("@/lib/pagos")>()),
+  pasarelaActiva: () => disponibilidad.pasarela,
+  pagoManualHabilitado: () => disponibilidad.manual,
+}));
+beforeEach(() => Object.assign(disponibilidad, { pasarela: true, manual: true }));
 
 const CUPON_VIGENTE = { id: 7, porcentaje_descuento: "20.00", fecha_vigencia: "2999-12-31", usos_maximos: null, activo: true };
 
@@ -50,9 +58,37 @@ describe("inscripción (HU-07 · HU-12 · HU-17)", () => {
     );
   const inscripcionCreada = { data: { id: UUID.inscripcion, codigo: "MAT-AB12CD34", vence_en: "2026-10-03T15:00:00Z" } };
 
-  it("por ahora solo acepta Yape o Plin", async () => {
+  it("solo acepta el pago en línea (Culqi) o el directo por Yape o Plin", async () => {
     conSesion("estudiante");
-    await expect(inscribirse(datos({ metodo: "CULQI" }))).rejects.toThrow("Por ahora solo aceptamos pagos por Yape o Plin");
+    await expect(inscribirse(datos({ metodo: "TARJETA" }))).rejects.toThrow();
+  });
+
+  it("con pago en línea guarda los datos de facturación, avisa por correo y lleva a pagar", async () => {
+    conSesion("estudiante", { nombres: "Ana" });
+    conCurso(inscripcionCreada);
+    await expect(inscribirse(datos({ metodo: "CULQI", comprobante: "FACTURA", ruc: "20605615521", razonSocial: "Empresa SAC" }))).rejects.toEqual(
+      new Redireccion("/estudiante/pagos?pagar=MAT-AB12CD34"),
+    );
+    expect(entorno.admin.de("pagos", "insert")[0].valores).toEqual({
+      inscripcion_id: UUID.inscripcion,
+      cupon_id: null,
+      monto: 180,
+      metodo: "CULQI",
+      datos_facturacion: { tipo: "FACTURA", ruc: "20605615521", razon_social: "Empresa SAC" },
+    });
+    await ejecutarTareas();
+    expect(console.info).toHaveBeenCalledWith(expect.stringMatching(/estudiante@pedsar\.test: Completa el pago .*Excel avanzado/));
+  });
+
+  it.each([
+    ["CULQI", "pasarela", "El pago en línea aún no está disponible"],
+    ["YAPE", "manual", "El pago directo por Yape o Plin no está disponible"],
+  ] as const)("no acepta %s si ese medio está apagado", async (metodo, apagado, mensaje) => {
+    disponibilidad[apagado] = false;
+    conSesion("estudiante");
+    conCurso(inscripcionCreada);
+    await expect(inscribirse(datos({ metodo }))).rejects.toEqual(new Redireccion(`/estudiante/cursos?error=${encodeURIComponent(mensaje)}`));
+    expect(entorno.servidor.de("inscripciones")).toHaveLength(0);
   });
 
   it("si el curso no existe, vuelve al catálogo", async () => {
@@ -81,7 +117,7 @@ describe("inscripción (HU-07 · HU-12 · HU-17)", () => {
     expect(entorno.servidor.de("perfiles", "update")[0].valores).toEqual({ telefono: "987654321", documento: "45678912" });
     // El estudiante solo inserta su inscripción; el pago lo escribe el servidor.
     expect(entorno.servidor.de("inscripciones", "insert")[0].valores).toEqual({ estudiante_id: UUID.estudiante, curso_id: UUID.curso });
-    expect(entorno.admin.de("pagos", "insert")[0].valores).toEqual({ inscripcion_id: UUID.inscripcion, cupon_id: 7, monto: 144, metodo: "YAPE" });
+    expect(entorno.admin.de("pagos", "insert")[0].valores).toEqual({ inscripcion_id: UUID.inscripcion, cupon_id: 7, monto: 144, metodo: "YAPE", datos_facturacion: { tipo: "BOLETA" } });
     expect(entorno.admin.de("registro_actividad")[0].valores).toMatchObject({
       accion: "INSCRIPCION_CREADA",
       detalle: { inscripcion: UUID.inscripcion, metodo: "YAPE", monto: 144, cupon: "PROMO20", comprobante: "BOLETA" },
@@ -97,7 +133,7 @@ describe("inscripción (HU-07 · HU-12 · HU-17)", () => {
     conCurso({ data: { ...inscripcionCreada.data, vence_en: null } });
     await expect(inscribirse(datos({ metodo: "PLIN", comprobante: "FACTURA", ruc: "20605615521", razonSocial: "Empresa SAC" }))).rejects.toBeInstanceOf(Redireccion);
     expect(entorno.servidor.de("perfiles")).toHaveLength(0);
-    expect(entorno.admin.de("pagos", "insert")[0].valores).toMatchObject({ cupon_id: null, monto: 180, metodo: "PLIN" });
+    expect(entorno.admin.de("pagos", "insert")[0].valores).toMatchObject({ cupon_id: null, monto: 180, metodo: "PLIN", datos_facturacion: { tipo: "FACTURA", ruc: "20605615521", razon_social: "Empresa SAC" } });
     expect(entorno.admin.de("registro_actividad")[0].valores).toMatchObject({ detalle: { ruc: "20605615521", razon_social: "Empresa SAC", cupon: null } });
   });
 });
