@@ -233,11 +233,26 @@ describe("exportaciones", () => {
   it("exporta los datos personales del usuario (Ley N.º 29733)", async () => {
     expect((await exportarDatos()).status).toBe(401);
     conSesion("estudiante");
-    responder({ perfiles: { data: { nombres: "Ana" } }, inscripciones: { data: [{ codigo: "MAT-1" }] }, notificaciones: { data: [] } });
+    responder({
+      perfiles: { data: { nombres: "Ana" } },
+      inscripciones: { data: [{ codigo: "MAT-1" }] },
+      notificaciones: { data: [] },
+      mensajes: { data: [{ texto: "¿Hasta cuándo?", enviado_en: "2026-10-02T14:00:00Z" }] },
+      resenas: { data: [{ estrellas: 5, texto: "Muy práctico" }] },
+    });
     const r = await exportarDatos();
     expect(r.headers.get("content-disposition")).toBe('attachment; filename="mis-datos-pedsar.json"');
-    expect(await r.json()).toMatchObject({ perfil: { nombres: "Ana" }, inscripciones: [{ codigo: "MAT-1" }], notificaciones: [] });
+    expect(await r.json()).toMatchObject({
+      perfil: { nombres: "Ana" },
+      inscripciones: [{ codigo: "MAT-1" }],
+      notificaciones: [],
+      mensajes: [{ texto: "¿Hasta cuándo?" }],
+      resenas: [{ estrellas: 5, texto: "Muy práctico" }],
+    });
     expect(entorno.servidor.de("inscripciones")[0].filtros).toEqual([["eq", "estudiante_id", UUID.estudiante]]);
+    // Solo los mensajes que escribió el usuario: los del otro participante son datos de otra persona.
+    expect(entorno.servidor.de("mensajes")[0].filtros).toEqual([["eq", "autor_id", UUID.estudiante]]);
+    expect(entorno.servidor.de("resenas")[0].filtros).toEqual([["eq", "estudiante_id", UUID.estudiante]]);
   });
 });
 

@@ -29,12 +29,22 @@ export interface Mensaje {
 type Cliente = Awaited<ReturnType<typeof createClient>>;
 type FilaConversacion = { id: number; curso_id: string; estudiante_id?: string; ultimo_mensaje_en: string; curso?: unknown; mensajes?: unknown };
 
-/** Mensajes del otro participante que el usuario aún no leyó, por conversación. */
-async function noLeidosPor(supabase: Cliente, ids: number[], usuarioId: string) {
+/**
+ * Los lados de una conversación son «el estudiante» y «el instructor del curso», sea quien sea hoy:
+ * si se reasigna el curso, los mensajes del instructor anterior siguen siendo del lado del instructor.
+ */
+const esDelEstudiante = (autorId: string, estudianteId: string) => autorId === estudianteId;
+
+/** Mensajes del otro lado que el usuario aún no leyó, por conversación. */
+async function noLeidosPor(supabase: Cliente, conversaciones: { id: number; estudianteId: string }[], lado: "estudiante" | "instructor") {
   const cuenta = new Map<number, number>();
-  if (!ids.length) return cuenta;
-  const { data } = await supabase.from("mensajes").select("conversacion_id").in("conversacion_id", ids).neq("autor_id", usuarioId).is("leido_en", null);
-  for (const m of data ?? []) cuenta.set(m.conversacion_id, (cuenta.get(m.conversacion_id) ?? 0) + 1);
+  if (!conversaciones.length) return cuenta;
+  const estudiante = new Map(conversaciones.map((c) => [c.id, c.estudianteId]));
+  const { data } = await supabase.from("mensajes").select("conversacion_id, autor_id").in("conversacion_id", [...estudiante.keys()]).is("leido_en", null);
+  for (const m of data ?? []) {
+    const delEstudiante = esDelEstudiante(m.autor_id, estudiante.get(m.conversacion_id) ?? "");
+    if (delEstudiante === (lado === "instructor")) cuenta.set(m.conversacion_id, (cuenta.get(m.conversacion_id) ?? 0) + 1);
+  }
   return cuenta;
 }
 
@@ -75,7 +85,7 @@ export async function listarConversacionesEstudiante(estudianteId: string): Prom
     .filter((c): c is { id: string; titulo: string; instructor_id: string | null } => Boolean(c));
   const filas = (conversaciones ?? []) as FilaConversacion[];
   const [noLeidos, instructores] = await Promise.all([
-    noLeidosPor(supabase, filas.map((c) => c.id), estudianteId),
+    noLeidosPor(supabase, filas.map((c) => ({ id: c.id, estudianteId })), "estudiante"),
     nombresInstructores(supabase, [...new Set(cursos.map((c) => c.instructor_id).filter((x): x is string => Boolean(x)))]),
   ]);
 
@@ -97,7 +107,7 @@ export async function listarConversacionesEstudiante(estudianteId: string): Prom
 }
 
 /** HU-19 · HU-54 · Bandeja del instructor: sus conversaciones (RLS), las más recientes primero. */
-export async function listarBandejaInstructor(instructorId: string, cursoId?: string): Promise<ConversacionResumen[]> {
+export async function listarBandejaInstructor(cursoId?: string): Promise<ConversacionResumen[]> {
   const supabase = await createClient();
   let consulta = supabase
     .from("conversaciones")
@@ -109,7 +119,7 @@ export async function listarBandejaInstructor(instructorId: string, cursoId?: st
   const { data } = await consulta;
   const filas = (data ?? []) as FilaConversacion[];
   const [noLeidos, estudiantes] = await Promise.all([
-    noLeidosPor(supabase, filas.map((c) => c.id), instructorId),
+    noLeidosPor(supabase, filas.map((c) => ({ id: c.id, estudianteId: c.estudiante_id! })), "instructor"),
     nombresEstudiantes([...new Set(filas.map((c) => c.estudiante_id!))]),
   ]);
   return filas.map((c) => {
@@ -140,7 +150,7 @@ export async function obtenerConversacion(
 
   const soyEstudiante = c.estudiante_id === usuarioId;
   const [{ data: mensajes }, otro] = await Promise.all([
-    supabase.from("mensajes").select("id, texto, enviado_en, autor_id, leido_en").eq("conversacion_id", c.id).order("enviado_en", { ascending: true }).limit(500),
+    supabase.from("mensajes").select("id, texto, enviado_en, autor_id, leido_en").eq("conversacion_id", c.id).order("enviado_en", { ascending: false }).limit(500),
     soyEstudiante
       ? nombresInstructores(supabase, curso?.instructor_id ? [curso.instructor_id] : []).then((n) => (curso?.instructor_id && n.get(curso.instructor_id)) || "Instructor")
       : nombresEstudiantes([c.estudiante_id]).then((n) => n.get(c.estudiante_id) || "Estudiante"),
@@ -150,6 +160,9 @@ export async function obtenerConversacion(
     cursoId: c.curso_id,
     curso: curso?.titulo ?? "Curso",
     otro,
-    mensajes: (mensajes ?? []).map((m) => ({ id: m.id, texto: m.texto, enviadoEn: m.enviado_en, propio: m.autor_id === usuarioId, leido: Boolean(m.leido_en) })),
+    // La BD entrega los 500 más recientes primero; se muestran en orden cronológico.
+    mensajes: (mensajes ?? [])
+      .map((m) => ({ id: m.id, texto: m.texto, enviadoEn: m.enviado_en, propio: esDelEstudiante(m.autor_id, c.estudiante_id) === soyEstudiante, leido: Boolean(m.leido_en) }))
+      .reverse(),
   };
 }
