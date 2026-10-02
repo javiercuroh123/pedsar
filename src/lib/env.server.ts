@@ -8,6 +8,8 @@ const serverEnvSchema = z.object({
   PAYMENT_PROVIDER: z.enum(["culqi", "izipay", "niubiz"]).default("culqi"),
   CULQI_SECRET_KEY: z.string().optional(),
   CULQI_WEBHOOK_SECRET: z.string().optional(),
+  // Pago directo por Yape / Plin validado por el administrador (contingencia si la pasarela falla).
+  PAGO_MANUAL_HABILITADO: z.stringbool().default(true),
   IZIPAY_MERCHANT_CODE: z.string().optional(),
   IZIPAY_API_KEY: z.string().optional(),
   NIUBIZ_MERCHANT_ID: z.string().optional(),
