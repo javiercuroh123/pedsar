@@ -2,6 +2,7 @@ import { revalidatePath } from "next/cache";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { requireRol } from "@/lib/auth";
 import { inscribirse, registrarPagoManual, validarCupon } from "@/features/matricula/acciones";
+import { confirmarPago } from "@/features/matricula/confirmar-pago";
 import { conSesion, ejecutarTareas, entorno, formulario, Redireccion, responder, UUID } from "../../apoyo/entorno";
 
 vi.mock("@/lib/auth", () => import("../../apoyo/auth-falso"));
@@ -13,6 +14,7 @@ vi.mock("@/lib/pagos", async (original) => ({
   pagoManualHabilitado: () => disponibilidad.manual,
 }));
 beforeEach(() => Object.assign(disponibilidad, { pasarela: true, manual: true }));
+vi.mock("@/features/matricula/confirmar-pago", () => ({ confirmarPago: vi.fn(async () => "CONFIRMADO") }));
 
 const CUPON_VIGENTE = { id: 7, porcentaje_descuento: "20.00", fecha_vigencia: "2999-12-31", usos_maximos: null, activo: true };
 
@@ -126,6 +128,15 @@ describe("inscripción (HU-07 · HU-12 · HU-17)", () => {
 
     await ejecutarTareas();
     expect(console.info).toHaveBeenCalledWith(expect.stringMatching(/estudiante@pedsar\.test: .*Excel avanzado/));
+  });
+
+  it("con un cupón del 100 % no hay nada que cobrar: confirma la matrícula de inmediato", async () => {
+    conSesion("estudiante");
+    conCurso(inscripcionCreada, { cupones: { data: { ...CUPON_VIGENTE, porcentaje_descuento: "100.00" } }, "pagos.insert": { data: { id: UUID.pago } } });
+    await expect(inscribirse(datos({ metodo: "CULQI", cupon: "BECA100" }))).rejects.toEqual(new Redireccion("/estudiante/cursos"));
+    expect(entorno.admin.de("pagos", "insert")[0].valores).toMatchObject({ monto: 0, metodo: "CULQI" });
+    expect(confirmarPago).toHaveBeenCalledWith(UUID.pago, { actor: UUID.estudiante });
+    expect(entorno.tareas).toHaveLength(0);
   });
 
   it("sin cupón cobra el precio completo y guarda los datos de la factura", async () => {

@@ -15,7 +15,7 @@ import { publicEnv } from "@/lib/env";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { uno } from "@/features/academico/consultas";
-import { confirmarPago } from "@/features/matricula/confirmar-pago";
+import { conciliarPago, confirmarPago, type ResultadoConciliacion } from "@/features/matricula/confirmar-pago";
 import { notificarAdministradores, notificarUsuario as notificar } from "@/features/notificaciones/enviar";
 import { getPasarela } from "@/lib/pagos";
 import type { EstadoFormulario } from "@/features/usuarios/esquemas";
@@ -277,43 +277,126 @@ export async function observarPago(_: EstadoFormulario, formData: FormData): Pro
   return { ok: true, mensaje: "Pago devuelto al estudiante para corrección" };
 }
 
-export async function resolverReembolso(formData: FormData) {
+type EstadoReembolso = "SOLICITADO" | "APROBADO" | "RECHAZADO" | "PROCESADO";
+
+type PagoReembolsable = {
+  id: string;
+  inscripcion_id: string;
+  metodo: string;
+  monto: number;
+  estado: string;
+  referencia_pasarela: string | null;
+  inscripcion: unknown;
+};
+
+/**
+ * HU-50 · Reembolsos. «aprobar» o «rechazar» una solicitud (una sola vez: la fila se
+ * toma con una actualización condicionada). Los cargos de Culqi (tarjeta o Yape) se
+ * devuelven en la pasarela por lo que se pagó; si Culqi falla, el reembolso queda
+ * APROBADO y el administrador puede «reintentar» o marcarlo como devuelto a «manual».
+ * Los pagos directos (y las órdenes de billetera) se devuelven a mano.
+ */
+export async function resolverReembolso(formData: FormData): Promise<EstadoFormulario> {
   const usuario = await admin();
   const id = z.coerce.number().int().parse(formData.get("id"));
-  const aprobar = formData.get("decision") === "aprobar";
+  const decision = z.enum(["aprobar", "rechazar", "reintentar", "manual"]).parse(formData.get("decision"));
   const db = createAdminClient();
   const { data: r } = await db
     .from("reembolsos")
-    .select("id, motivo, monto, pago:pagos(id, inscripcion_id, metodo, referencia_pasarela, inscripcion:inscripciones(estudiante_id))")
+    .select("id, estado, motivo, monto, pago:pagos(id, inscripcion_id, metodo, monto, estado, referencia_pasarela, inscripcion:inscripciones(estudiante_id))")
     .eq("id", id)
-    .single();
-  if (!r) return;
-  const pago = uno<{ id: string; inscripcion_id: string; metodo?: string; referencia_pasarela?: string | null; inscripcion: unknown }>(r.pago);
+    .maybeSingle();
+  const pago = uno<PagoReembolsable>(r?.pago);
+  if (!r || !pago) return { ok: false, mensaje: "No encontramos la solicitud" };
+  const yaAtendida = { ok: false, mensaje: "Esta solicitud ya fue atendida" };
+  const estudiante = uno<{ estudiante_id: string }>(pago.inscripcion)?.estudiante_id;
 
-  // HU-50 · Los cargos de Culqi (tarjeta o Yape) se devuelven en la pasarela; los pagos directos, a mano.
-  const enPasarela = aprobar && pago?.metodo === "CULQI" && Boolean(pago.referencia_pasarela?.startsWith("chr_"));
-  let devuelto = aprobar && !enPasarela;
-  if (enPasarela) {
-    const motivoFallo = await getPasarela("culqi")
-      .reembolsar(pago!.referencia_pasarela!, Number(r.monto), r.motivo)
-      .then((res) => (res.aprobado ? null : res.mensaje))
-      .catch((e: Error) => e.message);
-    devuelto = motivoFallo === null;
-    if (motivoFallo !== null) {
-      await notificarAdministradores(`El reembolso ${id} no se pudo procesar en Culqi: ${motivoFallo}. Revísalo en CulqiPanel.`, "/admin/inscripciones");
-      await registrarActividad(usuario.id, "REEMBOLSO_FALLIDO", { reembolso: id, motivo: motivoFallo });
-    }
-  }
-
-  await db.from("reembolsos").update({ estado: !aprobar ? "RECHAZADO" : enPasarela && devuelto ? "PROCESADO" : "APROBADO" }).eq("id", id);
-  if (devuelto && pago) {
+  // Toma la solicitud: si otro administrador (o un doble clic) ya la resolvió, no hace nada.
+  const tomar = async (desde: EstadoReembolso, a: EstadoReembolso) => {
+    const { data } = await db.from("reembolsos").update({ estado: a }).eq("id", id).eq("estado", desde).select("id").maybeSingle();
+    return Boolean(data);
+  };
+  const cerrar = async (estadoFinal: "APROBADO" | "PROCESADO") => {
+    if (estadoFinal === "PROCESADO") await db.from("reembolsos").update({ estado: "PROCESADO" }).eq("id", id);
     await db.from("pagos").update({ estado: "REEMBOLSADO" }).eq("id", pago.id);
     await db.from("inscripciones").update({ estado: "CANCELADA" }).eq("id", pago.inscripcion_id);
+    revalidatePath("/admin", "layout");
+  };
+  const enPasarela = pago.metodo === "CULQI" && Boolean(pago.referencia_pasarela?.startsWith("chr_"));
+  /** Devuelve en Culqi; null si salió bien o el motivo del fallo. */
+  const devolverEnCulqi = () =>
+    getPasarela("culqi")
+      .reembolsar(pago.referencia_pasarela!, Number(pago.monto), r.motivo)
+      .then((res) => (res.aprobado ? null : res.mensaje))
+      .catch((e: Error) => e.message);
+  const fallo = async (motivo: string) => {
+    await notificarAdministradores(`El reembolso ${id} no se pudo procesar en Culqi: ${motivo}. Reintenta o devuélvelo en CulqiPanel.`, "/admin/inscripciones?tab=reembolsos");
+    await registrarActividad(usuario.id, "REEMBOLSO_FALLIDO", { reembolso: id, motivo });
+    revalidatePath("/admin", "layout");
+    return { ok: false, mensaje: `Culqi no procesó el reembolso: ${motivo}. Puedes reintentar o marcarlo como devuelto a mano.` };
+  };
+
+  if (decision === "rechazar") {
+    if (!(await tomar("SOLICITADO", "RECHAZADO"))) return yaAtendida;
+    if (estudiante) await notificar(estudiante, "Tu solicitud de reembolso fue rechazada.", "/estudiante/pagos");
+    await registrarActividad(usuario.id, "RECHAZAR_REEMBOLSO", { reembolso: id });
+    revalidatePath("/admin", "layout");
+    return { ok: true, mensaje: "Solicitud rechazada" };
   }
-  const estudiante = uno<{ estudiante_id: string }>(pago?.inscripcion)?.estudiante_id;
-  if (estudiante) await notificar(estudiante, aprobar ? "Tu solicitud de reembolso fue aprobada." : "Tu solicitud de reembolso fue rechazada.", "/estudiante/pagos");
-  await registrarActividad(usuario.id, aprobar ? "APROBAR_REEMBOLSO" : "RECHAZAR_REEMBOLSO", { reembolso: id });
-  revalidatePath("/admin", "layout");
+
+  if (decision === "aprobar") {
+    if (!(await tomar("SOLICITADO", "APROBADO"))) return yaAtendida;
+    if (estudiante) await notificar(estudiante, "Tu solicitud de reembolso fue aprobada.", "/estudiante/pagos");
+    await registrarActividad(usuario.id, "APROBAR_REEMBOLSO", { reembolso: id });
+    if (!enPasarela) {
+      await cerrar("APROBADO");
+      return { ok: true, mensaje: "Reembolso aprobado: devuelve el dinero al estudiante." };
+    }
+    const motivo = await devolverEnCulqi();
+    if (motivo !== null) return fallo(motivo);
+    await cerrar("PROCESADO");
+    return { ok: true, mensaje: "Reembolso procesado en Culqi" };
+  }
+
+  // reintentar / manual: solo para un reembolso aprobado cuyo pago aún no se devolvió.
+  if (r.estado !== "APROBADO" || pago.estado !== "APROBADO") return yaAtendida;
+  if (decision === "manual") {
+    await registrarActividad(usuario.id, "REEMBOLSO_MANUAL", { reembolso: id });
+    await cerrar("PROCESADO");
+    return { ok: true, mensaje: "Reembolso marcado como devuelto" };
+  }
+  if (!enPasarela) return { ok: false, mensaje: "Este pago se devuelve a mano" };
+  const motivo = await devolverEnCulqi();
+  if (motivo !== null) return fallo(motivo);
+  await cerrar("PROCESADO");
+  return { ok: true, mensaje: "Reembolso procesado en Culqi" };
+}
+
+const MENSAJE_CONCILIACION: Record<ResultadoConciliacion, [boolean, string]> = {
+  CONFIRMADO: [true, "Pago verificado en Culqi: la matrícula quedó confirmada."],
+  YA_APROBADO: [true, "El pago ya estaba confirmado."],
+  DUPLICADO: [false, "Culqi registra un cobro duplicado: revísalo y reembolsa en CulqiPanel."],
+  SIN_CUPO: [false, "El pago está en Culqi, pero ya no hay cupo: hay que reembolsar al estudiante."],
+  NO_ENCONTRADO: [false, "No encontramos ese pago."],
+  NO_PAGADO: [false, "Culqi aún no registra este pago."],
+  MONTO_DISTINTO: [false, "El monto pagado en Culqi no coincide; revísalo en CulqiPanel."],
+  SIN_REFERENCIA: [false, "Este pago aún no tiene una orden ni un cargo en Culqi."],
+};
+
+/**
+ * Conciliación manual de un pago en línea cuyo aviso no llegó: se pregunta a la API de
+ * Culqi y solo se confirma si allí está pagado con el monto correcto.
+ */
+export async function verificarPagoEnCulqi(formData: FormData): Promise<EstadoFormulario> {
+  const usuario = await admin();
+  const pagoId = z.uuid().parse(formData.get("pagoId"));
+  try {
+    const [ok, mensaje] = MENSAJE_CONCILIACION[await conciliarPago(pagoId, usuario.id)];
+    revalidatePath("/admin", "layout");
+    return { ok, mensaje };
+  } catch (e) {
+    return { ok: false, mensaje: (e as Error).message };
+  }
 }
 
 // ---------- Cupones (HU-32) ----------

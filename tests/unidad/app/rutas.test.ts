@@ -98,6 +98,14 @@ describe("webhook de pagos verificado contra la pasarela (secuencia de pago, pas
     expect(confirmarPagoFalso).not.toHaveBeenCalled();
   });
 
+  it("si la BD falla al confirmar, responde 500 para que Culqi reintente", async () => {
+    pasarelaFalsa.consultar.mockResolvedValueOnce(PAGADA);
+    responder({}, { pagos: PAGO });
+    confirmarPagoFalso.mockRejectedValueOnce(new Error("No se pudo aprobar el pago: conexión perdida"));
+    const r = await webhook(aviso(), culqi);
+    expect(r.status).toBe(500);
+  });
+
   it("si no puede consultar la pasarela responde 500 para que Culqi reintente", async () => {
     pasarelaFalsa.consultar.mockRejectedValueOnce(new Error("No pudimos conectar con la pasarela de pagos"));
     expect((await webhook(aviso(), culqi)).status).toBe(500);

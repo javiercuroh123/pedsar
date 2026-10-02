@@ -31,7 +31,7 @@ interface Culqi3DSGlobal {
   options?: { showModal?: boolean; showLoading?: boolean; showIcon?: boolean; style?: Record<string, string> };
   generateDevice(): Promise<string | null>;
   initAuthentication(tokenId: string): void;
-  reset(): void;
+  reset?(): void;
 }
 
 interface Window {

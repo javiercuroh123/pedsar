@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { cobrarConToken, estadoDelPago, prepararPagoEnLinea } from "@/features/matricula/pago-en-linea";
+import { cambiarAPagoDirecto, cobrarConToken, estadoDelPago, prepararPagoEnLinea } from "@/features/matricula/pago-en-linea";
 import { confirmarPago } from "@/features/matricula/confirmar-pago";
 import { requireRol } from "@/lib/auth";
 import { conSesion, entorno, responder, UUID } from "../../apoyo/entorno";
@@ -11,18 +11,20 @@ const { pasarela, disponibilidad } = vi.hoisted(() => {
   process.env.NEXT_PUBLIC_CULQI_PUBLIC_KEY = "pk_test_prueba";
   return {
     pasarela: { crearOrden: vi.fn(), cobrar: vi.fn(), consultar: vi.fn() },
-    disponibilidad: { activa: true },
+    disponibilidad: { activa: true, manual: true },
   };
 });
 vi.mock("@/lib/pagos", async (original) => ({
   ...(await original<typeof import("@/lib/pagos")>()),
   getPasarela: () => pasarela,
   pasarelaActiva: () => disponibilidad.activa,
+  pagoManualHabilitado: () => disponibilidad.manual,
 }));
 const { ErrorPasarela } = await vi.importActual<typeof import("@/lib/pagos")>("@/lib/pagos");
 
 beforeEach(() => {
   disponibilidad.activa = true;
+  disponibilidad.manual = true;
   vi.useFakeTimers({ now: new Date("2026-10-02T15:00:00Z"), toFake: ["Date"] });
 });
 
@@ -80,11 +82,22 @@ describe("preparar el pago en línea (orden de Culqi)", () => {
     await expect(prepararPagoEnLinea(UUID.pago)).resolves.toMatchObject({ ok: true, checkout: { ordenId: "ord_nuevo" } });
   });
 
-  it("si la billetera ya pagó la orden, avisa que se está confirmando", async () => {
+  it("si la billetera ya pagó la orden (y el aviso no llegó), confirma el pago en ese momento", async () => {
     conSesion("estudiante");
     responder({ pagos: pagoCulqi({ orden_pasarela: "ord_pagado" }) });
-    pasarela.consultar.mockResolvedValueOnce({ estado: "PAGADO" });
-    await expect(prepararPagoEnLinea(UUID.pago)).resolves.toEqual({ ok: false, mensaje: "Ya recibimos tu pago; en unos segundos se confirmará tu matrícula" });
+    pasarela.consultar.mockResolvedValueOnce({ estado: "PAGADO", montoCentimos: 14400, medio: "BILLETERA", referencia: "ord_pagado", respuesta: { id: "ord_pagado" } });
+    await expect(prepararPagoEnLinea(UUID.pago)).resolves.toEqual({ ok: false, aprobado: true, mensaje: "¡Ya recibimos tu pago! Tu matrícula quedó confirmada." });
+    expect(confirmarPago).toHaveBeenCalledWith(UUID.pago, { referencia: "ord_pagado", medio: "BILLETERA", respuesta: { id: "ord_pagado" }, actor: UUID.estudiante });
+    expect(pasarela.crearOrden).not.toHaveBeenCalled();
+  });
+
+  it("si Culqi rechaza la orden, igual permite pagar con tarjeta o Yape (sin billeteras) y registra el motivo", async () => {
+    conSesion("estudiante");
+    responder({ pagos: pagoCulqi() });
+    pasarela.crearOrden.mockRejectedValueOnce(new ErrorPasarela({ merchant_message: "phone_number es requerido" }, 400));
+    await expect(prepararPagoEnLinea(UUID.pago)).resolves.toMatchObject({ ok: true, checkout: { ordenId: null, montoCentimos: 14400 } });
+    expect(console.error).toHaveBeenCalledWith(expect.stringContaining("orden"), { merchant_message: "phone_number es requerido" });
+    expect(entorno.admin.de("pagos", "update")).toHaveLength(0);
   });
 
   it.each([
@@ -133,6 +146,17 @@ describe("cobrar con el token del checkout (tarjeta o Yape)", () => {
     expect(confirmarPago).toHaveBeenCalledWith(UUID.pago, { referencia: "chr_1", medio: "TARJETA", respuesta, actor: UUID.estudiante });
   });
 
+  it.each([
+    ["SIN_CUPO", "no quedan cupos"],
+    ["DUPLICADO", "cobro duplicado"],
+  ])("si la confirmación resulta %s, se lo explica al estudiante", async (resultado, texto) => {
+    conSesion("estudiante");
+    responder({ pagos: pagoCulqi() });
+    pasarela.cobrar.mockResolvedValueOnce({ estado: "APROBADO", referencia: "chr_1", medio: "TARJETA", mensaje: "ok", respuesta: {} });
+    vi.mocked(confirmarPago).mockResolvedValueOnce(resultado as never);
+    await expect(cobrarConToken(entrada)).resolves.toMatchObject({ estado: "APROBADO", mensaje: expect.stringContaining(texto) });
+  });
+
   it("si el banco pide 3DS no confirma, y el reintento lleva sus parámetros", async () => {
     conSesion("estudiante");
     responder({ pagos: pagoCulqi() });
@@ -168,7 +192,8 @@ describe("cobrar con el token del checkout (tarjeta o Yape)", () => {
     conSesion("estudiante");
     responder({ pagos: pagoCulqi() });
     pasarela.cobrar.mockRejectedValueOnce(new ErrorPasarela());
-    await expect(cobrarConToken(entrada)).resolves.toEqual({ estado: "ERROR", mensaje: "No pudimos conectar con la pasarela de pagos" });
+    // Culqi pudo cobrar aunque no respondió a tiempo: no se invita a pagar otra vez.
+    await expect(cobrarConToken(entrada)).resolves.toMatchObject({ estado: "ERROR", mensaje: expect.stringContaining("no vuelvas a pagar") });
     await expect(cobrarConToken({ pagoId: "no-es-uuid", token: "" })).resolves.toMatchObject({ estado: "ERROR" });
   });
 });
@@ -181,5 +206,26 @@ describe("estado del pago (mientras se espera la billetera)", () => {
     expect(entorno.servidor.de("pagos")[0].filtros).toEqual([["eq", "id", UUID.pago]]);
     responder({ pagos: { data: null } });
     await expect(estadoDelPago(UUID.pago)).resolves.toEqual({ estado: null, comprobanteId: null });
+  });
+});
+
+describe("cambiar al pago directo por Yape o Plin (si la pasarela falla)", () => {
+  it("cambia el método de un pago en línea pendiente", async () => {
+    conSesion("estudiante");
+    responder({ pagos: pagoCulqi({ observacion: "Fondos insuficientes" }) });
+    await expect(cambiarAPagoDirecto(UUID.pago, "PLIN")).resolves.toEqual({ ok: true, mensaje: "Listo: paga por Plin y registra el N.º de operación." });
+    expect(entorno.admin.de("pagos", "update")[0]).toMatchObject({ valores: { metodo: "PLIN", medio: null, observacion: null }, filtros: [["eq", "id", UUID.pago], ["eq", "estado", "PENDIENTE"]] });
+  });
+
+  it("no lo permite si el pago directo está apagado, si el pago no es suyo o si la reserva venció", async () => {
+    conSesion("estudiante");
+    disponibilidad.manual = false;
+    await expect(cambiarAPagoDirecto(UUID.pago, "YAPE")).resolves.toEqual({ ok: false, mensaje: "El pago directo por Yape o Plin no está disponible" });
+    disponibilidad.manual = true;
+    responder({ pagos: { data: null } });
+    await expect(cambiarAPagoDirecto(UUID.pago, "YAPE")).resolves.toEqual({ ok: false, mensaje: "No encontramos ese pago" });
+    responder({ pagos: pagoCulqi({}, { vence_en: "2026-10-02T14:00:00Z" }) });
+    await expect(cambiarAPagoDirecto(UUID.pago, "YAPE")).resolves.toMatchObject({ ok: false });
+    expect(entorno.admin.de("pagos", "update")).toHaveLength(0);
   });
 });

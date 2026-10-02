@@ -7,6 +7,7 @@ import { DialogoReembolso } from "@/features/academico/dialogo-reembolso";
 import { PagoEnLinea } from "@/features/matricula/pago-en-linea-cliente";
 import { PagoManual } from "@/features/matricula/pago-manual";
 import { requireRol } from "@/lib/auth";
+import { pagoManualHabilitado } from "@/lib/pagos";
 import { createClient } from "@/lib/supabase/server";
 import { etiquetaPago, formatearFecha, formatearSoles } from "@/lib/formato";
 
@@ -75,6 +76,7 @@ export default async function EstudiantePagosPage({ searchParams }: PageProps<"/
           venceEn={i.vence_en}
           abrirAlCargar={typeof pagar === "string" && i.codigo === pagar}
           observacion={i.pago!.observacion}
+          pagoManual={pagoManualHabilitado()}
         />
       ))}
 

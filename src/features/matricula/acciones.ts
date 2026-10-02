@@ -6,6 +6,7 @@ import { z } from "zod";
 import { EMPRESA } from "@/config/empresa";
 import { PLAZO_PAGO_HORAS, reservaVencida } from "@/config/matricula";
 import { uno } from "@/features/academico/consultas";
+import { confirmarPago } from "@/features/matricula/confirmar-pago";
 import { notificarAdministradores } from "@/features/notificaciones/enviar";
 import type { EstadoFormulario } from "@/features/usuarios/esquemas";
 import { registrarActividad } from "@/lib/auditoria";
@@ -106,9 +107,11 @@ export async function inscribirse(formData: FormData) {
   // Los pagos solo los escribe el servidor (sin política de inserción para estudiantes).
   const datosFacturacion =
     datos.comprobante === "FACTURA" ? { tipo: "FACTURA", ruc: datos.ruc ?? null, razon_social: datos.razonSocial ?? null } : { tipo: "BOLETA" };
-  await createAdminClient()
+  const { data: pago } = await createAdminClient()
     .from("pagos")
-    .insert({ inscripcion_id: inscripcion.id, cupon_id: cupon?.id ?? null, monto, metodo: datos.metodo, datos_facturacion: datosFacturacion });
+    .insert({ inscripcion_id: inscripcion.id, cupon_id: cupon?.id ?? null, monto, metodo: datos.metodo, datos_facturacion: datosFacturacion })
+    .select("id")
+    .single();
 
   await registrarActividad(estudiante.id, "INSCRIPCION_CREADA", {
     inscripcion: inscripcion.id,
@@ -118,6 +121,12 @@ export async function inscribirse(formData: FormData) {
     comprobante: datos.comprobante,
     ...(datos.comprobante === "FACTURA" ? { ruc: datos.ruc, razon_social: datos.razonSocial } : {}),
   });
+
+  // Cupón del 100 % (beca): no hay nada que cobrar, se confirma de inmediato.
+  if (monto <= 0 && pago) {
+    await confirmarPago(pago.id, { actor: estudiante.id });
+    redirect("/estudiante/cursos");
+  }
 
   // HU-21 · Confirmación de la inscripción con el plazo de la reserva y cómo pagar.
   const comun = {

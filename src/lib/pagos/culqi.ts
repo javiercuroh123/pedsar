@@ -24,8 +24,8 @@ async function llamar(ruta: string, cuerpo?: object) {
     throw new ErrorPasarela(e);
   }
   const json = await res.json().catch(() => null);
-  if (res.status >= 500) throw new ErrorPasarela(json);
-  return { ok: res.ok, json };
+  if (res.status >= 500) throw new ErrorPasarela(json, res.status);
+  return { ok: res.ok, status: res.status, json };
 }
 
 /** Los tokens de Yape empiezan con «ype_»; los de tarjeta, con «tkn_». */
@@ -41,18 +41,23 @@ export const culqi: PasarelaPago = {
   nombre: "culqi",
 
   async crearOrden({ pagoId, montoSoles, descripcion, numeroOrden, cliente, venceEn }) {
-    const { ok, json } = await llamar("/orders", {
+    const { ok, status, json } = await llamar("/orders", {
       amount: centimos(montoSoles),
       currency_code: "PEN",
       description: descripcion.slice(0, 80),
       order_number: numeroOrden,
       expiration_date: Math.floor(venceEn.getTime() / 1000),
-      client_details: { first_name: cliente.nombres, last_name: cliente.apellidos, email: cliente.correo, phone_number: cliente.telefono ?? "" },
+      client_details: {
+        first_name: cliente.nombres,
+        last_name: cliente.apellidos,
+        email: cliente.correo,
+        ...(cliente.telefono ? { phone_number: cliente.telefono } : {}),
+      },
       // El checkout confirma la orden cuando el cliente elige billetera, banca móvil o agente.
       confirm: false,
       metadata: { pago_id: pagoId },
     });
-    if (!ok || !json?.id) throw new ErrorPasarela(json);
+    if (!ok || !json?.id) throw new ErrorPasarela(json, status);
     return { id: json.id as string };
   },
 
@@ -82,15 +87,16 @@ export const culqi: PasarelaPago = {
   },
 
   async consultar({ tipo, id }) {
-    const { ok, json } = await llamar(`/${tipo === "orden" ? "orders" : "charges"}/${encodeURIComponent(id)}`);
-    if (!ok || !json) throw new ErrorPasarela(json);
+    const { ok, status, json } = await llamar(`/${tipo === "orden" ? "orders" : "charges"}/${encodeURIComponent(id)}`);
+    if (!ok || !json) throw new ErrorPasarela(json, status);
     const comun = { pagoId: (json.metadata?.pago_id as string | undefined) ?? null, montoCentimos: Number(json.amount ?? 0), referencia: id, respuesta: json as Json };
     if (tipo === "orden") return { ...comun, estado: ESTADO_ORDEN[json.state] ?? "PENDIENTE", medio: "BILLETERA" };
     return { ...comun, estado: json.outcome?.type === "venta_exitosa" ? "PAGADO" : "RECHAZADO", medio: medioDelToken(json.source?.id) };
   },
 
-  async reembolsar(referencia, montoSoles, motivo) {
-    const { ok, json } = await llamar("/refunds", { amount: centimos(montoSoles), charge_id: referencia, reason: motivo });
+  // Culqi solo acepta los motivos duplicidad, fraudulento o solicitud_comprador; el texto del estudiante queda en PEDSAR.
+  async reembolsar(referencia, montoSoles) {
+    const { ok, json } = await llamar("/refunds", { amount: centimos(montoSoles), charge_id: referencia, reason: "solicitud_comprador" });
     return { aprobado: ok, referencia: ok ? (json?.id ?? null) : null, mensaje: mensajeDe(json, ok ? "Reembolso registrado en Culqi" : "Culqi rechazó el reembolso"), respuesta: json };
   },
 

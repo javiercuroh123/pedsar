@@ -109,9 +109,17 @@ Checkout Custom:
   la orden en la API** y compara el monto antes de confirmar. Nunca confía en el contenido del aviso.
 - Todas las vías confirman con `confirmarPago()` (`src/features/matricula/confirmar-pago.ts`),
   que es idempotente.
-- Los reembolsos aprobados de cargos de Culqi se devuelven en la pasarela.
-- Sin `NEXT_PUBLIC_CULQI_PUBLIC_KEY` y `CULQI_SECRET_KEY`, el pago en línea aparece como
-  «Próximamente».
+- Un segundo cobro sobre un pago ya aprobado se avisa al administrador para reembolsarlo, y un
+  aviso repetido nunca revive un pago reembolsado.
+- Si el aviso no llega, el pago se concilia consultando la API: al volver a abrir el pago, o con
+  «Verificar en Culqi» en «Inscripciones y pagos».
+- Los reembolsos aprobados de cargos de Culqi se devuelven en la pasarela por el monto pagado.
+  Si Culqi falla, el administrador puede reintentar o marcarlo como devuelto a mano.
+- Si Culqi no responde, el estudiante puede cambiar al pago directo por Yape o Plin sin perder la
+  reserva.
+- Un cupón del 100 % confirma la matrícula sin cobro.
+- Sin `NEXT_PUBLIC_CULQI_PUBLIC_KEY`, `CULQI_SECRET_KEY` y `CULQI_WEBHOOK_SECRET`, el pago en línea
+  aparece como «Próximamente».
 
 **Pago directo (contingencia de la Tabla 12):** Yape o Plin al celular de `src/config/empresa.ts`.
 El estudiante registra el N.º de operación y la captura (bucket privado `vouchers`), y el

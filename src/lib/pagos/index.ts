@@ -16,9 +16,13 @@ export function esPasarelaValida(nombre: string): nombre is PasarelaPago["nombre
   return nombre in pasarelas;
 }
 
-/** El pago en línea se ofrece solo con las dos llaves de Culqi; sin ellas aparece como «Próximamente». */
+/**
+ * El pago en línea se ofrece solo con las dos llaves de Culqi y la clave del webhook (sin ella,
+ * los pagos por billetera, banca móvil o agente nunca se confirmarían); si falta alguna, aparece
+ * como «Próximamente».
+ */
 export function pasarelaActiva(): boolean {
-  return Boolean(serverEnv.CULQI_SECRET_KEY && publicEnv.NEXT_PUBLIC_CULQI_PUBLIC_KEY);
+  return Boolean(serverEnv.CULQI_SECRET_KEY && publicEnv.NEXT_PUBLIC_CULQI_PUBLIC_KEY && serverEnv.CULQI_WEBHOOK_SECRET);
 }
 
 /** Pago directo por Yape / Plin validado por el administrador (contingencia de la Tabla 12). */
