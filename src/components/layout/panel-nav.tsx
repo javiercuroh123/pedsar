@@ -13,9 +13,11 @@ import {
   GraduationCapIcon,
   LayoutDashboardIcon,
   LogOutIcon,
+  MessagesSquareIcon,
   PanelLeftIcon,
   ReceiptIcon,
   ScrollTextIcon,
+  StarIcon,
   TagsIcon,
   TicketPercentIcon,
   UserCheckIcon,
@@ -52,6 +54,8 @@ const ICONOS: Record<IconoNav, LucideIcon> = {
   auditoria: ScrollTextIcon,
   perfil: UserRoundIcon,
   notificaciones: BellIcon,
+  mensajes: MessagesSquareIcon,
+  resenas: StarIcon,
 };
 
 /** Raíces de portal: solo se marcan activas con coincidencia exacta. */
