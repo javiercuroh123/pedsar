@@ -294,6 +294,45 @@ export type Database = {
           },
         ]
       }
+      conversaciones: {
+        Row: {
+          creada_en: string
+          curso_id: string
+          estudiante_id: string
+          id: number
+          ultimo_mensaje_en: string
+        }
+        Insert: {
+          creada_en?: string
+          curso_id: string
+          estudiante_id: string
+          id?: never
+          ultimo_mensaje_en?: string
+        }
+        Update: {
+          creada_en?: string
+          curso_id?: string
+          estudiante_id?: string
+          id?: never
+          ultimo_mensaje_en?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "conversaciones_curso_id_fkey"
+            columns: ["curso_id"]
+            isOneToOne: false
+            referencedRelation: "cursos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conversaciones_estudiante_id_fkey"
+            columns: ["estudiante_id"]
+            isOneToOne: false
+            referencedRelation: "perfiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       cupones: {
         Row: {
           activo: boolean
@@ -517,6 +556,48 @@ export type Database = {
             columns: ["inscripcion_id"]
             isOneToOne: false
             referencedRelation: "inscripciones"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      mensajes: {
+        Row: {
+          autor_id: string
+          conversacion_id: number
+          enviado_en: string
+          id: number
+          leido_en: string | null
+          texto: string
+        }
+        Insert: {
+          autor_id: string
+          conversacion_id: number
+          enviado_en?: string
+          id?: never
+          leido_en?: string | null
+          texto: string
+        }
+        Update: {
+          autor_id?: string
+          conversacion_id?: number
+          enviado_en?: string
+          id?: never
+          leido_en?: string | null
+          texto?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mensajes_autor_id_fkey"
+            columns: ["autor_id"]
+            isOneToOne: false
+            referencedRelation: "perfiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "mensajes_conversacion_id_fkey"
+            columns: ["conversacion_id"]
+            isOneToOne: false
+            referencedRelation: "conversaciones"
             referencedColumns: ["id"]
           },
         ]
@@ -850,6 +931,64 @@ export type Database = {
           },
         ]
       }
+      resenas: {
+        Row: {
+          actualizada_en: string
+          creada_en: string
+          curso_id: string
+          estrellas: number
+          estudiante_id: string
+          id: number
+          inscripcion_id: string
+          oculta: boolean
+          texto: string | null
+        }
+        Insert: {
+          actualizada_en?: string
+          creada_en?: string
+          curso_id: string
+          estrellas: number
+          estudiante_id: string
+          id?: never
+          inscripcion_id: string
+          oculta?: boolean
+          texto?: string | null
+        }
+        Update: {
+          actualizada_en?: string
+          creada_en?: string
+          curso_id?: string
+          estrellas?: number
+          estudiante_id?: string
+          id?: never
+          inscripcion_id?: string
+          oculta?: boolean
+          texto?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "resenas_curso_id_fkey"
+            columns: ["curso_id"]
+            isOneToOne: false
+            referencedRelation: "cursos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "resenas_estudiante_id_fkey"
+            columns: ["estudiante_id"]
+            isOneToOne: false
+            referencedRelation: "perfiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "resenas_inscripcion_id_fkey"
+            columns: ["inscripcion_id"]
+            isOneToOne: true
+            referencedRelation: "inscripciones"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       roles: {
         Row: {
           codigo: Database["public"]["Enums"]["rol_usuario"]
@@ -911,6 +1050,14 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      calificacion_cursos: {
+        Args: { p_ids: string[] }
+        Returns: {
+          cantidad: number
+          curso_id: string
+          promedio: number
+        }[]
+      }
       cupo_disponible: { Args: { p_curso: string }; Returns: number }
       es_admin: { Args: never; Returns: boolean }
       instructores_publicos: {
@@ -921,6 +1068,16 @@ export type Database = {
           especialidad: string
           id: string
           nombres: string
+        }[]
+      }
+      marcar_leidos: { Args: { p_conversacion: number }; Returns: number }
+      resenas_publicas: {
+        Args: { p_curso: string; p_limite?: number }
+        Returns: {
+          autor: string
+          estrellas: number
+          fecha: string
+          texto: string
         }[]
       }
       resultado_academico: {
