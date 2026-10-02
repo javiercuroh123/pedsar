@@ -15,7 +15,7 @@ export default async function InstructorMensajesPage({ searchParams }: PageProps
   const { curso } = await searchParams;
   const cursos = await listarCursosDelInstructor(usuario);
   const filtro = typeof curso === "string" && cursos.some((c) => c.id === curso) ? curso : undefined;
-  const bandeja = await listarBandejaInstructor(usuario.id, filtro);
+  const bandeja = await listarBandejaInstructor(filtro);
   const sinLeer = bandeja.reduce((a, c) => a + c.noLeidos, 0);
 
   return (

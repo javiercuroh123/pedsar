@@ -4,7 +4,7 @@
 -- =====================================================================
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(25);
+select plan(27);
 
 create schema pruebas;
 create function pruebas.como(p_usuario uuid) returns void language plpgsql as $$
@@ -91,6 +91,24 @@ select is(public.marcar_leidos((select id from public.conversaciones where estud
 reset role;
 select is((select count(*)::int from public.mensajes where autor_id = 'a0000000-0000-4000-8000-000000000002' and leido_en is null), 1,
   'Su propio mensaje sigue sin leer para el instructor');
+
+-- Los lados son «la estudiante» y «el instructor del curso»: si se reasigna el curso, la nueva
+-- instructora no marca como leída la respuesta pendiente del instructor anterior.
+select pruebas.como('a0000000-0000-4000-8000-000000000001');
+insert into public.mensajes (conversacion_id, autor_id, texto)
+  values ((select id from public.conversaciones where estudiante_id = 'a0000000-0000-4000-8000-000000000002'),
+          'a0000000-0000-4000-8000-000000000001', 'Recuerda subir el archivo en Excel');
+reset role;
+insert into auth.users (id, email, raw_user_meta_data) values ('a0000000-0000-4000-8000-000000000006', 'marta@pedsar.test', '{"nombres":"Marta"}');
+update public.perfiles set rol = 'instructor' where id = 'a0000000-0000-4000-8000-000000000006';
+update public.cursos set instructor_id = 'a0000000-0000-4000-8000-000000000006' where id = 'c0000000-0000-4000-8000-000000000001';
+select pruebas.como('a0000000-0000-4000-8000-000000000006');
+select is(public.marcar_leidos((select id from public.conversaciones where estudiante_id = 'a0000000-0000-4000-8000-000000000002')), 1,
+  'Tras reasignar el curso, la nueva instructora solo marca como leídos los mensajes de la estudiante');
+reset role;
+select is((select count(*)::int from public.mensajes where autor_id = 'a0000000-0000-4000-8000-000000000001' and leido_en is null), 1,
+  'La respuesta del instructor anterior sigue sin leer para la estudiante');
+update public.cursos set instructor_id = 'a0000000-0000-4000-8000-000000000001' where id = 'c0000000-0000-4000-8000-000000000001';
 
 -- ---------- Reseñas ----------
 select pruebas.como('a0000000-0000-4000-8000-000000000002');

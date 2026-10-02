@@ -109,7 +109,7 @@ describe("leer conversaciones", () => {
       {
         inscripciones: { data: [{ curso: { id: UUID.curso, titulo: "Excel", instructor_id: UUID.instructor } }, { curso: { id: UUID.otra, titulo: "Redes", instructor_id: null } }] },
         conversaciones: { data: [{ id: 5, curso_id: UUID.curso, ultimo_mensaje_en: "2026-10-02T15:00:00Z", mensajes: [{ texto: "El viernes", enviado_en: "2026-10-02T15:00:00Z" }] }] },
-        mensajes: { data: [{ conversacion_id: 5 }, { conversacion_id: 5 }] },
+        mensajes: { data: [{ conversacion_id: 5, autor_id: UUID.instructor }, { conversacion_id: 5, autor_id: UUID.otra }, { conversacion_id: 5, autor_id: UUID.estudiante }] },
         "rpc:instructores_publicos": { data: [{ id: UUID.instructor, nombres: "Luis", apellidos: "Ramos" }] },
       },
     );
@@ -124,22 +124,22 @@ describe("leer conversaciones", () => {
     responder(
       {
         conversaciones: { data: [{ id: 5, curso_id: UUID.curso, estudiante_id: UUID.estudiante, ultimo_mensaje_en: "2026-10-02T15:00:00Z", curso: { titulo: "Excel" }, mensajes: [{ texto: "¿Hasta cuándo?", enviado_en: "2026-10-02T15:00:00Z" }] }] },
-        mensajes: { data: [{ conversacion_id: 5 }] },
+        mensajes: { data: [{ conversacion_id: 5, autor_id: UUID.estudiante }, { conversacion_id: 5, autor_id: UUID.otra }] },
       },
       { perfiles: { data: [{ id: UUID.estudiante, nombres: "Ana", apellidos: "Quispe" }] } },
     );
-    await expect(listarBandejaInstructor(UUID.instructor, UUID.curso)).resolves.toEqual([
+    await expect(listarBandejaInstructor(UUID.curso)).resolves.toEqual([
       { id: 5, cursoId: UUID.curso, curso: "Excel", otro: "Ana Quispe", ultimoMensaje: "¿Hasta cuándo?", ultimoEn: "2026-10-02T15:00:00Z", noLeidos: 1 },
     ]);
     expect(entorno.servidor.de("conversaciones")[0].filtros).toContainEqual(["eq", "curso_id", UUID.curso]);
   });
 
-  it("una conversación trae sus mensajes en orden y marca cuáles son propios", async () => {
+  it("una conversación trae sus 500 mensajes más recientes en orden cronológico y marca cuáles son propios", async () => {
     conSesion("estudiante");
     responder(
       {
         conversaciones: { data: { id: 5, curso_id: UUID.curso, estudiante_id: UUID.estudiante, curso: { titulo: "Excel", instructor_id: UUID.instructor } } },
-        mensajes: { data: [{ id: 1, texto: "Hola", enviado_en: "2026-10-02T14:00:00Z", autor_id: UUID.estudiante, leido_en: null }, { id: 2, texto: "Hola, Ana", enviado_en: "2026-10-02T14:05:00Z", autor_id: UUID.instructor, leido_en: "2026-10-02T14:06:00Z" }] },
+        mensajes: { data: [{ id: 2, texto: "Hola, Ana", enviado_en: "2026-10-02T14:05:00Z", autor_id: UUID.instructor, leido_en: "2026-10-02T14:06:00Z" }, { id: 1, texto: "Hola", enviado_en: "2026-10-02T14:00:00Z", autor_id: UUID.estudiante, leido_en: null }] },
         "rpc:instructores_publicos": { data: [{ id: UUID.instructor, nombres: "Luis", apellidos: "Ramos" }] },
       },
     );
@@ -153,7 +153,24 @@ describe("leer conversaciones", () => {
         { id: 2, texto: "Hola, Ana", enviadoEn: "2026-10-02T14:05:00Z", propio: false, leido: true },
       ],
     });
-    expect(entorno.servidor.de("mensajes")[0].filtros).toEqual(expect.arrayContaining([["eq", "conversacion_id", 5], ["order", "enviado_en", { ascending: true }]]));
+    expect(entorno.servidor.de("mensajes")[0].filtros).toEqual(expect.arrayContaining([["eq", "conversacion_id", 5], ["order", "enviado_en", { ascending: false }], ["limit", 500]]));
+  });
+
+  it("tras reasignar el curso, los mensajes del instructor anterior siguen del lado del instructor", async () => {
+    conSesion("instructor");
+    const conversacion = { id: 5, curso_id: UUID.curso, estudiante_id: UUID.estudiante, curso: { titulo: "Excel", instructor_id: UUID.instructor } };
+    const mensajes = [
+      { id: 2, texto: "Sube el archivo", enviado_en: "2026-10-02T14:05:00Z", autor_id: UUID.otra, leido_en: null },
+      { id: 1, texto: "Hola", enviado_en: "2026-10-02T14:00:00Z", autor_id: UUID.estudiante, leido_en: null },
+    ];
+    responder({ conversaciones: { data: conversacion }, mensajes: { data: mensajes } }, { perfiles: { data: [{ id: UUID.estudiante, nombres: "Ana", apellidos: "Quispe" }] } });
+    const comoInstructor = await obtenerConversacion({ id: 5 }, UUID.instructor);
+    expect(comoInstructor?.mensajes.map((m) => [m.id, m.propio])).toEqual([[1, false], [2, true]]);
+
+    conSesion("estudiante");
+    responder({ conversaciones: { data: conversacion }, mensajes: { data: mensajes }, "rpc:instructores_publicos": { data: [] } });
+    const comoEstudiante = await obtenerConversacion({ id: 5 }, UUID.estudiante);
+    expect(comoEstudiante?.mensajes.map((m) => [m.id, m.propio])).toEqual([[1, true], [2, false]]);
   });
 
   it("sin acceso a la conversación devuelve null", async () => {

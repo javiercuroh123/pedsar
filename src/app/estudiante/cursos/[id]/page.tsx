@@ -187,11 +187,6 @@ export default async function AulaPage({ params, searchParams }: PageProps<"/est
               </div>
             )}
             {curso.descripcion && <p className="mt-6 max-w-3xl text-sm leading-relaxed text-muted-foreground">{curso.descripcion}</p>}
-            {puedeResenar && (
-              <div className="mt-6 max-w-3xl">
-                <FormularioResena inscripcionId={inscripcion.id} resena={resena} />
-              </div>
-            )}
           </div>
 
           <aside className="h-fit overflow-hidden rounded-2xl border bg-card shadow-xs xl:sticky xl:top-24">
@@ -253,6 +248,13 @@ export default async function AulaPage({ params, searchParams }: PageProps<"/est
               ))}
             </div>
           </aside>
+        </div>
+      )}
+
+      {/* HU-24 · Fuera del aula de contenidos: un curso sin módulos también se califica con el certificado. */}
+      {puedeResenar && (
+        <div className="max-w-3xl pt-2">
+          <FormularioResena inscripcionId={inscripcion.id} resena={resena} />
         </div>
       )}
     </div>
