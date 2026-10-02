@@ -154,34 +154,67 @@ export type Database = {
       }
       comprobantes: {
         Row: {
+          cliente_documento: string | null
+          cliente_nombre: string | null
+          concepto: string | null
+          descuento: number | null
           enviado_sunat: boolean
           fecha_emision: string
           id: number
+          medio: string | null
+          metodo: Database["public"]["Enums"]["metodo_pago"] | null
           numero: string
           pago_id: string
           pdf_url: string | null
+          razon_social: string | null
+          referencia_pasarela: string | null
+          ruc: string | null
           serie: string
+          subtotal: number | null
           tipo: Database["public"]["Enums"]["tipo_comprobante"]
+          total: number | null
         }
         Insert: {
+          cliente_documento?: string | null
+          cliente_nombre?: string | null
+          concepto?: string | null
+          descuento?: number | null
           enviado_sunat?: boolean
           fecha_emision?: string
           id?: never
+          medio?: string | null
+          metodo?: Database["public"]["Enums"]["metodo_pago"] | null
           numero: string
           pago_id: string
           pdf_url?: string | null
+          razon_social?: string | null
+          referencia_pasarela?: string | null
+          ruc?: string | null
           serie: string
+          subtotal?: number | null
           tipo?: Database["public"]["Enums"]["tipo_comprobante"]
+          total?: number | null
         }
         Update: {
+          cliente_documento?: string | null
+          cliente_nombre?: string | null
+          concepto?: string | null
+          descuento?: number | null
           enviado_sunat?: boolean
           fecha_emision?: string
           id?: never
+          medio?: string | null
+          metodo?: Database["public"]["Enums"]["metodo_pago"] | null
           numero?: string
           pago_id?: string
           pdf_url?: string | null
+          razon_social?: string | null
+          referencia_pasarela?: string | null
+          ruc?: string | null
           serie?: string
+          subtotal?: number | null
           tipo?: Database["public"]["Enums"]["tipo_comprobante"]
+          total?: number | null
         }
         Relationships: [
           {
@@ -558,14 +591,17 @@ export type Database = {
       pagos: {
         Row: {
           cupon_id: number | null
+          datos_facturacion: Json
           estado: Database["public"]["Enums"]["estado_pago"]
           fecha_pago: string | null
           id: string
           inscripcion_id: string
+          medio: string | null
           metodo: Database["public"]["Enums"]["metodo_pago"]
           monto: number
           numero_operacion: string | null
           observacion: string | null
+          orden_pasarela: string | null
           referencia_pasarela: string | null
           reportado_en: string | null
           respuesta_pasarela: Json | null
@@ -573,14 +609,17 @@ export type Database = {
         }
         Insert: {
           cupon_id?: number | null
+          datos_facturacion?: Json
           estado?: Database["public"]["Enums"]["estado_pago"]
           fecha_pago?: string | null
           id?: string
           inscripcion_id: string
+          medio?: string | null
           metodo: Database["public"]["Enums"]["metodo_pago"]
           monto: number
           numero_operacion?: string | null
           observacion?: string | null
+          orden_pasarela?: string | null
           referencia_pasarela?: string | null
           reportado_en?: string | null
           respuesta_pasarela?: Json | null
@@ -588,14 +627,17 @@ export type Database = {
         }
         Update: {
           cupon_id?: number | null
+          datos_facturacion?: Json
           estado?: Database["public"]["Enums"]["estado_pago"]
           fecha_pago?: string | null
           id?: string
           inscripcion_id?: string
+          medio?: string | null
           metodo?: Database["public"]["Enums"]["metodo_pago"]
           monto?: number
           numero_operacion?: string | null
           observacion?: string | null
+          orden_pasarela?: string | null
           referencia_pasarela?: string | null
           reportado_en?: string | null
           respuesta_pasarela?: Json | null
