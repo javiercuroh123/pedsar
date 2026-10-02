@@ -137,8 +137,14 @@ describe("catálogo público (HU-05 · HU-06 · HU-33)", () => {
       },
       "rpc:instructores_publicos": { data: [{ id: "ins-1", nombres: "Luis", apellidos: "Ramos" }] },
       "rpc:cupo_disponible": (c) => ({ data: (c.valores as { p_curso: string }).p_curso === "excel" ? 4 : null }),
+      "rpc:calificacion_cursos": { data: [{ curso_id: "excel", promedio: 4.5, cantidad: 2 }] },
     });
     const [excel, sst] = await listarCursosPublicados({ categorias: ["ofimatica"], niveles: ["BASICO"], modalidades: ["VIRTUAL"], precioMax: 200, destacados: true });
+    // HU-24 · Una sola consulta de calificaciones para todo el catálogo.
+    expect(entorno.servidor.de("rpc:calificacion_cursos")).toHaveLength(1);
+    expect(entorno.servidor.de("rpc:calificacion_cursos")[0].valores).toEqual({ p_ids: ["excel", "sst"] });
+    expect(excel.calificacion).toEqual({ promedio: 4.5, cantidad: 2 });
+    expect(sst.calificacion).toBeNull();
     expect(entorno.servidor.de("cursos")[0].columnas).toContain("categoria:categorias!inner(nombre, slug)");
     expect(entorno.servidor.de("cursos")[0].filtros).toEqual(
       expect.arrayContaining([["eq", "estado", "PUBLICADO"], ["in", "categoria.slug", ["ofimatica"]], ["lte", "precio", 200], ["eq", "destacado", true]]),
@@ -173,8 +179,12 @@ describe("catálogo público (HU-05 · HU-06 · HU-33)", () => {
       cursos: { data: curso("excel", { modulos: [{ id: 2, titulo: "B", orden: 2 }, { id: 1, titulo: "A", orden: 1 }], sesiones: [{ id: 2, fecha: "2026-10-09", hora_inicio: "19:00" }, { id: 1, fecha: "2026-10-02", hora_inicio: "19:00" }] }) },
       "rpc:cupo_disponible": { data: 0 },
       "rpc:instructores_publicos": { data: { nombres: "Luis", apellidos: "Ramos", especialidad: "Excel", avatar_url: null } },
+      "rpc:calificacion_cursos": { data: [{ curso_id: "excel", promedio: 4, cantidad: 1 }] },
+      "rpc:resenas_publicas": { data: [{ estrellas: 4, texto: "Muy práctico", autor: "Ana Q.", fecha: "2026-10-02T15:00:00Z" }] },
     });
     const detalle = await obtenerCursoPorSlug("excel");
+    expect(detalle).toMatchObject({ calificacion: { promedio: 4, cantidad: 1 }, resenas: [{ estrellas: 4, texto: "Muy práctico", autor: "Ana Q.", fecha: "2026-10-02T15:00:00Z" }] });
+    expect(entorno.servidor.de("rpc:resenas_publicas")[0].valores).toEqual({ p_curso: "excel", p_limite: 6 });
     expect(entorno.servidor.de("cursos")[0].filtros).toEqual([
       ["eq", "slug", "excel"],
       ["eq", "estado", "PUBLICADO"],
@@ -184,7 +194,7 @@ describe("catálogo público (HU-05 · HU-06 · HU-33)", () => {
     expect(detalle!.sesiones.map((s) => s.id)).toEqual([1, 2]);
 
     responder({ cursos: { data: curso("x", { instructor_id: null, modulos: null, sesiones: null }) } });
-    await expect(obtenerCursoPorSlug("x")).resolves.toMatchObject({ instructor: null, cupo_disponible: 0, modulos: [], sesiones: [] });
+    await expect(obtenerCursoPorSlug("x")).resolves.toMatchObject({ instructor: null, cupo_disponible: 0, modulos: [], sesiones: [], calificacion: null, resenas: [] });
     responder();
     await expect(obtenerCursoPorSlug("no-existe")).resolves.toBeNull();
     responder({ cursos: { error: { message: "caído" } } });
