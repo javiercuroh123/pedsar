@@ -139,6 +139,22 @@ export function correoPagoRechazado(p: { nombre: string; curso: string; codigo: 
   };
 }
 
+// ---------- Comunidad ----------
+
+/** HU-19 · Primer mensaje sin leer de una conversación (los siguientes solo van a la campana). */
+export function correoMensajeNuevo(p: { nombre: string; de: string; curso: string; extracto: string; url: string }) {
+  const extracto = p.extracto.length > 140 ? `${p.extracto.slice(0, 140)}…` : p.extracto;
+  return {
+    asunto: `Nuevo mensaje de ${p.de} · ${p.curso}`,
+    html: marco(`
+      ${saludo(p.nombre)}
+      <p style="margin:0">${escapar(p.de)} te escribió sobre <strong>${escapar(p.curso)}</strong>:</p>
+      ${aviso(escapar(extracto))}
+      ${boton("Leer y responder", p.url)}
+      ${pie("No te enviaremos otro correo por esta conversación hasta que leas este mensaje.")}`),
+  };
+}
+
 // ---------- Certificación ----------
 
 export function correoCertificadoEmitido(p: { nombre: string; curso: string; codigo: string; url: string }) {
