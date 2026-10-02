@@ -18,6 +18,8 @@ import { BotonEnviar } from "@/components/boton-enviar";
 import { buttonVariants } from "@/components/ui/button";
 import { marcarCompletado } from "@/features/academico/acciones-estudiante";
 import { listarModulosConContenidos, type ContenidoAula } from "@/features/academico/consultas";
+import { datosResenaPropia } from "@/features/comunidad/consultas-resenas";
+import { FormularioResena } from "@/features/comunidad/formulario-resena";
 import { requireRol } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
@@ -61,14 +63,17 @@ export default async function AulaPage({ params, searchParams }: PageProps<"/est
   if (!inscripcion) notFound();
   const curso = (Array.isArray(inscripcion.curso) ? inscripcion.curso[0] : inscripcion.curso) as { id: string; titulo: string; descripcion: string | null };
 
-  const [modulos, { data: completados }] = await Promise.all([
+  const [modulos, { data: completados }, { resena, certificado }] = await Promise.all([
     listarModulosConContenidos(id),
     supabase.from("contenidos_completados").select("contenido_id").eq("inscripcion_id", inscripcion.id),
+    datosResenaPropia(inscripcion.id),
   ]);
   const hechos = new Set((completados ?? []).map((x: { contenido_id: number }) => x.contenido_id));
   const todos = modulos.flatMap((m, mi) => m.contenidos.map((ct, ci) => ({ ...ct, modulo: m.titulo, mi, ci })));
   const total = todos.length;
   const porcentaje = total ? Math.round((hechos.size / total) * 100) : 0;
+  // HU-24 · Se califica al completar el curso (la BD lo vuelve a verificar al guardar).
+  const puedeResenar = porcentaje >= 100 || certificado || !!resena;
 
   const indice = Math.max(
     0,
@@ -182,6 +187,11 @@ export default async function AulaPage({ params, searchParams }: PageProps<"/est
               </div>
             )}
             {curso.descripcion && <p className="mt-6 max-w-3xl text-sm leading-relaxed text-muted-foreground">{curso.descripcion}</p>}
+            {puedeResenar && (
+              <div className="mt-6 max-w-3xl">
+                <FormularioResena inscripcionId={inscripcion.id} resena={resena} />
+              </div>
+            )}
           </div>
 
           <aside className="h-fit overflow-hidden rounded-2xl border bg-card shadow-xs xl:sticky xl:top-24">

@@ -10,7 +10,9 @@ import {
   ClockIcon,
   FolderDownIcon,
   LayersIcon,
+  MessageSquareQuoteIcon,
   ReceiptIcon,
+  StarIcon,
   UsersIcon,
 } from "lucide-react";
 import { AvatarIniciales, EstadoVacio, tabla } from "@/components/comunes";
@@ -19,6 +21,7 @@ import { reservaVencida } from "@/config/matricula";
 import { obtenerCursoPorSlug } from "@/features/catalogo/consultas";
 import { IndicadorCupo } from "@/features/catalogo/curso-card";
 import { ICONO_MODALIDAD, PortadaCurso } from "@/features/catalogo/portada-curso";
+import { Estrellas, formatearPromedio } from "@/features/comunidad/estrellas";
 import { getUsuarioActual } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import {
@@ -108,6 +111,13 @@ export default async function CursoPage({ params }: PageProps<"/cursos/[slug]">)
                 <UsersIcon className="size-4" />
                 {curso.cupo_maximo - Math.max(curso.cupo_disponible, 0)} inscritos
               </span>
+              {curso.calificacion && (
+                <a href="#resenas" className="flex items-center gap-1.5 hover:text-white">
+                  <StarIcon className="size-4 fill-amber-400 text-amber-400" />
+                  <span className="font-semibold text-white">{formatearPromedio(curso.calificacion.promedio)}</span>
+                  ({curso.calificacion.cantidad} {curso.calificacion.cantidad === 1 ? "reseña" : "reseñas"})
+                </a>
+              )}
               {inicio && (
                 <span className="flex items-center gap-1.5">
                   <CalendarDaysIcon className="size-4" />
@@ -186,6 +196,42 @@ export default async function CursoPage({ params }: PageProps<"/cursos/[slug]">)
               </div>
             </section>
           )}
+
+          {/* HU-24 · Reseñas de quienes completaron el curso (las ocultas por moderación no se publican) */}
+          <section id="resenas" className="scroll-mt-24">
+            <div className="flex flex-wrap items-end justify-between gap-3">
+              <h2 className="text-xl font-bold tracking-tight">Reseñas</h2>
+              {curso.calificacion && (
+                <p className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <span className="text-2xl font-bold text-foreground tabular-nums">{formatearPromedio(curso.calificacion.promedio)}</span>
+                  <Estrellas valor={curso.calificacion.promedio} className="text-base" />
+                  {curso.calificacion.cantidad} {curso.calificacion.cantidad === 1 ? "reseña" : "reseñas"}
+                </p>
+              )}
+            </div>
+            {curso.resenas.length ? (
+              <ul className="mt-4 grid gap-4 sm:grid-cols-2">
+                {curso.resenas.map((r, i) => (
+                  <li key={i} className="rounded-2xl border bg-card p-5">
+                    <div className="flex items-center gap-3">
+                      <AvatarIniciales nombre={r.autor} className="size-9 text-xs" />
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-semibold">{r.autor}</p>
+                        <p className="text-xs text-muted-foreground">{formatearFecha(r.fecha)}</p>
+                      </div>
+                      <Estrellas valor={r.estrellas} className="text-sm" />
+                    </div>
+                    {r.texto && <p className="mt-3 text-sm leading-relaxed break-words whitespace-pre-line text-muted-foreground">{r.texto}</p>}
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <div className="mt-4 flex items-center gap-3 rounded-2xl border border-dashed p-5 text-sm text-muted-foreground">
+                <MessageSquareQuoteIcon className="size-5 shrink-0" />
+                Aún no tiene reseñas. Quienes completen el curso podrán calificarlo.
+              </div>
+            )}
+          </section>
         </div>
 
         <aside className="animar-escala lg:sticky lg:top-24 lg:-mt-40 lg:self-start [--i:3]">

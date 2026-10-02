@@ -1,6 +1,7 @@
 import { ArrowRightIcon, CalendarDaysIcon, ClockIcon, SignalIcon, UserRoundIcon } from "lucide-react";
 import Link from "next/link";
 import { BarraProgreso } from "@/components/comunes";
+import { ResumenCalificacion } from "@/features/comunidad/estrellas";
 import { ETIQUETA_NIVEL, formatearFecha, formatearHora, formatearSoles } from "@/lib/formato";
 import { cn } from "@/lib/utils";
 import type { CursoResumen } from "./consultas";
@@ -65,6 +66,7 @@ export function CursoCard({ curso }: { curso: CursoResumen }) {
             <SignalIcon className="size-4 shrink-0" />
             {ETIQUETA_NIVEL[curso.nivel]}
           </span>
+          {curso.calificacion && <ResumenCalificacion promedio={curso.calificacion.promedio} cantidad={curso.calificacion.cantidad} />}
         </div>
         <div className="mt-2 space-y-1.5 text-sm text-muted-foreground">
           {curso.instructor && (
