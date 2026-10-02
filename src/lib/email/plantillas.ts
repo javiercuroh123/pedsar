@@ -95,13 +95,17 @@ export function correoPagoObservado(p: { nombre: string; curso: string; motivo: 
   };
 }
 
-export function correoConfirmacionMatricula(p: { nombre: string; curso: string; codigo: string; url: string }) {
+export function correoConfirmacionMatricula(p: { nombre: string; curso: string; codigo: string; url: string; comprobante?: { numero: string; url: string } }) {
+  const filas: [string, string][] = [["Código de matrícula", escapar(p.codigo)]];
+  if (p.comprobante) {
+    filas.push(["Comprobante", `<a href="${escapar(encodeURI(p.comprobante.url))}" style="color:${COLOR.cian}">${escapar(p.comprobante.numero)}</a>`]);
+  }
   return {
     asunto: `Matrícula confirmada: ${p.curso}`,
     html: marco(`
       ${saludo(p.nombre)}
-      <p style="margin:0">Validamos tu pago y tu matrícula en <strong>${escapar(p.curso)}</strong> está confirmada. Ya puedes ingresar al aula virtual.</p>
-      ${datos([["Código de matrícula", escapar(p.codigo)]])}
+      <p style="margin:0">Recibimos tu pago y tu matrícula en <strong>${escapar(p.curso)}</strong> está confirmada. Ya puedes ingresar al aula virtual.</p>
+      ${datos(filas)}
       ${boton("Ir a mis cursos", p.url)}`),
   };
 }

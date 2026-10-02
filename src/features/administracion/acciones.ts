@@ -6,7 +6,7 @@ import { registrarActividad } from "@/lib/auditoria";
 import { requireRol } from "@/lib/auth";
 import { generarCodigoCertificado } from "@/lib/certificados";
 import { programarCorreo } from "@/lib/email";
-import { correoCertificadoEmitido, correoConfirmacionMatricula, correoPagoObservado, correoPagoRechazado } from "@/lib/email/plantillas";
+import { correoCertificadoEmitido, correoPagoObservado, correoPagoRechazado } from "@/lib/email/plantillas";
 import { formatearFechaHora, nombreCompleto } from "@/lib/formato";
 import { evaluarAptitud } from "@/config/academico";
 import { PLAZO_PAGO_HORAS } from "@/config/matricula";
@@ -15,6 +15,7 @@ import { publicEnv } from "@/lib/env";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { uno } from "@/features/academico/consultas";
+import { confirmarPago } from "@/features/matricula/confirmar-pago";
 import { notificarUsuario as notificar } from "@/features/notificaciones/enviar";
 import type { EstadoFormulario } from "@/features/usuarios/esquemas";
 
@@ -183,37 +184,38 @@ export async function resolverPago(formData: FormData) {
 
   const { data: ins } = await db
     .from("inscripciones")
-    .select("id, codigo, estado, estudiante_id, estudiante:perfiles(nombres, correo), curso:cursos(titulo, slug)")
+    .select("id, codigo, estado, estudiante_id, estudiante:perfiles(nombres, correo), curso:cursos(titulo, slug), pagos(id)")
     .eq("id", inscripcionId)
     .single();
   // Solo se resuelve una vez (evita confirmar dos veces y duplicar correos).
   if (!ins || ins.estado !== "PENDIENTE") return;
-  await db
-    .from("pagos")
-    .update(aprobar ? { estado: "APROBADO", fecha_pago: new Date().toISOString(), observacion: null } : { estado: "RECHAZADO", fecha_pago: null })
-    .eq("inscripcion_id", inscripcionId);
-  await db.from("inscripciones").update({ estado: aprobar ? "CONFIRMADA" : "CANCELADA" }).eq("id", inscripcionId);
+  const pago = uno<{ id: string }>(ins.pagos);
+
+  if (aprobar) {
+    // Mismo camino que el pago en línea: confirma, emite el comprobante y avisa.
+    if (pago) await confirmarPago(pago.id, { actor: usuario.id });
+    revalidatePath("/admin", "layout");
+    return;
+  }
+
+  await db.from("pagos").update({ estado: "RECHAZADO", fecha_pago: null }).eq("inscripcion_id", inscripcionId);
+  await db.from("inscripciones").update({ estado: "CANCELADA" }).eq("id", inscripcionId);
 
   const curso = uno<{ titulo: string; slug: string }>(ins.curso);
   const estudiante = uno<{ nombres: string; correo: string }>(ins.estudiante);
-  await notificar(
-    ins.estudiante_id,
-    aprobar
-      ? `¡Tu inscripción en ${curso?.titulo ?? "el curso"} fue confirmada! Ya puedes ingresar al aula virtual.`
-      : `No pudimos validar el pago de tu inscripción ${ins.codigo}. Si aún hay cupos, puedes volver a inscribirte.`,
-    aprobar ? "/estudiante/cursos" : "/estudiante/pagos",
-  );
+  await notificar(ins.estudiante_id, `No pudimos validar el pago de tu inscripción ${ins.codigo}. Si aún hay cupos, puedes volver a inscribirte.`, "/estudiante/pagos");
   if (estudiante?.correo && curso) {
-    const datos = { nombre: estudiante.nombres || "estudiante", curso: curso.titulo, codigo: ins.codigo };
     programarCorreo({
       para: estudiante.correo,
-      ...(aprobar
-        ? correoConfirmacionMatricula({ ...datos, url: `${publicEnv.NEXT_PUBLIC_SITE_URL}/estudiante/cursos` })
-        : correoPagoRechazado({ ...datos, url: `${publicEnv.NEXT_PUBLIC_SITE_URL}/cursos/${curso.slug}` })),
+      ...correoPagoRechazado({
+        nombre: estudiante.nombres || "estudiante",
+        curso: curso.titulo,
+        codigo: ins.codigo,
+        url: `${publicEnv.NEXT_PUBLIC_SITE_URL}/cursos/${curso.slug}`,
+      }),
     });
   }
-  await registrarActividad(usuario.id, aprobar ? "CONFIRMAR_PAGO" : "RECHAZAR_PAGO", { inscripcion: ins.codigo });
-  // TODO: emitir comprobante electrónico (SUNAT) al aprobar.
+  await registrarActividad(usuario.id, "RECHAZAR_PAGO", { inscripcion: ins.codigo });
   revalidatePath("/admin", "layout");
 }
 

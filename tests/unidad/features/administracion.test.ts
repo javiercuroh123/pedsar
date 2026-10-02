@@ -16,10 +16,12 @@ import {
   resolverPago,
   resolverReembolso,
 } from "@/features/administracion/acciones";
+import { confirmarPago } from "@/features/matricula/confirmar-pago";
 import { requireRol } from "@/lib/auth";
 import { conSesion, ejecutarTareas, entorno, formulario, Redireccion, responder, UUID } from "../../apoyo/entorno";
 
 vi.mock("@/lib/auth", () => import("../../apoyo/auth-falso"));
+vi.mock("@/features/matricula/confirmar-pago", () => ({ confirmarPago: vi.fn(async () => "CONFIRMADO") }));
 
 const auditadas = () => entorno.admin.de("registro_actividad").map((c) => (c.valores as { accion: string }).accion);
 
@@ -130,16 +132,13 @@ describe("validación de pagos (CU «Validar comprobantes»)", () => {
     },
   });
 
-  it("confirmar aprueba el pago, confirma la matrícula, notifica y envía el correo", async () => {
+  it("confirmar delega en confirmarPago, con el administrador como responsable", async () => {
     conSesion("administrador");
     responder({}, { "inscripciones.select": inscripcion() });
     await resolverPago(formulario({ inscripcionId: UUID.inscripcion, decision: "aprobar" }));
-    expect(entorno.admin.de("pagos", "update")[0]).toMatchObject({ valores: { estado: "APROBADO", observacion: null, fecha_pago: expect.any(String) }, filtros: [["eq", "inscripcion_id", UUID.inscripcion]] });
-    expect(entorno.admin.de("inscripciones", "update")[0].valores).toEqual({ estado: "CONFIRMADA" });
-    expect(entorno.admin.de("notificaciones")[0].valores).toMatchObject({ usuario_id: UUID.estudiante, enlace: "/estudiante/cursos", mensaje: expect.stringContaining("confirmada") });
-    expect(auditadas()).toEqual(["CONFIRMAR_PAGO"]);
-    await ejecutarTareas();
-    expect(console.info).toHaveBeenCalledWith(expect.stringContaining("ana@pedsar.test"));
+    expect(confirmarPago).toHaveBeenCalledWith(UUID.pago, { actor: UUID.admin });
+    expect(entorno.admin.de("pagos", "update")).toHaveLength(0);
+    expect(entorno.admin.de("inscripciones", "update")).toHaveLength(0);
   });
 
   it("rechazar cancela la matrícula y libera el cupo", async () => {
@@ -158,14 +157,7 @@ describe("validación de pagos (CU «Validar comprobantes»)", () => {
     responder({}, { "inscripciones.select": inscripcion("CONFIRMADA") });
     await resolverPago(formulario({ inscripcionId: UUID.inscripcion, decision: "aprobar" }));
     expect(entorno.admin.de("pagos")).toHaveLength(0);
-    expect(entorno.tareas).toHaveLength(0);
-  });
-
-  it("sin correo del estudiante igual confirma, pero no programa correo", async () => {
-    conSesion("administrador");
-    responder({}, { "inscripciones.select": inscripcion("PENDIENTE", { estudiante: null }) });
-    await resolverPago(formulario({ inscripcionId: UUID.inscripcion, decision: "aprobar" }));
-    expect(entorno.admin.de("inscripciones", "update")).toHaveLength(1);
+    expect(confirmarPago).not.toHaveBeenCalled();
     expect(entorno.tareas).toHaveLength(0);
   });
 
