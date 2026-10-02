@@ -89,11 +89,13 @@ Todas las pantallas del prototipo están implementadas y conectadas a Supabase:
 - **Sitio público:** inicio, catálogo con filtros instantáneos, detalle de curso, inscripción
   en 3 pasos con cupones, verificación de certificados, nosotros, contacto y privacidad.
 - **Estudiante:** panel, mis cursos, aula virtual (video/PDF/enlace y progreso), evaluaciones
-  con temporizador y calificación en el servidor, pagos/reembolsos y certificados en PDF con QR de verificación.
+  con temporizador y calificación en el servidor, pagos/reembolsos, certificados en PDF con QR de
+  verificación, mensajes con el instructor y reseña del curso completado.
 - **Instructor:** panel, contenidos (subida directa a Storage), sesiones, asistencia,
-  constructor de evaluaciones y notas con reporte del curso en Excel y PDF (HU-42).
-- **Administrador:** dashboard, cursos, categorías, inscripciones y pagos, reembolsos, cupones,
-  certificados (emisión masiva), usuarios y roles, reportes de usuarios, inscripciones e ingresos en Excel y PDF (RF-10) y auditoría.
+  constructor de evaluaciones, notas con reporte del curso en Excel y PDF (HU-42) y bandeja de mensajes.
+- **Administrador:** dashboard (con los cursos mejor evaluados), cursos, categorías, inscripciones y pagos,
+  reembolsos, cupones, certificados (emisión masiva), usuarios y roles, reportes de usuarios,
+  inscripciones e ingresos en Excel y PDF (RF-10), moderación de reseñas y auditoría.
 - **Cuenta:** perfil con foto, contraseña, exportación de datos (JSON) y notificaciones.
 - Modo claro/oscuro, alto contraste y tamaño de fuente ajustable (RNF-08).
 
@@ -171,6 +173,23 @@ rechazar un pago y al emitir un certificado. Se envían con Resend después de r
 (`after`), sin demorar la acción; sin `RESEND_API_KEY` solo se muestran en la consola del
 servidor. Para producción hay que verificar el dominio de `EMAIL_FROM` en Resend.
 
+**Mensajería (HU-19):** conversación privada entre el estudiante y el instructor, una por curso.
+El estudiante escribe desde «Mensajes» o con «Escribir al instructor» en el aula, solo en cursos
+con la matrícula confirmada; el instructor responde desde su bandeja, filtrada por curso. La
+conversación se actualiza cada 10 segundos mientras está abierta (no es tiempo real) y marca como
+leídos los mensajes recibidos. Cada mensaje genera un aviso en la campana; el correo se envía solo
+con el primer mensaje sin leer, para no llenar la bandeja. La RLS deja leer y escribir solo a los
+dos participantes: el administrador no lee los chats (`supabase/migrations/…_comunidad.sql`,
+`src/features/comunidad/mensajes.ts`).
+
+**Reseñas (HU-24):** quien completa el curso (100 % de avance o certificado emitido) lo califica
+de 1 a 5 estrellas con una reseña opcional de hasta 500 caracteres, y puede editarla. La BD
+verifica la elegibilidad y toma el curso y el autor de la inscripción. El detalle del curso
+muestra el promedio y las últimas reseñas con el nombre abreviado («Ana Q.»); el catálogo, el
+promedio y la cantidad. El administrador oculta o muestra reseñas en «Reseñas»: las ocultas no se
+publican ni cuentan en el promedio, y su autor las sigue viendo con la marca «Oculta por
+moderación».
+
 Pendiente: emisión de boletas y facturas electrónicas SUNAT (HU-31) y recordatorios programados
 de sesiones y evaluaciones.
 Varias funciones (pagos, evaluaciones, notificaciones, auditoría) requieren `SUPABASE_SECRET_KEY`.
@@ -192,7 +211,8 @@ npm run test:db           # pruebas de la BD con pgTAP (requiere `npm run db:sta
   rutas y proxy); el umbral de 70 % está en `vitest.config.mts` y hace fallar la ejecución.
 - **Base de datos** (`supabase/tests`): RLS por rol (visitante, estudiante, instructor,
   administrador), cupo y reservas de 48 h, vencimiento por pg_cron, reinscripción, N.º de
-  operación único, `resultado_academico` y verificación pública de certificados. Cada archivo
+  operación único, `resultado_academico`, verificación pública de certificados, numeración de
+  comprobantes, privacidad de los mensajes y elegibilidad y moderación de las reseñas. Cada archivo
   corre en una transacción que se revierte.
 - **CI** (`.github/workflows/calidad.yml`): en cada push y pull request ejecuta lint, tipos,
   pruebas con cobertura, `next build` y las pruebas de la BD contra un Supabase local.
