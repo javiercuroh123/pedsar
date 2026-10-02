@@ -5,6 +5,7 @@ import { ArrowLeftIcon } from "lucide-react";
 import { obtenerCursoPorSlug } from "@/features/catalogo/consultas";
 import { FormularioInscripcion } from "@/features/matricula/formulario-inscripcion";
 import { requireRol } from "@/lib/auth";
+import { pagoManualHabilitado, pasarelaActiva } from "@/lib/pagos";
 import { createClient } from "@/lib/supabase/server";
 import { ETIQUETA_MODALIDAD, formatearFecha, formatearHora, hoyISO } from "@/lib/formato";
 
@@ -49,6 +50,8 @@ export default async function InscripcionPage({ params }: PageProps<"/cursos/[sl
           }}
           cupoLibre={curso.cupo_disponible}
           cupoMaximo={curso.cupo_maximo}
+          pasarelaActiva={pasarelaActiva()}
+          pagoManual={pagoManualHabilitado()}
         />
       </div>
     </div>

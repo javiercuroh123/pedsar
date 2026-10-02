@@ -1,8 +1,7 @@
 import "server-only";
 import { hojaExcel, libroExcel, type ValorExcel } from "@/lib/excel";
-import { ETIQUETA_METODO, ETIQUETA_MODALIDAD, formatearFecha, formatearSoles } from "@/lib/formato";
+import { ETIQUETA_MODALIDAD, formatearFecha, formatearSoles } from "@/lib/formato";
 import { generarPdfReporte } from "@/lib/pdf/reporte";
-import type { MetodoPago } from "@/types/dominio";
 import { etiquetaMes, type ReporteGeneral } from "./reportes";
 
 const fraccion = (parte: number, total: number) => (total ? parte / total : 0);
@@ -12,7 +11,8 @@ const NOTA = "Inscripciones activas (sin las canceladas) registradas en el perio
 
 /** RF-10 · Reporte del administrador en Excel: resumen, por curso, por método de pago y por mes. */
 export async function reporteAExcel(r: ReporteGeneral): Promise<Buffer> {
-  const metodos = (Object.keys(ETIQUETA_METODO) as MetodoPago[]).filter((m) => r.porCurso.some((f) => f.porMetodo[m]));
+  // Columnas por medio de pago, en el orden del total de ingresos.
+  const metodos = r.porMetodo.map((m) => m.metodo).filter((m) => r.porCurso.some((f) => f.porMetodo[m]));
   const subtitulo = periodo(r);
   const t = r.totales;
   const resumen: [string, ValorExcel][] = [
@@ -54,7 +54,7 @@ export async function reporteAExcel(r: ReporteGeneral): Promise<Buffer> {
         { titulo: "Confirmados", ancho: 12, formato: "entero" },
         { titulo: "Ocupación", ancho: 11, formato: "porcentaje" },
         { titulo: "Ingresos", ancho: 14, formato: "soles" },
-        ...metodos.map((m) => ({ titulo: ETIQUETA_METODO[m], ancho: 14, formato: "soles" as const })),
+        ...metodos.map((m) => ({ titulo: m, ancho: 14, formato: "soles" as const })),
       ],
       filas: r.porCurso.map((f) => [
         f.titulo,
@@ -86,7 +86,7 @@ export async function reporteAExcel(r: ReporteGeneral): Promise<Buffer> {
         { titulo: "Ingresos", ancho: 16, formato: "soles" },
         { titulo: "Participación", ancho: 14, formato: "porcentaje" },
       ],
-      filas: r.porMetodo.map((m) => [ETIQUETA_METODO[m.metodo], m.monto, fraccion(m.monto, t.ingresos)]),
+      filas: r.porMetodo.map((m) => [m.metodo, m.monto, fraccion(m.monto, t.ingresos)]),
       totales: ["Total", t.ingresos, t.ingresos ? 1 : 0],
     }),
     hojaExcel({
@@ -151,7 +151,7 @@ export function reporteAPdf(r: ReporteGeneral): Promise<Uint8Array> {
           { titulo: "Ingresos", ancho: 2, alinear: "derecha" },
           { titulo: "Participación", ancho: 2, alinear: "derecha" },
         ],
-        filas: r.porMetodo.map((m) => [ETIQUETA_METODO[m.metodo], formatearSoles(m.monto), pct(m.monto, t.ingresos)]),
+        filas: r.porMetodo.map((m) => [m.metodo, formatearSoles(m.monto), pct(m.monto, t.ingresos)]),
         totales: ["Total", formatearSoles(t.ingresos), t.ingresos ? "100 %" : "0 %"],
         vacio: "Sin pagos aprobados en el periodo.",
       },

@@ -9,9 +9,9 @@ import { GraficoDona } from "@/features/administracion/grafico-dona";
 import { uno } from "@/features/academico/consultas";
 import { requireRol } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
-import { ETIQUETA_METODO, ETIQUETA_MODALIDAD, formatearSoles, hoyISO, nombreCompleto } from "@/lib/formato";
+import { ETIQUETA_MODALIDAD, etiquetaPago, formatearSoles, hoyISO, nombreCompleto } from "@/lib/formato";
 import { cn } from "@/lib/utils";
-import type { MetodoPago, Modalidad } from "@/types/dominio";
+import type { MedioPago, MetodoPago, Modalidad } from "@/types/dominio";
 
 export const metadata: Metadata = { title: "Panel principal" };
 
@@ -37,7 +37,7 @@ export default async function AdminPage() {
     supabase.from("cursos").select("id, titulo, modalidad, cupo_maximo, estado"),
     supabase
       .from("inscripciones")
-      .select("id, codigo, estudiante:perfiles(nombres, apellidos, correo), curso:cursos(titulo), pagos(monto, metodo)")
+      .select("id, codigo, estudiante:perfiles(nombres, apellidos, correo), curso:cursos(titulo), pagos(monto, metodo, medio)")
       .eq("estado", "PENDIENTE")
       .order("fecha_inscripcion", { ascending: false })
       .limit(6),
@@ -117,22 +117,24 @@ export default async function AdminPage() {
               <tbody>
                 {listaPendientes.map((x) => {
                   const e = uno<{ nombres: string; apellidos: string; correo: string }>(x.estudiante);
-                  const pago = uno<{ monto: number; metodo: MetodoPago }>(x.pagos);
+                  const pago = uno<{ monto: number; metodo: MetodoPago; medio: MedioPago | null }>(x.pagos);
                   return (
                     <tr key={x.id} className={tabla.tr}>
                       <td className={tabla.td}>
                         <p className="font-medium">{nombreCompleto(e) || e?.correo}</p>
                         <p className="text-xs text-muted-foreground">{uno<{ titulo: string }>(x.curso)?.titulo}</p>
                       </td>
-                      <td className={cn(tabla.td, "text-muted-foreground")}>{pago ? ETIQUETA_METODO[pago.metodo] : "—"}</td>
+                      <td className={cn(tabla.td, "text-muted-foreground")}>{pago ? etiquetaPago(pago.metodo, pago.medio) : "—"}</td>
                       <td className={cn(tabla.td, "text-right tabular-nums")}>{pago ? formatearSoles(Number(pago.monto)) : "—"}</td>
                       <td className={cn(tabla.td, "text-right whitespace-nowrap")}>
                         <BotonAccion accion={resolverPago} campos={{ inscripcionId: x.id, decision: "rechazar" }} confirmar="¿Rechazar este pago y cancelar la inscripción?" variant="ghost" size="sm">
                           Rechazar
                         </BotonAccion>{" "}
-                        <BotonAccion accion={resolverPago} campos={{ inscripcionId: x.id, decision: "aprobar" }} size="sm">
-                          Confirmar
-                        </BotonAccion>
+                        {pago?.metodo !== "CULQI" && (
+                          <BotonAccion accion={resolverPago} campos={{ inscripcionId: x.id, decision: "aprobar" }} size="sm">
+                            Confirmar
+                          </BotonAccion>
+                        )}
                       </td>
                     </tr>
                   );

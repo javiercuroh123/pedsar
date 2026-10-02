@@ -27,11 +27,11 @@ import { formatearSoles } from "@/lib/formato";
 import { cn } from "@/lib/utils";
 import { inscribirse, validarCupon } from "./acciones";
 
-// La tarjeta se habilita con el checkout de la pasarela; mientras tanto se cobra directo por Yape / Plin.
+// Pago en línea con Culqi (si hay llaves) y pago directo por Yape / Plin validado por el administrador (contingencia).
 const METODOS = [
-  { valor: "YAPE", titulo: "Yape", detalle: "Pago directo a PEDSAR", icono: SmartphoneIcon, color: "from-[#742284] to-[#9b3cb0]", disponible: true },
-  { valor: "PLIN", titulo: "Plin", detalle: "Desde tu app bancaria", icono: SmartphoneIcon, color: "from-[#00a7b8] to-[#00c7a0]", disponible: true },
-  { valor: "CULQI", titulo: "Tarjeta", detalle: "Próximamente", icono: CreditCardIcon, color: "from-brand-600 to-brand-800", disponible: false },
+  { valor: "CULQI", titulo: "Pago en línea", detalle: "Tarjeta, Yape, Plin u otras billeteras", icono: CreditCardIcon, color: "from-brand-600 to-brand-800" },
+  { valor: "YAPE", titulo: "Yape directo", detalle: "Validación manual", icono: SmartphoneIcon, color: "from-[#742284] to-[#9b3cb0]" },
+  { valor: "PLIN", titulo: "Plin directo", detalle: "Validación manual", icono: SmartphoneIcon, color: "from-[#00a7b8] to-[#00c7a0]" },
 ] as const;
 
 const PASOS = ["Datos", "Pago", "Confirmación"];
@@ -41,11 +41,18 @@ interface Props {
   perfil: { nombres: string; apellidos: string; correo: string; telefono: string | null; documento: string | null };
   cupoLibre: number;
   cupoMaximo: number;
+  /** Culqi configurado: se ofrece el pago en línea. */
+  pasarelaActiva: boolean;
+  /** Pago directo por Yape / Plin habilitado (PAGO_MANUAL_HABILITADO). */
+  pagoManual: boolean;
 }
 
-export function FormularioInscripcion({ curso, perfil, cupoLibre, cupoMaximo }: Props) {
+export function FormularioInscripcion({ curso, perfil, cupoLibre, cupoMaximo, pasarelaActiva, pagoManual }: Props) {
+  const disponible = (valor: string) => (valor === "CULQI" ? pasarelaActiva : pagoManual);
   const [paso, setPaso] = useState(1);
-  const [metodo, setMetodo] = useState<string>("YAPE");
+  const [metodo, setMetodo] = useState<string>(pasarelaActiva ? "CULQI" : "YAPE");
+  const enLinea = metodo === "CULQI";
+  const sinMedios = !pasarelaActiva && !pagoManual;
   const [comprobante, setComprobante] = useState<"BOLETA" | "FACTURA">("BOLETA");
   const [cupon, setCupon] = useState<{ codigo: string; porcentaje: number } | null>(null);
   const [textoCupon, setTextoCupon] = useState("");
@@ -208,12 +215,12 @@ export function FormularioInscripcion({ curso, perfil, cupoLibre, cupoMaximo }: 
               <legend className="sr-only">Método de pago</legend>
               <h2 className="text-lg font-semibold">Método de pago</h2>
               <div className="mt-5 grid gap-3 sm:grid-cols-3">
-                {METODOS.map((m) => (
+                {METODOS.filter((m) => m.valor === "CULQI" || pagoManual).map((m) => (
                   <label
                     key={m.valor}
                     className={cn(
                       "relative flex flex-col gap-2 rounded-xl border p-4 transition-all duration-200 has-focus-visible:ring-3 has-focus-visible:ring-ring/50",
-                      !m.disponible
+                      !disponible(m.valor)
                         ? "cursor-not-allowed opacity-60"
                         : metodo === m.valor
                           ? "cursor-pointer border-primary bg-brand-50 ring-1 ring-primary dark:bg-brand-500/10"
@@ -225,7 +232,7 @@ export function FormularioInscripcion({ curso, perfil, cupoLibre, cupoMaximo }: 
                       name="metodo"
                       value={m.valor}
                       checked={metodo === m.valor}
-                      disabled={!m.disponible}
+                      disabled={!disponible(m.valor)}
                       onChange={() => setMetodo(m.valor)}
                       className="sr-only"
                     />
@@ -233,7 +240,7 @@ export function FormularioInscripcion({ curso, perfil, cupoLibre, cupoMaximo }: 
                       <m.icono className="size-4.5" />
                     </span>
                     <span className="text-sm font-semibold">{m.titulo}</span>
-                    <span className="text-xs text-muted-foreground">{m.detalle}</span>
+                    <span className="text-xs text-muted-foreground">{disponible(m.valor) ? m.detalle : "Próximamente"}</span>
                     {metodo === m.valor && (
                       <span className="animar-escala absolute top-3 right-3 grid size-5 place-items-center rounded-full bg-primary text-primary-foreground">
                         <CheckIcon className="size-3" />
@@ -242,22 +249,34 @@ export function FormularioInscripcion({ curso, perfil, cupoLibre, cupoMaximo }: 
                   </label>
                 ))}
               </div>
-              <div className="mt-6 space-y-2 rounded-xl bg-muted/60 p-4 text-sm text-muted-foreground">
-                <p>
-                  {metodo === "YAPE" ? "Yapea" : "Envía por Plin"} <b className="text-foreground tabular-nums">{formatearSoles(total)}</b> al{" "}
-                  <b className="font-mono text-foreground">{EMPRESA.pagoDirecto.celular}</b> ({EMPRESA.pagoDirecto.titular}).
-                </p>
-                <p>
-                  Al confirmar, tu cupo queda reservado por {PLAZO_PAGO_HORAS} horas. En ese plazo registra el{" "}
-                  <b className="text-foreground">N.º de operación</b> en «Pagos» y validaremos tu matrícula.
-                </p>
+              <div className="mt-6 space-y-2 rounded-xl bg-muted/60 p-4 text-sm text-muted-foreground" aria-live="polite">
+                {sinMedios ? (
+                  <p>Por ahora no hay medios de pago disponibles. Escríbenos a {EMPRESA.correo} para inscribirte.</p>
+                ) : enLinea ? (
+                  <p>
+                    Al confirmar, tu cupo queda reservado por {PLAZO_PAGO_HORAS} horas y pasas a pagar{" "}
+                    <b className="text-foreground tabular-nums">{formatearSoles(total)}</b> con tarjeta, Yape, Plin u otra billetera. Tu matrícula se
+                    confirma en cuanto se aprueba el pago.
+                  </p>
+                ) : (
+                  <>
+                    <p>
+                      {metodo === "YAPE" ? "Yapea" : "Envía por Plin"} <b className="text-foreground tabular-nums">{formatearSoles(total)}</b> al{" "}
+                      <b className="font-mono text-foreground">{EMPRESA.pagoDirecto.celular}</b> ({EMPRESA.pagoDirecto.titular}).
+                    </p>
+                    <p>
+                      Al confirmar, tu cupo queda reservado por {PLAZO_PAGO_HORAS} horas. En ese plazo registra el{" "}
+                      <b className="text-foreground">N.º de operación</b> en «Pagos» y validaremos tu matrícula.
+                    </p>
+                  </>
+                )}
               </div>
             </fieldset>
 
             <fieldset className="rounded-2xl border bg-card p-6 shadow-xs">
-              <legend className="sr-only">Comprobante electrónico</legend>
+              <legend className="sr-only">Comprobante</legend>
               <div className="flex flex-wrap items-center justify-between gap-3">
-                <h2 className="text-lg font-semibold">Comprobante electrónico</h2>
+                <h2 className="text-lg font-semibold">Comprobante</h2>
                 <div className="inline-flex rounded-lg bg-muted p-1" role="radiogroup" aria-label="Tipo de comprobante">
                   {(["BOLETA", "FACTURA"] as const).map((t) => (
                     <label
@@ -281,7 +300,7 @@ export function FormularioInscripcion({ curso, perfil, cupoLibre, cupoMaximo }: 
                 </div>
               </div>
               {comprobante === "BOLETA" ? (
-                <p className="mt-3 text-sm text-muted-foreground">Se emitirá una boleta de venta electrónica a tu nombre y se enviará a tu correo.</p>
+                <p className="mt-3 text-sm text-muted-foreground">Recibirás tu comprobante de pago en PDF; la boleta electrónica irá a tu nombre.</p>
               ) : (
                 <div className="mt-4 grid gap-4 sm:grid-cols-2">
                   <div className="space-y-1.5">
@@ -300,11 +319,8 @@ export function FormularioInscripcion({ curso, perfil, cupoLibre, cupoMaximo }: 
               <Button type="button" variant="ghost" onClick={() => setPaso(1)} className="h-10">
                 <ArrowLeftIcon /> Atrás
               </Button>
-              <BotonEnviar
-                pendiente="Procesando…"
-                className="h-11 px-6 text-[0.95rem]"
-              >
-                <LockIcon /> Confirmar inscripción · {formatearSoles(total)}
+              <BotonEnviar pendiente="Procesando…" className="h-11 px-6 text-[0.95rem]" disabled={sinMedios}>
+                <LockIcon /> {enLinea ? "Continuar al pago" : "Confirmar inscripción"} · {formatearSoles(total)}
               </BotonEnviar>
             </div>
           </div>
@@ -362,7 +378,7 @@ export function FormularioInscripcion({ curso, perfil, cupoLibre, cupoMaximo }: 
             <ul className="space-y-2 border-t bg-muted/40 p-5 text-xs text-muted-foreground">
               <li className="flex items-center gap-2">
                 <ReceiptIcon className="size-3.5 text-brand-600 dark:text-brand-400" />
-                Comprobante electrónico SUNAT
+                Comprobante de pago en PDF
               </li>
               <li className="flex items-center gap-2">
                 <AwardIcon className="size-3.5 text-rose-500" />

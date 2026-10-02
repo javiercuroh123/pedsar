@@ -17,7 +17,7 @@ import { listarEvaluacionesEstudiante, listarMisInscripciones, listarSesionesPro
 import { SiglaCurso } from "@/features/catalogo/portada-curso";
 import { requireRol } from "@/lib/auth";
 import {
-  ETIQUETA_METODO,
+  etiquetaPago,
   formatearDiaSemana,
   formatearFechaCorta,
   formatearHora,
@@ -123,11 +123,11 @@ export default async function EstudiantePage() {
               <div className="flex-1">
                 <p className="font-semibold text-amber-900 dark:text-amber-200">Pago pendiente · {i.curso.titulo}</p>
                 <p className="mt-0.5 text-amber-800/80 dark:text-amber-200/70">
-                  {i.pago ? `${ETIQUETA_METODO[i.pago.metodo]} · ${formatearSoles(i.pago.monto)} · ${situacionPagoPendiente(i.pago, i).texto}. ` : ""}Tu cupo se
+                  {i.pago ? `${etiquetaPago(i.pago.metodo, i.pago.medio)} · ${formatearSoles(i.pago.monto)} · ${situacionPagoPendiente(i.pago, i).texto}. ` : ""}Tu cupo se
                   confirmará cuando se valide el pago.
                 </p>
               </div>
-              <Link href="/estudiante/pagos" className={buttonVariants({ variant: "outline", size: "sm" })}>
+              <Link href={i.pago?.metodo === "CULQI" ? `/estudiante/pagos?pagar=${i.codigo}` : "/estudiante/pagos"} className={buttonVariants({ variant: "outline", size: "sm" })}>
                 {i.pago ? situacionPagoPendiente(i.pago, i).accion : "Ver pago"}
               </Link>
             </div>

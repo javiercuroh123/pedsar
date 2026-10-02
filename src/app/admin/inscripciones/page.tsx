@@ -10,10 +10,10 @@ import { requireRol } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { reservaVencida } from "@/config/matricula";
-import { ETIQUETA_METODO, formatearFecha, formatearFechaHora, formatearSoles, hoyISO, nombreCompleto } from "@/lib/formato";
+import { etiquetaPago, formatearFecha, formatearFechaHora, formatearSoles, hoyISO, nombreCompleto } from "@/lib/formato";
 import { cn } from "@/lib/utils";
 import { Constants } from "@/types/database";
-import type { MetodoPago } from "@/types/dominio";
+import type { MedioPago, MetodoPago } from "@/types/dominio";
 
 export const metadata: Metadata = { title: "Inscripciones y pagos" };
 
@@ -21,6 +21,8 @@ type Persona = { nombres: string; apellidos: string; correo: string };
 type PagoFila = {
   monto: number;
   metodo: MetodoPago;
+  medio: MedioPago | null;
+  referencia_pasarela: string | null;
   estado: string;
   numero_operacion: string | null;
   voucher_ruta: string | null;
@@ -41,7 +43,7 @@ export default async function AdminInscripcionesPage({ searchParams }: PageProps
   let consulta = supabase
     .from("inscripciones")
     .select(
-      "id, codigo, estado, fecha_inscripcion, vence_en, estudiante:perfiles(nombres, apellidos, correo), curso:cursos(titulo), pagos(monto, metodo, estado, fecha_pago, numero_operacion, voucher_ruta, reportado_en, observacion, comprobantes(serie, numero))",
+      "id, codigo, estado, fecha_inscripcion, vence_en, estudiante:perfiles(nombres, apellidos, correo), curso:cursos(titulo), pagos(monto, metodo, medio, referencia_pasarela, estado, fecha_pago, numero_operacion, voucher_ruta, reportado_en, observacion, comprobantes(id, serie, numero))",
     )
     .order("fecha_inscripcion", { ascending: false })
     .limit(200);
@@ -139,7 +141,8 @@ export default async function AdminInscripcionesPage({ searchParams }: PageProps
                     const pago = uno<PagoFila>(x.pagos);
                     const captura = pago?.voucher_ruta ? urlCaptura.get(pago.voucher_ruta) : undefined;
                     const reportado = x.estado === "PENDIENTE" && Boolean(pago?.reportado_en);
-                    const comp = uno<{ serie: string; numero: string }>(pago?.comprobantes);
+                    const comp = uno<{ id: number; serie: string; numero: string }>(pago?.comprobantes);
+                    const enLinea = pago?.metodo === "CULQI";
                     return (
                       <tr key={x.id} className={tabla.tr}>
                         <td className={cn(tabla.td, "font-mono text-xs")}>{x.codigo}</td>
@@ -149,7 +152,14 @@ export default async function AdminInscripcionesPage({ searchParams }: PageProps
                         </td>
                         <td className={cn(tabla.td, "text-muted-foreground")}>{uno<{ titulo: string }>(x.curso)?.titulo}</td>
                         <td className={cn(tabla.td, "whitespace-nowrap text-muted-foreground")}>{formatearFecha(x.fecha_inscripcion)}</td>
-                        <td className={cn(tabla.td, "whitespace-nowrap")}>{pago ? ETIQUETA_METODO[pago.metodo] : "—"}</td>
+                        <td className={cn(tabla.td, "whitespace-nowrap")}>
+                          {pago ? etiquetaPago(pago.metodo, pago.medio) : "—"}
+                          {pago?.referencia_pasarela && (
+                            <span className="block font-mono text-xs text-muted-foreground" title="Referencia de Culqi">
+                              {pago.referencia_pasarela}
+                            </span>
+                          )}
+                        </td>
                         <td className={cn(tabla.td, "text-right tabular-nums")}>{pago ? formatearSoles(Number(pago.monto)) : "—"}</td>
                         <td className={tabla.td}>
                           {pago ? <EstadoBadge estado={pago.estado} /> : "—"}
@@ -169,7 +179,7 @@ export default async function AdminInscripcionesPage({ searchParams }: PageProps
                             <span className="block text-xs text-muted-foreground">
                               {reservaVencida(x)
                                 ? "Reserva vencida · se cancelará en breve"
-                                : `${pago.observacion ? "Observado · esperando corrección" : "Sin reportar"}${x.vence_en ? ` · vence ${formatearFechaHora(x.vence_en)}` : ""}`}
+                                : `${enLinea ? (pago.observacion ? `Rechazado: ${pago.observacion}` : "Esperando el pago en línea") : pago.observacion ? "Observado · esperando corrección" : "Sin reportar"}${x.vence_en ? ` · vence ${formatearFechaHora(x.vence_en)}` : ""}`}
                             </span>
                           ) : null}
                         </td>
@@ -193,14 +203,17 @@ export default async function AdminInscripcionesPage({ searchParams }: PageProps
                                   <DialogoObservarPago inscripcionId={x.id} codigo={x.codigo} />{" "}
                                 </>
                               )}
-                              <BotonAccion accion={resolverPago} campos={{ inscripcionId: x.id, decision: "aprobar" }} size="sm">
-                                Confirmar
-                              </BotonAccion>
+                              {/* El pago en línea lo confirma Culqi; el administrador solo valida el pago directo. */}
+                              {!enLinea && (
+                                <BotonAccion accion={resolverPago} campos={{ inscripcionId: x.id, decision: "aprobar" }} size="sm">
+                                  Confirmar
+                                </BotonAccion>
+                              )}
                             </>
                           ) : comp ? (
-                            <span className="font-mono text-xs">
+                            <a href={`/comprobantes/${comp.id}/pdf`} className="font-mono text-xs text-primary hover:underline">
                               {comp.serie}-{comp.numero}
-                            </span>
+                            </a>
                           ) : (
                             <span className="text-muted-foreground">—</span>
                           )}

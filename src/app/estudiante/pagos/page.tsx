@@ -4,17 +4,19 @@ import { EncabezadoPagina, EstadoBadge, EstadoVacio, PanelTabla, TarjetaKpi, tab
 import { PLAZO_PAGO_HORAS, reservaVencida } from "@/config/matricula";
 import { listarMisInscripciones } from "@/features/academico/consultas";
 import { DialogoReembolso } from "@/features/academico/dialogo-reembolso";
+import { PagoEnLinea } from "@/features/matricula/pago-en-linea-cliente";
 import { PagoManual } from "@/features/matricula/pago-manual";
 import { requireRol } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
-import { ETIQUETA_METODO, formatearFecha, formatearSoles } from "@/lib/formato";
+import { etiquetaPago, formatearFecha, formatearSoles } from "@/lib/formato";
 
 export const metadata: Metadata = { title: "Pagos y comprobantes" };
 
 // HU-12 · Pagos · HU-30 · Comprobantes · HU-31 · Reembolsos · HU-50
 export default async function EstudiantePagosPage({ searchParams }: PageProps<"/estudiante/pagos">) {
   const usuario = await requireRol("estudiante");
-  const { inscripcion: nueva } = await searchParams;
+  const { inscripcion, pagar } = await searchParams;
+  const nueva = typeof pagar === "string" ? pagar : inscripcion;
   const inscripciones = (await listarMisInscripciones(usuario.id)).filter((i) => i.pago);
 
   const supabase = await createClient();
@@ -39,10 +41,14 @@ export default async function EstudiantePagosPage({ searchParams }: PageProps<"/
   const porCompletar = inscripciones
     .filter((i) => i.estado === "PENDIENTE" && i.pago?.estado === "PENDIENTE" && (i.pago.metodo === "YAPE" || i.pago.metodo === "PLIN"))
     .sort((a, b) => Number(b.codigo === nueva) - Number(a.codigo === nueva));
+  // Pagos en línea (Culqi) pendientes con la reserva vigente; el recién creado va primero.
+  const porPagarEnLinea = inscripciones
+    .filter((i) => i.estado === "PENDIENTE" && i.pago?.estado === "PENDIENTE" && i.pago.metodo === "CULQI" && !reservaVencida(i))
+    .sort((a, b) => Number(b.codigo === nueva) - Number(a.codigo === nueva));
 
   return (
     <div className="space-y-6">
-      <EncabezadoPagina titulo="Pagos y comprobantes" descripcion="Historial de pagos y comprobantes electrónicos emitidos." eyebrow="Cuenta" />
+      <EncabezadoPagina titulo="Pagos y comprobantes" descripcion="Historial de pagos y comprobantes de pago en PDF." eyebrow="Cuenta" />
 
       {recien && (
         <div className="flex items-start gap-3 animar-escala rounded-2xl border border-green-100 bg-green-50 p-5 dark:border-green-500/25 dark:bg-green-500/10" role="status">
@@ -50,12 +56,27 @@ export default async function EstudiantePagosPage({ searchParams }: PageProps<"/
           <div>
             <p className="font-semibold text-green-900 dark:text-green-200">¡Inscripción registrada! · {recien.curso.titulo}</p>
             <p className="mt-1 text-sm text-green-800/80 dark:text-green-200/70">
-              N.º <span className="font-mono">{recien.codigo}</span>. Tu cupo queda reservado por {PLAZO_PAGO_HORAS} horas: realiza el pago y registra el N.º de
-              operación para confirmar tu matrícula.
+              N.º <span className="font-mono">{recien.codigo}</span>. Tu cupo queda reservado por {PLAZO_PAGO_HORAS} horas:{" "}
+              {recien.pago?.metodo === "CULQI"
+                ? "paga en línea para confirmar tu matrícula al instante."
+                : "realiza el pago y registra el N.º de operación para confirmar tu matrícula."}
             </p>
           </div>
         </div>
       )}
+
+      {porPagarEnLinea.map((i) => (
+        <PagoEnLinea
+          key={i.id}
+          pagoId={i.pago!.id}
+          curso={i.curso.titulo}
+          codigo={i.codigo}
+          monto={i.pago!.monto}
+          venceEn={i.vence_en}
+          abrirAlCargar={typeof pagar === "string" && i.codigo === pagar}
+          observacion={i.pago!.observacion}
+        />
+      ))}
 
       {porCompletar.map((i) => (
         <PagoManual
@@ -105,7 +126,7 @@ export default async function EstudiantePagosPage({ searchParams }: PageProps<"/
                       <span className="block font-mono text-xs font-normal text-muted-foreground">{i.codigo}</span>
                     </td>
                     <td className={tabla.td}>
-                      {ETIQUETA_METODO[p.metodo]}
+                      {etiquetaPago(p.metodo, p.medio)}
                       {p.numero_operacion && <span className="block font-mono text-xs text-muted-foreground">Op. {p.numero_operacion}</span>}
                     </td>
                     <td className={`${tabla.td} text-right tabular-nums`}>{formatearSoles(p.monto)}</td>
@@ -114,15 +135,9 @@ export default async function EstudiantePagosPage({ searchParams }: PageProps<"/
                     </td>
                     <td className={tabla.td}>
                       {p.comprobante ? (
-                        p.comprobante.pdf_url ? (
-                          <a href={p.comprobante.pdf_url} target="_blank" rel="noreferrer" className="font-mono text-xs text-primary hover:underline">
-                            {p.comprobante.serie}-{p.comprobante.numero}
-                          </a>
-                        ) : (
-                          <span className="font-mono text-xs">
-                            {p.comprobante.serie}-{p.comprobante.numero}
-                          </span>
-                        )
+                        <a href={`/comprobantes/${p.comprobante.id}/pdf`} className="font-mono text-xs text-primary hover:underline">
+                          {p.comprobante.serie}-{p.comprobante.numero}
+                        </a>
                       ) : (
                         <span className="text-xs text-muted-foreground">{p.estado === "APROBADO" ? "En emisión" : "—"}</span>
                       )}

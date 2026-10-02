@@ -7,7 +7,7 @@ import { Button, buttonVariants } from "@/components/ui/button";
 import { etiquetaMes, generarReporte, rangoPorDefecto } from "@/features/administracion/reportes";
 import { requireRol } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
-import { ETIQUETA_METODO, ETIQUETA_MODALIDAD, formatearFecha, formatearSoles, hoyISO } from "@/lib/formato";
+import { ETIQUETA_MODALIDAD, formatearFecha, formatearSoles, hoyISO } from "@/lib/formato";
 import { cn } from "@/lib/utils";
 
 export const metadata: Metadata = { title: "Reportes" };
@@ -126,10 +126,10 @@ export default async function AdminReportesPage({ searchParams }: PageProps<"/ad
                   {r.porMetodo.map(({ metodo, monto }) => (
                     <li key={metodo}>
                       <div className="flex justify-between text-sm">
-                        <span>{ETIQUETA_METODO[metodo]}</span>
+                        <span>{metodo}</span>
                         <span className="font-mono text-xs text-muted-foreground">{formatearSoles(monto)}</span>
                       </div>
-                      <BarraProgreso valor={(monto / t.ingresos) * 100} tono="turquesa" className="mt-1.5 h-1.5" etiqueta={ETIQUETA_METODO[metodo]} />
+                      <BarraProgreso valor={(monto / t.ingresos) * 100} tono="turquesa" className="mt-1.5 h-1.5" etiqueta={metodo} />
                     </li>
                   ))}
                 </ul>

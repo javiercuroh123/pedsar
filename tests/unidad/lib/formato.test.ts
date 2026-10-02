@@ -83,5 +83,12 @@ describe("etiquetas y situación del pago directo", () => {
     expect(situacionPagoPendiente({ reportado_en: null, observacion: "Captura ilegible" }, vencida).texto).toBe("tu reserva venció");
     expect(situacionPagoPendiente({ reportado_en: null, observacion: "Captura ilegible" }, pendiente).accion).toBe("Corregir pago");
     expect(situacionPagoPendiente({ reportado_en: null, observacion: null }, pendiente).accion).toBe("Registrar pago");
+    // Pago en línea (Culqi): no se registra un N.º de operación, se paga desde «Pagos».
+    expect(situacionPagoPendiente({ metodo: "CULQI", reportado_en: null, observacion: null }, pendiente)).toEqual({ texto: "falta pagar en línea", accion: "Pagar en línea" });
+    expect(situacionPagoPendiente({ metodo: "CULQI", reportado_en: null, observacion: "Fondos insuficientes" }, pendiente)).toEqual({
+      texto: "tu último intento de pago no se aprobó",
+      accion: "Reintentar pago",
+    });
+    expect(situacionPagoPendiente({ metodo: "CULQI", reportado_en: null, observacion: null }, vencida).texto).toBe("tu reserva venció");
   });
 });
