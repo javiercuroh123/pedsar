@@ -97,13 +97,53 @@ Todas las pantallas del prototipo están implementadas y conectadas a Supabase:
 - **Cuenta:** perfil con foto, contraseña, exportación de datos (JSON) y notificaciones.
 - Modo claro/oscuro, alto contraste y tamaño de fuente ajustable (RNF-08).
 
-**Pagos:** mientras se activa la pasarela, el cobro es directo por Yape o Plin (contingencia
-de la Tabla 12). El estudiante registra el N.º de operación y la captura en «Pagos» (bucket
-privado `vouchers`) y el administrador valida en «Inscripciones y pagos»: confirma, observa
-(devuelve para corregir) o rechaza. El celular de cobro se configura en `src/config/empresa.ts`.
-Cada inscripción pendiente reserva el cupo 48 horas (`PLAZO_PAGO_HORAS`). Si no se registra el
-pago a tiempo, deja de contar en el cupo y una tarea de pg_cron (cada 15 min) la cancela, marca el
-pago como VENCIDO y avisa al estudiante. Una inscripción cancelada no impide volver a inscribirse.
+**Pagos en línea (HU-12, RF-09):** con Culqi. Al inscribirse se crea la inscripción PENDIENTE,
+que reserva el cupo 48 horas (`PLAZO_PAGO_HORAS`), y el estudiante paga en «Pagos» con Culqi
+Checkout Custom:
+
+- **Tarjeta o Yape:** el checkout entrega un token y el servidor crea el cargo
+  (`src/features/matricula/pago-en-linea.ts`). Si el banco pide 3DS, el navegador ejecuta Culqi3DS
+  y el servidor reintenta. Un rechazo no cancela la inscripción: se puede reintentar.
+- **Plin, otras billeteras, banca móvil o agentes:** el servidor crea una orden que vence junto con
+  la reserva. Culqi avisa por webhook (`/api/pagos/webhook/culqi?clave=…`) y el servidor **consulta
+  la orden en la API** y compara el monto antes de confirmar. Nunca confía en el contenido del aviso.
+- Todas las vías confirman con `confirmarPago()` (`src/features/matricula/confirmar-pago.ts`),
+  que es idempotente.
+- Los reembolsos aprobados de cargos de Culqi se devuelven en la pasarela.
+- Sin `NEXT_PUBLIC_CULQI_PUBLIC_KEY` y `CULQI_SECRET_KEY`, el pago en línea aparece como
+  «Próximamente».
+
+**Pago directo (contingencia de la Tabla 12):** Yape o Plin al celular de `src/config/empresa.ts`.
+El estudiante registra el N.º de operación y la captura (bucket privado `vouchers`), y el
+administrador confirma, observa o rechaza en «Inscripciones y pagos». Se apaga con
+`PAGO_MANUAL_HABILITADO=false`.
+
+**Vencimiento:** si no se paga a tiempo, la inscripción deja de contar en el cupo y una tarea de
+pg_cron (cada 15 min) la cancela, marca el pago como VENCIDO y avisa al estudiante. Una inscripción
+cancelada no impide volver a inscribirse.
+
+**Comprobante de pago (HU-30):** al aprobarse un pago, por cualquier vía, un trigger de la BD
+emite el comprobante interno `CP01-000001`:
+
+- Congela el cliente (o el RUC y la razón social si pidió factura), el curso, los importes con el
+  cupón, el medio y la referencia de Culqi.
+- El PDF se genera al vuelo en `/comprobantes/[id]/pdf` y lo enlazan «Pagos» y el correo de
+  confirmación.
+- Lleva la nota de que **no reemplaza la boleta o factura electrónica SUNAT**, que está pendiente
+  (HU-31).
+
+**Prueba real de Culqi:**
+
+1. En CulqiPanel (entorno de integración), copia `pk_test_…` y `sk_test_…` a `.env.local` y a
+   Vercel (Preview).
+2. Define `CULQI_WEBHOOK_SECRET`.
+3. En Eventos → Webhooks, registra `order.status.changed` y `charge.creation.succeeded` hacia
+   `https://<staging>/api/pagos/webhook/culqi?clave=<CULQI_WEBHOOK_SECRET>`.
+4. Prueba estos medios:
+   - Visa `4111 1111 1111 1111` (09/30, CVV 123): aprobada.
+   - Visa con 3DS `4456 5300 0000 1096` (07/30, CVV 111).
+   - Yape `900 000 001` con cualquier código de 6 dígitos.
+   - Una billetera por orden.
 
 **Certificados (HU-11):** se emiten a quien rinde todas las evaluaciones con nota final ≥ 13/20 y
 asiste al 75 % de las sesiones dictadas (`src/config/academico.ts`; la función
@@ -118,13 +158,13 @@ curso, método de pago y mes; el instructor, el reporte de su curso (estudiantes
 calificaciones y asistencia por sesión), ambos en Excel (`write-excel-file`, `src/lib/excel.ts`)
 y PDF (`pdf-lib`, `src/lib/pdf/reporte.ts`).
 
-**Correos (HU-21):** al inscribirse (instrucciones de pago y plazo), al observar, confirmar o
+**Correos (HU-21):** al inscribirse (cómo pagar y plazo), al observar, confirmar (con el comprobante) o
 rechazar un pago y al emitir un certificado. Se envían con Resend después de responder
 (`after`), sin demorar la acción; sin `RESEND_API_KEY` solo se muestran en la consola del
 servidor. Para producción hay que verificar el dominio de `EMAIL_FROM` en Resend.
 
-Pendiente: cobro con tarjeta mediante el checkout de la pasarela, emisión de comprobantes SUNAT,
-reembolso automático en la pasarela y recordatorios programados de sesiones y evaluaciones.
+Pendiente: emisión de boletas y facturas electrónicas SUNAT (HU-31) y recordatorios programados
+de sesiones y evaluaciones.
 Varias funciones (pagos, evaluaciones, notificaciones, auditoría) requieren `SUPABASE_SECRET_KEY`.
 
 ## Pruebas (Definición de Terminado)
