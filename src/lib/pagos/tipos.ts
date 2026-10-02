@@ -69,9 +69,15 @@ export interface ResultadoReembolso {
   respuesta: Json;
 }
 
-/** La pasarela no respondió (red, límite de tiempo o error del proveedor): se puede reintentar. */
+/**
+ * La pasarela no respondió (red, límite de tiempo o error 5xx: se puede reintentar) o
+ * rechazó la solicitud (`status` 4xx, con la respuesta en `detalle` para el registro).
+ */
 export class ErrorPasarela extends Error {
-  constructor(public detalle?: unknown) {
+  constructor(
+    public detalle?: unknown,
+    public status?: number,
+  ) {
     super("No pudimos conectar con la pasarela de pagos");
     this.name = "ErrorPasarela";
   }

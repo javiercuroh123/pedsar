@@ -4,7 +4,7 @@ import { ClipboardListIcon, ClockIcon, ReceiptIcon, WalletIcon } from "lucide-re
 import { BotonAccion } from "@/components/boton-accion";
 import { EncabezadoPagina, EstadoBadge, EstadoVacio, PanelTabla, PestanasEnlace, Pildora, TarjetaKpi, tabla } from "@/components/comunes";
 import { uno } from "@/features/academico/consultas";
-import { resolverPago, resolverReembolso } from "@/features/administracion/acciones";
+import { resolverPago, resolverReembolso, verificarPagoEnCulqi } from "@/features/administracion/acciones";
 import { DialogoObservarPago } from "@/features/administracion/dialogos";
 import { requireRol } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -19,6 +19,7 @@ export const metadata: Metadata = { title: "Inscripciones y pagos" };
 
 type Persona = { nombres: string; apellidos: string; correo: string };
 type PagoFila = {
+  id: string;
   monto: number;
   metodo: MetodoPago;
   medio: MedioPago | null;
@@ -43,7 +44,7 @@ export default async function AdminInscripcionesPage({ searchParams }: PageProps
   let consulta = supabase
     .from("inscripciones")
     .select(
-      "id, codigo, estado, fecha_inscripcion, vence_en, estudiante:perfiles(nombres, apellidos, correo), curso:cursos(titulo), pagos(monto, metodo, medio, referencia_pasarela, estado, fecha_pago, numero_operacion, voucher_ruta, reportado_en, observacion, comprobantes(id, serie, numero))",
+      "id, codigo, estado, fecha_inscripcion, vence_en, estudiante:perfiles(nombres, apellidos, correo), curso:cursos(titulo), pagos(id, monto, metodo, medio, referencia_pasarela, estado, fecha_pago, numero_operacion, voucher_ruta, reportado_en, observacion, comprobantes(id, serie, numero))",
     )
     .order("fecha_inscripcion", { ascending: false })
     .limit(200);
@@ -56,7 +57,7 @@ export default async function AdminInscripcionesPage({ searchParams }: PageProps
     supabase.from("pagos").select("monto").eq("estado", "APROBADO").gte("fecha_pago", inicioMes),
     supabase
       .from("reembolsos")
-      .select("id, motivo, monto, estado, fecha_solicitud, pago:pagos(inscripcion:inscripciones(estudiante:perfiles(nombres, apellidos, correo), curso:cursos(titulo)))")
+      .select("id, motivo, monto, estado, fecha_solicitud, pago:pagos(estado, metodo, referencia_pasarela, inscripcion:inscripciones(estudiante:perfiles(nombres, apellidos, correo), curso:cursos(titulo)))")
       .order("fecha_solicitud", { ascending: false }),
   ]);
   // Los pagos ya reportados por el estudiante (por validar) van primero.
@@ -203,8 +204,12 @@ export default async function AdminInscripcionesPage({ searchParams }: PageProps
                                   <DialogoObservarPago inscripcionId={x.id} codigo={x.codigo} />{" "}
                                 </>
                               )}
-                              {/* El pago en línea lo confirma Culqi; el administrador solo valida el pago directo. */}
-                              {!enLinea && (
+                              {/* El pago en línea lo confirma Culqi; el administrador solo puede verificarlo en su API. */}
+                              {enLinea ? (
+                                <BotonAccion accion={verificarPagoEnCulqi} campos={{ pagoId: pago!.id }} variant="outline" size="sm">
+                                  Verificar en Culqi
+                                </BotonAccion>
+                              ) : (
                                 <BotonAccion accion={resolverPago} campos={{ inscripcionId: x.id, decision: "aprobar" }} size="sm">
                                   Confirmar
                                 </BotonAccion>
@@ -244,7 +249,8 @@ export default async function AdminInscripcionesPage({ searchParams }: PageProps
             </thead>
             <tbody>
               {listaReembolsos.map((r) => {
-                const ins = uno<{ estudiante: unknown; curso: unknown }>(uno<{ inscripcion: unknown }>(r.pago)?.inscripcion);
+                const pagoReembolso = uno<{ estado: string; metodo: string; referencia_pasarela: string | null; inscripcion: unknown }>(r.pago);
+                const ins = uno<{ estudiante: unknown; curso: unknown }>(pagoReembolso?.inscripcion);
                 const e = uno<Persona>(ins?.estudiante);
                 return (
                   <tr key={r.id} className={tabla.tr}>
@@ -264,6 +270,24 @@ export default async function AdminInscripcionesPage({ searchParams }: PageProps
                           </BotonAccion>{" "}
                           <BotonAccion accion={resolverReembolso} campos={{ id: r.id, decision: "aprobar" }} confirmar="¿Aprobar el reembolso? La inscripción se cancelará." size="sm">
                             Aprobar
+                          </BotonAccion>
+                        </>
+                      ) : r.estado === "APROBADO" && pagoReembolso?.estado === "APROBADO" ? (
+                        <>
+                          {pagoReembolso.metodo === "CULQI" && pagoReembolso.referencia_pasarela?.startsWith("chr_") && (
+                            <>
+                              <BotonAccion accion={resolverReembolso} campos={{ id: r.id, decision: "reintentar" }} variant="outline" size="sm">
+                                Reintentar en Culqi
+                              </BotonAccion>{" "}
+                            </>
+                          )}
+                          <BotonAccion
+                            accion={resolverReembolso}
+                            campos={{ id: r.id, decision: "manual" }}
+                            confirmar="¿Ya devolviste el dinero al estudiante (por ejemplo desde CulqiPanel)? El pago quedará como reembolsado."
+                            size="sm"
+                          >
+                            Devuelto a mano
                           </BotonAccion>
                         </>
                       ) : (

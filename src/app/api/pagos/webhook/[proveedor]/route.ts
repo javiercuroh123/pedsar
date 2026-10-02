@@ -63,6 +63,12 @@ export async function POST(request: Request, ctx: RouteContext<"/api/pagos/webho
     return recibido();
   }
 
-  await confirmarPago(pago.id, { referencia: consulta.referencia, medio: consulta.medio, respuesta: consulta.respuesta, actor: null });
+  try {
+    await confirmarPago(pago.id, { referencia: consulta.referencia, medio: consulta.medio, respuesta: consulta.respuesta, actor: null });
+  } catch (e) {
+    // 500: la pasarela reintenta el aviso y confirmarPago completa lo que faltó.
+    console.error(`Webhook ${proveedor}: no se pudo confirmar el pago ${pago.id}:`, (e as Error).message);
+    return NextResponse.json({ error: "No se pudo confirmar el pago" }, { status: 500 });
+  }
   return recibido();
 }

@@ -58,13 +58,15 @@ describe("pasarelas de pago intercambiables", () => {
     }
   });
 
-  it("la pasarela está activa solo con las dos llaves de Culqi", async () => {
+  it("la pasarela está activa solo con las dos llaves de Culqi y la clave del webhook", async () => {
     vi.resetModules();
     expect((await import("@/lib/pagos")).pasarelaActiva()).toBe(false);
     vi.stubEnv("CULQI_SECRET_KEY", "sk_test_prueba");
-    vi.resetModules();
-    expect((await import("@/lib/pagos")).pasarelaActiva()).toBe(false);
     vi.stubEnv("NEXT_PUBLIC_CULQI_PUBLIC_KEY", "pk_test_prueba");
+    vi.resetModules();
+    // Sin la clave del webhook, los pagos por billetera nunca se confirmarían.
+    expect((await import("@/lib/pagos")).pasarelaActiva()).toBe(false);
+    vi.stubEnv("CULQI_WEBHOOK_SECRET", "secreto");
     vi.resetModules();
     expect((await import("@/lib/pagos")).pasarelaActiva()).toBe(true);
   });
@@ -112,6 +114,14 @@ describe("órdenes de Culqi (billeteras, banca móvil y agentes)", () => {
     await expect(culqi.consultar({ tipo: "orden", id: "ord_1" })).resolves.toMatchObject({ estado: "PENDIENTE" });
     await expect(culqi.consultar({ tipo: "orden", id: "ord_1" })).resolves.toMatchObject({ estado: "EXPIRADO" });
     await expect(culqi.consultar({ tipo: "orden", id: "ord_1" })).resolves.toMatchObject({ estado: "EXPIRADO" });
+  });
+
+  it("si Culqi rechaza la orden, informa el código y el detalle; sin teléfono no envía phone_number", async () => {
+    const { culqi, modulo, llamada } = await conCulqi(respuesta(400, { object: "error", merchant_message: "phone_number es requerido" }));
+    const error = await culqi.crearOrden({ ...ORDEN, cliente: { ...ORDEN.cliente, telefono: null } }).catch((e) => e);
+    expect(error).toBeInstanceOf(modulo.ErrorPasarela);
+    expect(error).toMatchObject({ status: 400, detalle: { merchant_message: "phone_number es requerido" } });
+    expect(llamada().cuerpo.client_details).not.toHaveProperty("phone_number");
   });
 
   it("no crea órdenes sin la clave secreta", async () => {
@@ -179,7 +189,8 @@ describe("cargos de Culqi (tarjeta y Yape)", () => {
   it("reembolsa en céntimos e informa si Culqi lo rechaza", async () => {
     const { culqi, llamada } = await conCulqi(respuesta(201, { object: "refund", id: "ref_1" }), respuesta(400, { user_message: "Monto inválido" }));
     await expect(culqi.reembolsar("chr_9", 99.99, "solicitud del cliente")).resolves.toMatchObject({ aprobado: true, referencia: "ref_1" });
-    expect(llamada().cuerpo).toEqual({ amount: 9999, charge_id: "chr_9", reason: "solicitud del cliente" });
+    // Culqi solo acepta motivos de su lista; el texto del estudiante queda en PEDSAR.
+    expect(llamada().cuerpo).toEqual({ amount: 9999, charge_id: "chr_9", reason: "solicitud_comprador" });
     await expect(culqi.reembolsar("chr_9", 10, "x")).resolves.toMatchObject({ aprobado: false, mensaje: "Monto inválido" });
   });
 });

@@ -1,13 +1,14 @@
 "use server";
 
+import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { reservaVencida } from "@/config/matricula";
 import { uno } from "@/features/academico/consultas";
-import { confirmarPago } from "@/features/matricula/confirmar-pago";
+import { confirmarPago, type ResultadoConfirmacion } from "@/features/matricula/confirmar-pago";
 import { registrarActividad } from "@/lib/auditoria";
 import { requireRol } from "@/lib/auth";
 import { publicEnv } from "@/lib/env";
-import { ErrorPasarela, getPasarela, pasarelaActiva, type Autenticacion3DS } from "@/lib/pagos";
+import { ErrorPasarela, getPasarela, pagoManualHabilitado, pasarelaActiva, type Autenticacion3DS } from "@/lib/pagos";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import type { Json } from "@/types/database";
@@ -17,7 +18,8 @@ import type { EstadoPago } from "@/types/dominio";
 export interface DatosCheckout {
   llavePublica: string;
   montoCentimos: number;
-  ordenId: string;
+  /** null si Culqi no aceptó la orden: se paga solo con tarjeta o Yape. */
+  ordenId: string | null;
   correo: string;
   nombres: string;
   apellidos: string;
@@ -39,6 +41,17 @@ interface InscripcionPorPagar {
 }
 
 const NO_DISPONIBLE = "El pago en línea aún no está disponible";
+const SIN_RESPUESTA =
+  "No pudimos confirmar el resultado con la pasarela. Si se te descontó, tu matrícula se confirmará sola en unos minutos; no vuelvas a pagar por ahora.";
+
+/** Qué decirle al estudiante según cómo terminó la confirmación de un cobro aprobado. */
+const MENSAJE_CONFIRMACION: Record<ResultadoConfirmacion, string> = {
+  CONFIRMADO: "¡Pago aprobado! Tu matrícula está confirmada.",
+  YA_APROBADO: "¡Pago aprobado! Tu matrícula está confirmada.",
+  NO_ENCONTRADO: "¡Pago aprobado! Tu matrícula está confirmada.",
+  SIN_CUPO: "Recibimos tu pago, pero tu reserva ya había vencido y no quedan cupos. Te devolveremos el dinero.",
+  DUPLICADO: "Este curso ya estaba pagado: PEDSAR revisará el cobro duplicado y te devolverá el dinero.",
+};
 
 /**
  * Pago CULQI pendiente del estudiante con sesión (RLS garantiza que es suyo) y con
@@ -67,7 +80,9 @@ async function pagoPorPagar(pagoId: string) {
 }
 
 /** HU-12 · Prepara el checkout: crea (o reutiliza) la orden de Culqi, que vence junto con la reserva. */
-export async function prepararPagoEnLinea(pagoId: string): Promise<{ ok: true; checkout: DatosCheckout } | { ok: false; mensaje: string }> {
+export async function prepararPagoEnLinea(
+  pagoId: string,
+): Promise<{ ok: true; checkout: DatosCheckout } | { ok: false; mensaje: string; aprobado?: true }> {
   const estudiante = await requireRol("estudiante");
   if (!pasarelaActiva()) return { ok: false, mensaje: NO_DISPONIBLE };
   const r = await pagoPorPagar(pagoId);
@@ -78,27 +93,17 @@ export async function prepararPagoEnLinea(pagoId: string): Promise<{ ok: true; c
     let ordenId = r.pago.orden;
     if (ordenId) {
       const anterior = await pasarela.consultar({ tipo: "orden", id: ordenId });
-      if (anterior.estado === "PAGADO") return { ok: false, mensaje: "Ya recibimos tu pago; en unos segundos se confirmará tu matrícula" };
+      if (anterior.estado === "PAGADO") {
+        // El aviso de la pasarela no llegó: se confirma aquí, con lo que dice la API de Culqi.
+        if (anterior.montoCentimos !== Math.round(r.pago.monto * 100)) {
+          return { ok: false, mensaje: "Recibimos un pago con otro monto; PEDSAR lo revisará y te contactará." };
+        }
+        await confirmarPago(r.pago.id, { referencia: anterior.referencia, medio: anterior.medio, respuesta: anterior.respuesta, actor: estudiante.id });
+        return { ok: false, aprobado: true, mensaje: "¡Ya recibimos tu pago! Tu matrícula quedó confirmada." };
+      }
       if (anterior.estado !== "PENDIENTE") ordenId = null;
     }
-    if (!ordenId) {
-      const venceEn = r.ins.vence_en ? new Date(r.ins.vence_en) : new Date(Date.now() + 48 * 3600 * 1000);
-      const orden = await pasarela.crearOrden({
-        pagoId: r.pago.id,
-        montoSoles: r.pago.monto,
-        descripcion: r.descripcion,
-        numeroOrden: `${r.ins.codigo}-${Date.now().toString(36)}`,
-        cliente: {
-          nombres: estudiante.nombres,
-          apellidos: estudiante.apellidos,
-          correo: estudiante.correo,
-          telefono: uno<{ telefono: string | null }>(r.ins.estudiante)?.telefono ?? null,
-        },
-        venceEn,
-      });
-      ordenId = orden.id;
-      await createAdminClient().from("pagos").update({ orden_pasarela: ordenId }).eq("id", r.pago.id);
-    }
+    if (!ordenId) ordenId = await crearOrden(r, estudiante);
     return {
       ok: true,
       checkout: {
@@ -113,6 +118,41 @@ export async function prepararPagoEnLinea(pagoId: string): Promise<{ ok: true; c
     };
   } catch (e) {
     if (e instanceof ErrorPasarela) return { ok: false, mensaje: e.message };
+    throw e;
+  }
+}
+
+/**
+ * Orden de Culqi que vence junto con la reserva, para pagar con billetera, banca móvil o
+ * agente. Si Culqi la rechaza (4xx), se registra el motivo y se sigue sin orden: la tarjeta
+ * y Yape no la necesitan. Sin conexión con Culqi, el error sube.
+ */
+async function crearOrden(
+  r: Extract<Awaited<ReturnType<typeof pagoPorPagar>>, { ok: true }>,
+  estudiante: { nombres: string; apellidos: string; correo: string },
+): Promise<string | null> {
+  const venceEn = r.ins.vence_en ? new Date(r.ins.vence_en) : new Date(Date.now() + 48 * 3600 * 1000);
+  try {
+    const orden = await getPasarela("culqi").crearOrden({
+      pagoId: r.pago.id,
+      montoSoles: r.pago.monto,
+      descripcion: r.descripcion,
+      numeroOrden: `${r.ins.codigo}-${Date.now().toString(36)}`,
+      cliente: {
+        nombres: estudiante.nombres,
+        apellidos: estudiante.apellidos,
+        correo: estudiante.correo,
+        telefono: uno<{ telefono: string | null }>(r.ins.estudiante)?.telefono ?? null,
+      },
+      venceEn,
+    });
+    await createAdminClient().from("pagos").update({ orden_pasarela: orden.id }).eq("id", r.pago.id);
+    return orden.id;
+  } catch (e) {
+    if (e instanceof ErrorPasarela && e.status && e.status < 500) {
+      console.error(`Culqi rechazó la orden del pago ${r.pago.id}:`, e.detalle);
+      return null;
+    }
     throw e;
   }
 }
@@ -147,8 +187,8 @@ export async function cobrarConToken(entrada: { pagoId: string; token: string; h
       autenticacion3DS: d.data.autenticacion3DS,
     });
     if (cobro.estado === "APROBADO") {
-      await confirmarPago(r.pago.id, { referencia: cobro.referencia, medio: cobro.medio, respuesta: cobro.respuesta, actor: estudiante.id });
-      return { estado: "APROBADO", mensaje: "¡Pago aprobado! Tu matrícula está confirmada." };
+      const resultado = await confirmarPago(r.pago.id, { referencia: cobro.referencia, medio: cobro.medio, respuesta: cobro.respuesta, actor: estudiante.id });
+      return { estado: "APROBADO", mensaje: MENSAJE_CONFIRMACION[resultado] };
     }
     if (cobro.estado === "REQUIERE_3DS") return { estado: "REQUIERE_3DS", mensaje: cobro.mensaje };
 
@@ -160,9 +200,31 @@ export async function cobrarConToken(entrada: { pagoId: string; token: string; h
     await registrarActividad(estudiante.id, "PAGO_RECHAZADO", { inscripcion: r.ins.codigo, medio: cobro.medio, motivo: cobro.mensaje });
     return { estado: "RECHAZADO", mensaje: cobro.mensaje };
   } catch (e) {
-    if (e instanceof ErrorPasarela) return { estado: "ERROR", mensaje: e.message };
+    // Sin respuesta, Culqi pudo haber cobrado: el aviso del cargo confirmará el pago.
+    if (e instanceof ErrorPasarela) return { estado: "ERROR", mensaje: SIN_RESPUESTA };
     throw e;
   }
+}
+
+/**
+ * Tabla 12 · Si la pasarela falla, el estudiante cambia su pago pendiente al cobro directo
+ * por Yape o Plin (validado por el administrador) sin perder la reserva.
+ */
+export async function cambiarAPagoDirecto(pagoId: string, metodo: "YAPE" | "PLIN"): Promise<{ ok: boolean; mensaje: string }> {
+  const estudiante = await requireRol("estudiante");
+  if (!pagoManualHabilitado()) return { ok: false, mensaje: "El pago directo por Yape o Plin no está disponible" };
+  if (metodo !== "YAPE" && metodo !== "PLIN") return { ok: false, mensaje: "Elige Yape o Plin" };
+  const r = await pagoPorPagar(pagoId);
+  if (!r.ok) return r;
+  const { error } = await createAdminClient()
+    .from("pagos")
+    .update({ metodo, medio: null, observacion: null })
+    .eq("id", r.pago.id)
+    .eq("estado", "PENDIENTE");
+  if (error) return { ok: false, mensaje: error.message };
+  await registrarActividad(estudiante.id, "CAMBIO_A_PAGO_DIRECTO", { inscripcion: r.ins.codigo, metodo });
+  revalidatePath("/estudiante/pagos");
+  return { ok: true, mensaje: `Listo: paga por ${metodo === "YAPE" ? "Yape" : "Plin"} y registra el N.º de operación.` };
 }
 
 /** Estado del pago propio, para la pantalla que espera la confirmación de la billetera. */
