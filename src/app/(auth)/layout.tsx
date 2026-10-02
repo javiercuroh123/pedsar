@@ -1,14 +1,14 @@
 import { BadgeCheckIcon, Clock3Icon, SparklesIcon, WalletIcon } from "lucide-react";
 import { Logo } from "@/components/layout/logo";
 import { BotonTema, MenuAccesibilidad } from "@/components/preferencias";
-
-const VENTAJAS = [
-  { icono: BadgeCheckIcon, texto: "Certificados con código verificable" },
-  { icono: WalletIcon, texto: "Paga con Yape o Plin" },
-  { icono: Clock3Icon, texto: "Accede a tus clases 24/7" },
-];
+import { pasarelaActiva } from "@/lib/pagos";
 
 export default function LayoutAuth({ children }: LayoutProps<"/">) {
+  const VENTAJAS = [
+    { icono: BadgeCheckIcon, texto: "Certificados con código verificable" },
+    { icono: WalletIcon, texto: pasarelaActiva() ? "Paga con tarjeta, Yape o Plin" : "Paga con Yape o Plin" },
+    { icono: Clock3Icon, texto: "Accede a tus clases 24/7" },
+  ];
   return (
     <div className="grid min-h-screen flex-1 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]">
       <div className="fondo-marca relative hidden overflow-hidden p-12 text-white lg:flex lg:flex-col lg:gap-10">

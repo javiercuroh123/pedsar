@@ -75,11 +75,16 @@ export const etiquetaPago = (metodo: MetodoPago, medio: MedioPago | null | undef
 
 /** Situación de un pago directo (Yape / Plin) pendiente, vista por el estudiante. */
 export function situacionPagoPendiente(
-  pago: { reportado_en: string | null; observacion: string | null },
+  pago: { metodo?: MetodoPago; reportado_en: string | null; observacion: string | null },
   inscripcion: { estado: string; vence_en: string | null },
 ) {
   if (pago.reportado_en) return { texto: "pago en validación", accion: "Ver pago" };
   if (reservaVencida(inscripcion)) return { texto: "tu reserva venció", accion: "Ver detalle" };
+  if (pago.metodo === "CULQI") {
+    return pago.observacion
+      ? { texto: "tu último intento de pago no se aprobó", accion: "Reintentar pago" }
+      : { texto: "falta pagar en línea", accion: "Pagar en línea" };
+  }
   if (pago.observacion) return { texto: "revisa la observación de tu pago", accion: "Corregir pago" };
   return { texto: "falta registrar tu pago", accion: "Registrar pago" };
 }

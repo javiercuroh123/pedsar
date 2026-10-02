@@ -1,6 +1,6 @@
 import "server-only";
 import { createClient } from "@/lib/supabase/server";
-import type { EstadoInscripcion, EstadoPago, MetodoPago, Modalidad, TipoContenido } from "@/types/dominio";
+import type { EstadoInscripcion, EstadoPago, MedioPago, MetodoPago, Modalidad, TipoContenido } from "@/types/dominio";
 
 /** PostgREST devuelve objeto o arreglo según detecte la relación; esto lo normaliza. */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -25,13 +25,16 @@ export interface InscripcionEstudiante {
     id: string;
     monto: number;
     metodo: MetodoPago;
+    /** Medio del pago en línea (Culqi); null en el pago directo. */
+    medio: MedioPago | null;
     estado: EstadoPago;
     fecha_pago: string | null;
     /** Pago manual (Yape / Plin): N.º de operación informado y observación del administrador. */
     numero_operacion: string | null;
     reportado_en: string | null;
     observacion: string | null;
-    comprobante: { tipo: string; serie: string; numero: string; pdf_url: string | null } | null;
+    /** Comprobante interno CP01; el PDF se descarga en /comprobantes/{id}/pdf. */
+    comprobante: { id: number; tipo: string; serie: string; numero: string } | null;
   } | null;
   /** Datos congelados al emitir (null en los campos si el certificado es anterior a ese cambio). */
   certificado: {
@@ -91,7 +94,7 @@ export async function listarMisInscripciones(estudianteId: string): Promise<Insc
     .select(
       `id, codigo, estado, fecha_inscripcion, vence_en,
        curso:cursos(id, slug, titulo, modalidad, duracion_horas, categoria:categorias(nombre, slug)),
-       pagos(id, monto, metodo, estado, fecha_pago, numero_operacion, reportado_en, observacion, comprobantes(tipo, serie, numero, pdf_url)),
+       pagos(id, monto, metodo, medio, estado, fecha_pago, numero_operacion, reportado_en, observacion, comprobantes(id, tipo, serie, numero)),
        certificados(codigo_unico, fecha_emision, estudiante_nombre, curso_titulo, duracion_horas, instructor_nombre, nota_final)`,
     )
     .eq("estudiante_id", estudianteId)
@@ -119,6 +122,7 @@ export async function listarMisInscripciones(estudianteId: string): Promise<Insc
             id: pago.id as string,
             monto: Number(pago.monto),
             metodo: pago.metodo as MetodoPago,
+            medio: (pago.medio as MedioPago | null) ?? null,
             estado: pago.estado as EstadoPago,
             fecha_pago: pago.fecha_pago as string | null,
             numero_operacion: pago.numero_operacion as string | null,

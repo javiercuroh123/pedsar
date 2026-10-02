@@ -6,7 +6,7 @@ import { leerPdf, leerXlsx } from "../../apoyo/archivos";
 import { entorno, responder } from "../../apoyo/entorno";
 
 describe("reporte general del administrador (RF-10 · HU-20)", () => {
-  const inscripcion = (curso: string, estado: string, fecha: string, pago?: { monto: string; metodo: string; estado: string }) => ({
+  const inscripcion = (curso: string, estado: string, fecha: string, pago?: { monto: string; metodo: string; medio?: string; estado: string }) => ({
     curso_id: curso,
     estado,
     fecha_inscripcion: fecha,
@@ -45,10 +45,10 @@ describe("reporte general del administrador (RF-10 · HU-20)", () => {
       ["Excel", 3, 2, 324],
       ["Power BI", 1, 1, 300],
     ]);
-    expect(r.porCurso[0].porMetodo).toEqual({ YAPE: 180, PLIN: 144 });
+    expect(r.porCurso[0].porMetodo).toEqual({ Yape: 180, Plin: 144 });
     expect(r.porMetodo).toEqual([
-      { metodo: "YAPE", monto: 480 },
-      { metodo: "PLIN", monto: 144 },
+      { metodo: "Yape", monto: 480 },
+      { metodo: "Plin", monto: 144 },
     ]);
     // 23:30 del 31 de agosto en Lima es agosto, aunque en UTC ya sea setiembre.
     expect(r.porMes).toEqual([
@@ -58,6 +58,24 @@ describe("reporte general del administrador (RF-10 · HU-20)", () => {
     expect(r.totales).toEqual({ inscritos: 4, confirmados: 3, ingresos: 624 });
     expect(r.usuarios).toEqual({ registrados: 50, activos: 10, nuevos: 10, estudiantes: 10, instructores: 3 });
     expect(r.curso).toBeNull();
+  });
+
+  it("separa los ingresos del pago en línea por medio de los pagos directos", async () => {
+    responder({
+      cursos: { data: [{ id: "c1", titulo: "Excel", modalidad: "VIRTUAL", cupo_maximo: 30 }] },
+      inscripciones: {
+        data: [
+          inscripcion("c1", "CONFIRMADA", "2026-09-10T10:00:00-05:00", { monto: "144.00", metodo: "CULQI", medio: "YAPE", estado: "APROBADO" }),
+          inscripcion("c1", "CONFIRMADA", "2026-09-11T10:00:00-05:00", { monto: "180.00", metodo: "CULQI", medio: "TARJETA", estado: "APROBADO" }),
+          inscripcion("c1", "CONFIRMADA", "2026-09-12T10:00:00-05:00", { monto: "100.00", metodo: "YAPE", estado: "APROBADO" }),
+        ],
+      },
+      perfiles: { count: 1 },
+    });
+    const r = await generarReporte("2026-09-01", "2026-09-30");
+    expect(entorno.servidor.de("inscripciones")[0].columnas).toContain("medio");
+    expect(r.porCurso[0].porMetodo).toEqual({ "Culqi · Yape": 144, "Culqi · Tarjeta": 180, Yape: 100 });
+    expect(r.porMetodo.map((m) => m.metodo)).toEqual(["Culqi · Tarjeta", "Culqi · Yape", "Yape"]);
   });
 
   it("filtrado por curso muestra el curso aunque no tenga inscripciones", async () => {

@@ -22,19 +22,24 @@ import { listarCategorias, listarCursosPublicados } from "@/features/catalogo/co
 import { CursoCard, IndicadorCupo } from "@/features/catalogo/curso-card";
 import { degradadoCategoria, IconoCategoria, PortadaCurso } from "@/features/catalogo/portada-curso";
 import { ETIQUETA_NIVEL, formatearFecha, formatearHora, formatearSoles } from "@/lib/formato";
+import { pasarelaActiva } from "@/lib/pagos";
 import { cn } from "@/lib/utils";
 
-const PASOS = [
+// Los textos de pago dependen de si la pasarela (Culqi) está configurada.
+const pasos = (enLinea: boolean) => [
   { icono: SearchIcon, titulo: "Elige tu curso", texto: "Revisa horario, cupos disponibles, temario, instructor y precio en el catálogo." },
-  { icono: CreditCardIcon, titulo: "Inscríbete y paga en línea", texto: "Tarjeta, Yape o Plin, con boleta o factura electrónica al instante." },
+  enLinea
+    ? { icono: CreditCardIcon, titulo: "Inscríbete y paga en línea", texto: "Tarjeta, Yape, Plin u otras billeteras; recibes tu comprobante de pago al instante." }
+    : { icono: CreditCardIcon, titulo: "Inscríbete y paga", texto: "Paga por Yape o Plin y registra tu operación; validamos tu pago y te confirmamos." },
   { icono: BookOpenCheckIcon, titulo: "Aprende en tu portal", texto: "Accede a sesiones, materiales y evaluaciones, y sigue tu progreso por curso." },
   { icono: AwardIcon, titulo: "Certifícate", texto: "Descarga tu certificado digital con un código único verificable públicamente." },
 ];
 
-const BENEFICIOS = [
+const beneficios = (enLinea: boolean) => [
   { icono: CalendarClockIcon, titulo: "Inscripción 24/7", texto: "Sin colas ni fichas físicas: matricúlate desde cualquier dispositivo." },
-  // TODO: volver a mencionar la tarjeta y el comprobante electrónico cuando estén activos (pasarela y SUNAT).
-  { icono: WalletIcon, titulo: "Pagos locales", texto: "Yape o Plin desde tu celular; validamos tu pago y te confirmamos por correo." },
+  enLinea
+    ? { icono: WalletIcon, titulo: "Pagos locales", texto: "Tarjeta, Yape, Plin u otras billeteras, con tu matrícula confirmada al instante." }
+    : { icono: WalletIcon, titulo: "Pagos locales", texto: "Yape o Plin desde tu celular; validamos tu pago y te confirmamos por correo." },
   { icono: LineChartIcon, titulo: "Progreso al día", texto: "Asistencia, notas y avance de cada curso en tiempo real." },
   { icono: ShieldCheckIcon, titulo: "Certificados verificables", texto: "Empleadores validan tu certificado con su código único." },
 ];
@@ -56,6 +61,7 @@ function EncabezadoSeccion({ sobre, titulo, texto, accion, oscuro }: { sobre: st
 // HU-48 · Página de inicio
 export default async function InicioPage() {
   const [cursos, categorias] = await Promise.all([listarCursosPublicados(), listarCategorias()]);
+  const enLinea = pasarelaActiva();
   const destacado = cursos[0];
   const proximos = cursos.slice(destacado ? 1 : 0, 5);
   const porCategoria = new Map<string, number>();
@@ -79,8 +85,8 @@ export default async function InicioPage() {
               Aprende tecnología con <span className="texto-degradado">certificación verificable</span>
             </h1>
             <p className="animar-entrada mt-6 max-w-xl text-lg text-muted-foreground [--i:2]">
-              Cursos de programación, redes, ofimática e IA en Ica. Inscríbete en línea las 24 horas, paga con Yape o Plin y
-              recibe tu certificado digital.
+              Cursos de programación, redes, ofimática e IA en Ica. Inscríbete en línea las 24 horas, paga con{" "}
+              {enLinea ? "tarjeta, Yape o Plin" : "Yape o Plin"} y recibe tu certificado digital.
             </p>
             <form
               action="/cursos"
@@ -163,7 +169,7 @@ export default async function InicioPage() {
       {/* ---------- Beneficios ---------- */}
       <section className="mx-auto max-w-7xl px-4 pt-12 sm:px-6 lg:px-8">
         <div className="escalonado grid gap-8 rounded-2xl border bg-card p-8 shadow-xs sm:grid-cols-2 lg:grid-cols-4">
-          {BENEFICIOS.map((b) => (
+          {beneficios(enLinea).map((b) => (
             <div key={b.titulo} className="group">
               <span className="grid size-11 place-items-center rounded-lg bg-brand-50 text-brand-700 transition-transform duration-300 group-hover:-rotate-6 group-hover:scale-110 dark:bg-brand-500/15 dark:text-brand-300">
                 <b.icono className="size-5" />
@@ -249,7 +255,7 @@ export default async function InicioPage() {
         <div className="relative mx-auto max-w-7xl px-4 py-20 sm:px-6 lg:px-8">
           <EncabezadoSeccion oscuro sobre="Cómo funciona" titulo="De la inscripción al certificado, sin fichas ni colas" />
           <ol className="escalonado mt-12 grid gap-8 sm:grid-cols-2 lg:grid-cols-4">
-            {PASOS.map((p, i) => (
+            {pasos(enLinea).map((p, i) => (
               <li key={p.titulo} className="group border-t-2 border-brand-600 pt-6">
                 <div className="flex items-center justify-between">
                   <span className="text-4xl font-bold text-brand-400">{i + 1}</span>

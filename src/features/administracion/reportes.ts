@@ -1,7 +1,8 @@
 import "server-only";
 import { createClient } from "@/lib/supabase/server";
 import { uno } from "@/features/academico/consultas";
-import type { MetodoPago, Modalidad } from "@/types/dominio";
+import { etiquetaPago } from "@/lib/formato";
+import type { MedioPago, MetodoPago, Modalidad } from "@/types/dominio";
 
 export interface FilaReporte {
   cursoId: string;
@@ -11,7 +12,8 @@ export interface FilaReporte {
   inscritos: number;
   confirmados: number;
   ingresos: number;
-  porMetodo: Partial<Record<MetodoPago, number>>;
+  /** Ingresos por medio de pago, con la etiqueta de etiquetaPago («Culqi · Tarjeta», «Yape»…). */
+  porMetodo: Record<string, number>;
 }
 
 export interface FilaMes {
@@ -28,7 +30,8 @@ export interface ReporteGeneral {
   /** Título del curso filtrado, o null si es de todos los cursos. */
   curso: string | null;
   porCurso: FilaReporte[];
-  porMetodo: { metodo: MetodoPago; monto: number }[];
+  /** `metodo` es la etiqueta de etiquetaPago. */
+  porMetodo: { metodo: string; monto: number }[];
   porMes: FilaMes[];
   totales: { inscritos: number; confirmados: number; ingresos: number };
   /** Indicadores de usuarios (HU-20); son globales aunque se filtre por curso. */
@@ -51,7 +54,7 @@ export async function generarReporte(desde: string, hasta: string, cursoId?: str
   if (cursoId) cursos = cursos.eq("id", cursoId);
   let ins = supabase
     .from("inscripciones")
-    .select("curso_id, estado, fecha_inscripcion, pagos(monto, metodo, estado)")
+    .select("curso_id, estado, fecha_inscripcion, pagos(monto, metodo, medio, estado)")
     .neq("estado", "CANCELADA")
     .gte("fecha_inscripcion", `${desde}T00:00:00-05:00`)
     .lte("fecha_inscripcion", `${hasta}T23:59:59-05:00`);
@@ -69,14 +72,14 @@ export async function generarReporte(desde: string, hasta: string, cursoId?: str
   ]);
   const filas = (listaIns ?? []) as FilaInscripcion[];
   const pagoAprobado = (f: FilaInscripcion) => {
-    const p = uno<{ monto: number; metodo: MetodoPago; estado: string }>(f.pagos);
-    return p?.estado === "APROBADO" ? { monto: Number(p.monto), metodo: p.metodo } : null;
+    const p = uno<{ monto: number; metodo: MetodoPago; medio: MedioPago | null; estado: string }>(f.pagos);
+    return p?.estado === "APROBADO" ? { monto: Number(p.monto), metodo: etiquetaPago(p.metodo, p.medio) } : null;
   };
 
   const porCurso = (listaCursos ?? [])
     .map((c): FilaReporte => {
       const propias = filas.filter((f) => f.curso_id === c.id);
-      const porMetodo: Partial<Record<MetodoPago, number>> = {};
+      const porMetodo: Record<string, number> = {};
       let ingresos = 0;
       propias.forEach((f) => {
         const p = pagoAprobado(f);
@@ -99,7 +102,7 @@ export async function generarReporte(desde: string, hasta: string, cursoId?: str
     .filter((f) => cursoId || f.inscritos > 0)
     .sort((a, b) => b.ingresos - a.ingresos || b.inscritos - a.inscritos);
 
-  const metodos = new Map<MetodoPago, number>();
+  const metodos = new Map<string, number>();
   const meses = new Map<string, FilaMes>();
   filas.forEach((f) => {
     const mes = mesDe(f.fecha_inscripcion);
