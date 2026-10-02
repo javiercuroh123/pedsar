@@ -1,7 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
 import {
   ETIQUETA_ESTADO,
+  ETIQUETA_MEDIO,
   ETIQUETA_METODO,
+  etiquetaPago,
   formatearDiaSemana,
   formatearFecha,
   formatearFechaCorta,
@@ -64,6 +66,14 @@ describe("etiquetas y situación del pago directo", () => {
   it("tiene etiqueta para cada método y estado", () => {
     expect(ETIQUETA_METODO.YAPE).toBe("Yape");
     expect(ETIQUETA_ESTADO.VENCIDO).toBe("Vencido");
+    expect(ETIQUETA_MEDIO.BILLETERA).toBe("Billetera (Plin u otra)");
+  });
+
+  it("nombra el pago en línea por su medio y el directo por su app", () => {
+    expect(etiquetaPago("CULQI", "TARJETA")).toBe("Culqi · Tarjeta");
+    expect(etiquetaPago("CULQI", "YAPE")).toBe("Culqi · Yape");
+    expect(etiquetaPago("CULQI", null)).toBe("Pago en línea (Culqi)");
+    expect(etiquetaPago("YAPE", null)).toBe("Yape");
   });
 
   it("indica qué le falta al estudiante, en orden de prioridad", () => {

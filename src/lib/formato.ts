@@ -1,5 +1,5 @@
 import { reservaVencida } from "@/config/matricula";
-import type { EstadoCurso, EstadoInscripcion, EstadoPago, MetodoPago, Modalidad, Nivel } from "@/types/dominio";
+import type { EstadoCurso, EstadoInscripcion, EstadoPago, MedioPago, MetodoPago, Modalidad, Nivel } from "@/types/dominio";
 
 // Todas las fechas se muestran en hora de Perú, aunque el servidor corra en UTC.
 const ZONA = "America/Lima";
@@ -54,12 +54,24 @@ export const ETIQUETA_NIVEL: Record<Nivel, string> = {
 };
 
 export const ETIQUETA_METODO: Record<MetodoPago, string> = {
-  CULQI: "Tarjeta (Culqi)",
+  CULQI: "Pago en línea (Culqi)",
   IZIPAY: "Tarjeta (Izipay)",
   NIUBIZ: "Tarjeta (Niubiz)",
   YAPE: "Yape",
   PLIN: "Plin",
 };
+
+export const ETIQUETA_MEDIO: Record<MedioPago, string> = {
+  TARJETA: "Tarjeta",
+  YAPE: "Yape",
+  BILLETERA: "Billetera (Plin u otra)",
+  BANCA_MOVIL: "Banca móvil",
+  AGENTE: "Agente o bodega",
+};
+
+/** «Culqi · Tarjeta» para el pago en línea con su medio; el nombre del método en los demás casos. */
+export const etiquetaPago = (metodo: MetodoPago, medio: MedioPago | null | undefined) =>
+  metodo === "CULQI" && medio ? `Culqi · ${ETIQUETA_MEDIO[medio]}` : ETIQUETA_METODO[metodo];
 
 /** Situación de un pago directo (Yape / Plin) pendiente, vista por el estudiante. */
 export function situacionPagoPendiente(

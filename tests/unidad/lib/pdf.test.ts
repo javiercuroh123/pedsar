@@ -1,6 +1,7 @@
 import { PDFDocument, StandardFonts } from "pdf-lib";
 import { describe, expect, it } from "vitest";
 import { aWinAnsi, centrado, dibujarIsotipo, partir, recortar, tamanoQueEntra } from "@/lib/pdf/comun";
+import { generarPdfComprobante } from "@/features/matricula/pdf-comprobante";
 import { generarPdfReporte } from "@/lib/pdf/reporte";
 import { leerPdf } from "../../apoyo/archivos";
 
@@ -88,5 +89,42 @@ describe("PDF tabular de reportes", () => {
     const { paginas, tamanos } = await leerPdf(bytes);
     expect(tamanos[0].width).toBeGreaterThan(tamanos[0].height);
     expect(paginas[0]).toContain("Aún no hay estudiantes.");
+  });
+});
+
+describe("comprobante de pago interno (HU-12 · HU-30)", () => {
+  const datos = {
+    serie: "CP01",
+    numero: "000123",
+    fechaEmision: "2026-10-02",
+    tipoSolicitado: "FACTURA" as const,
+    cliente: { nombre: "Ana Quispe", documento: "71234567", ruc: "20123456789", razonSocial: "ACME SAC" },
+    concepto: "Excel empresarial con tablas dinámicas",
+    subtotal: 180,
+    descuento: 36,
+    total: 144,
+    pago: "Culqi · Tarjeta",
+    referencia: "chr_test_1",
+  };
+
+  it("muestra la empresa, el cliente con su RUC, los importes, el pago y la nota de que no es un comprobante SUNAT", async () => {
+    const { texto, tamanos } = await leerPdf(await generarPdfComprobante(datos));
+    const plano = texto.replace(/\s+/g, " ");
+    expect(tamanos[0].width).toBeLessThan(tamanos[0].height);
+    for (const esperado of ["CP01-000123", "20605615521", "ACME SAC", "20123456789", "Ana Quispe", "Excel empresarial con tablas dinámicas", "S/ 180.00", "S/ 36.00", "S/ 144.00", "Culqi · Tarjeta", "chr_test_1"]) {
+      expect(plano).toContain(esperado);
+    }
+    expect(plano).toContain("no reemplaza la boleta o factura electrónica SUNAT");
+  });
+
+  it("sin factura muestra el nombre y documento del cliente, y omite el descuento y la referencia que no hay", async () => {
+    const { texto } = await leerPdf(
+      await generarPdfComprobante({ ...datos, tipoSolicitado: "BOLETA", cliente: { nombre: "Beto Ramos", documento: null, ruc: null, razonSocial: null }, descuento: 0, subtotal: 144, pago: "Yape", referencia: null }),
+    );
+    const plano = texto.replace(/\s+/g, " ");
+    expect(plano).toContain("Beto Ramos");
+    expect(plano).not.toContain("RUC del cliente");
+    expect(plano).not.toContain("Descuento");
+    expect(plano).not.toContain("Referencia");
   });
 });
