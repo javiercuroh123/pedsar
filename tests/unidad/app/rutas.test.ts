@@ -8,60 +8,99 @@ import { GET as pdfCertificado } from "@/app/certificados/[codigo]/pdf/route";
 import { GET as exportarDatos } from "@/app/cuenta/exportar/route";
 import { GET as exportarReporteCurso } from "@/app/instructor/notas/exportar/route";
 import { leerPdf, leerXlsx } from "../../apoyo/archivos";
-import { conSesion, ejecutarTareas, entorno, Redireccion, responder, UUID } from "../../apoyo/entorno";
+import { conSesion, entorno, Redireccion, responder, UUID } from "../../apoyo/entorno";
 
 vi.mock("@/lib/auth", () => import("../../apoyo/auth-falso"));
+
+// El webhook exige la clave secreta; se fija antes de importar la ruta.
+const { pasarelaFalsa, confirmarPagoFalso } = vi.hoisted(() => {
+  process.env.CULQI_WEBHOOK_SECRET = "secreto-de-prueba";
+  return {
+    pasarelaFalsa: {
+      leerWebhook: vi.fn((cuerpo: string): { tipo: "orden" | "cargo"; id: string } | null => ({ tipo: "orden", id: JSON.parse(cuerpo).data.id })),
+      consultar: vi.fn(),
+    },
+    confirmarPagoFalso: vi.fn(async () => "CONFIRMADO"),
+  };
+});
+vi.mock("@/lib/pagos", async (original) => ({ ...(await original<typeof import("@/lib/pagos")>()), getPasarela: () => pasarelaFalsa }));
+vi.mock("@/features/matricula/confirmar-pago", () => ({ confirmarPago: confirmarPagoFalso }));
 
 const contexto = <T,>(params: T) => ({ params: Promise.resolve(params) }) as never;
 const pedido = (ruta: string, init?: RequestInit) => new NextRequest(`https://pedsar.test${ruta}`, init as never);
 
-describe("webhook de pagos (secuencia de pago, pasos 19-25)", () => {
-  const evento = (type: string) => pedido("/api/pagos/webhook/culqi", { method: "POST", body: JSON.stringify({ type, data: { id: "chr_1" } }) });
+describe("webhook de pagos verificado contra la pasarela (secuencia de pago, pasos 19-22)", () => {
+  const aviso = (clave: string | null = "secreto-de-prueba", cuerpo = '{"type":"order.status.changed","data":{"id":"ord_1"}}') =>
+    pedido(`/api/pagos/webhook/culqi${clave === null ? "" : `?clave=${clave}`}`, { method: "POST", body: cuerpo });
+  const culqi = contexto({ proveedor: "culqi" });
+  const PAGADA = { estado: "PAGADO", pagoId: UUID.pago, montoCentimos: 14400, medio: "BILLETERA", referencia: "ord_1", respuesta: { id: "ord_1" } };
+  const PAGO = { data: { id: UUID.pago, monto: 144 } };
 
-  it("rechaza proveedores desconocidos e ignora eventos irrelevantes", async () => {
+  it("rechaza proveedores desconocidos y avisos sin la clave secreta correcta", async () => {
     expect((await webhook(pedido("/x", { method: "POST", body: "{}" }), contexto({ proveedor: "paypal" }))).status).toBe(404);
-    const r = await webhook(evento("order.created"), contexto({ proveedor: "culqi" }));
-    expect(await r.json()).toEqual({ recibido: true });
+    expect((await webhook(aviso(null), culqi)).status).toBe(401);
+    expect((await webhook(aviso("otra-clave"), culqi)).status).toBe(401);
+    expect(pasarelaFalsa.consultar).not.toHaveBeenCalled();
     expect(entorno.admin.consultas).toHaveLength(0);
   });
 
-  it("un cargo aprobado confirma la inscripción y envía el correo de confirmación", async () => {
-    responder(
-      {},
-      {
-        "pagos.update": { data: { inscripcion_id: UUID.inscripcion } },
-        "inscripciones.update": { data: { codigo: "MAT-1", estudiante: { nombres: "Ana", correo: "ana@pedsar.test" }, curso: { titulo: "Excel" } } },
-      },
-    );
-    expect((await webhook(evento("charge.succeeded"), contexto({ proveedor: "culqi" }))).status).toBe(200);
-    expect(entorno.admin.de("pagos", "update")[0]).toMatchObject({ valores: { estado: "APROBADO", fecha_pago: expect.any(String) }, filtros: [["eq", "referencia_pasarela", "chr_1"], ["select", "inscripcion_id"]] });
-    expect(entorno.admin.de("inscripciones", "update")[0].valores).toEqual({ estado: "CONFIRMADA", vence_en: null });
-    await ejecutarTareas();
-    expect(console.info).toHaveBeenCalledWith(expect.stringContaining("ana@pedsar.test"));
+  it("sin secreto configurado no acepta ningún aviso", async () => {
+    vi.stubEnv("CULQI_WEBHOOK_SECRET", "");
+    vi.resetModules();
+    const { POST } = await import("@/app/api/pagos/webhook/[proveedor]/route");
+    expect((await POST(aviso(""), culqi)).status).toBe(401);
+    vi.unstubAllEnvs();
   });
 
-  it("un cargo rechazado cancela solo inscripciones pendientes (libera el cupo)", async () => {
-    responder({}, { "pagos.update": { data: { inscripcion_id: UUID.inscripcion } } });
-    await webhook(evento("charge.failed"), contexto({ proveedor: "culqi" }));
-    expect(entorno.admin.de("pagos", "update")[0].valores).toMatchObject({ estado: "RECHAZADO", fecha_pago: null });
-    expect(entorno.admin.de("inscripciones", "update")[0]).toMatchObject({ valores: { estado: "CANCELADA" }, filtros: [["eq", "id", UUID.inscripcion], ["eq", "estado", "PENDIENTE"]] });
-    expect(entorno.tareas).toHaveLength(0);
+  it("ignora los eventos que no indican una orden o un cargo", async () => {
+    pasarelaFalsa.leerWebhook.mockReturnValueOnce(null);
+    const r = await webhook(aviso(), culqi);
+    expect(await r.json()).toEqual({ recibido: true });
+    expect(pasarelaFalsa.consultar).not.toHaveBeenCalled();
   });
 
-  it("informa errores de la BD y no toca inscripciones de pagos desconocidos", async () => {
-    responder({}, { "pagos.update": [{ error: { message: "caído" } }, { data: null }] });
-    const r = await webhook(evento("charge.succeeded"), contexto({ proveedor: "culqi" }));
-    expect(r.status).toBe(500);
-    await webhook(evento("charge.succeeded"), contexto({ proveedor: "culqi" }));
-    expect(entorno.admin.de("inscripciones")).toHaveLength(0);
+  it("confirma el pago solo después de consultar la orden en la API y comprobar el monto (con cupón)", async () => {
+    pasarelaFalsa.consultar.mockResolvedValueOnce(PAGADA);
+    responder({}, { pagos: PAGO });
+    expect((await webhook(aviso(), culqi)).status).toBe(200);
+    expect(pasarelaFalsa.consultar).toHaveBeenCalledWith({ tipo: "orden", id: "ord_1" });
+    expect(entorno.admin.de("pagos")[0].filtros).toEqual([["eq", "id", UUID.pago]]);
+    expect(confirmarPagoFalso).toHaveBeenCalledWith(UUID.pago, { referencia: "ord_1", medio: "BILLETERA", respuesta: { id: "ord_1" }, actor: null });
   });
 
-  it("un reembolso de la pasarela cancela la inscripción", async () => {
-    const pasarelas = await import("@/lib/pagos");
-    vi.spyOn(pasarelas, "getPasarela").mockReturnValueOnce({ procesarWebhook: async () => ({ referencia: "chr_1", estado: "REEMBOLSADO", respuesta: {} }) } as never);
-    responder({}, { "pagos.update": { data: { inscripcion_id: UUID.inscripcion } } });
-    await webhook(evento("x"), contexto({ proveedor: "culqi" }));
-    expect(entorno.admin.de("inscripciones", "update")[0]).toMatchObject({ valores: { estado: "CANCELADA" }, filtros: [["eq", "id", UUID.inscripcion]] });
+  it("sin la referencia del pago en la metadata, lo busca por la orden", async () => {
+    pasarelaFalsa.consultar.mockResolvedValueOnce({ ...PAGADA, pagoId: null });
+    responder({}, { pagos: PAGO });
+    await webhook(aviso(), culqi);
+    expect(entorno.admin.de("pagos")[0].filtros).toEqual([["eq", "orden_pasarela", "ord_1"]]);
+    expect(confirmarPagoFalso).toHaveBeenCalledTimes(1);
+  });
+
+  it("no confirma un pago cuyo monto no coincide y lo deja en la auditoría", async () => {
+    pasarelaFalsa.consultar.mockResolvedValueOnce({ ...PAGADA, montoCentimos: 14000 });
+    responder({}, { pagos: PAGO });
+    expect((await webhook(aviso(), culqi)).status).toBe(200);
+    expect(confirmarPagoFalso).not.toHaveBeenCalled();
+    expect(entorno.admin.de("registro_actividad")[0].valores).toMatchObject({ accion: "PAGO_MONTO_DISTINTO", detalle: { esperado: 14400, recibido: 14000 } });
+  });
+
+  it.each(["PENDIENTE", "EXPIRADO", "RECHAZADO"])("no confirma una orden %s", async (estado) => {
+    pasarelaFalsa.consultar.mockResolvedValueOnce({ ...PAGADA, estado });
+    expect((await webhook(aviso(), culqi)).status).toBe(200);
+    expect(confirmarPagoFalso).not.toHaveBeenCalled();
+  });
+
+  it("no confirma pagos que no existen", async () => {
+    pasarelaFalsa.consultar.mockResolvedValueOnce(PAGADA);
+    responder({}, { pagos: { data: null } });
+    expect((await webhook(aviso(), culqi)).status).toBe(200);
+    expect(confirmarPagoFalso).not.toHaveBeenCalled();
+  });
+
+  it("si no puede consultar la pasarela responde 500 para que Culqi reintente", async () => {
+    pasarelaFalsa.consultar.mockRejectedValueOnce(new Error("No pudimos conectar con la pasarela de pagos"));
+    expect((await webhook(aviso(), culqi)).status).toBe(500);
+    expect(confirmarPagoFalso).not.toHaveBeenCalled();
   });
 });
 
