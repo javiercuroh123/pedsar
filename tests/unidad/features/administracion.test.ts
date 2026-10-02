@@ -18,7 +18,7 @@ import {
 } from "@/features/administracion/acciones";
 import { confirmarPago } from "@/features/matricula/confirmar-pago";
 import { requireRol } from "@/lib/auth";
-import { conSesion, ejecutarTareas, entorno, formulario, Redireccion, responder, UUID } from "../../apoyo/entorno";
+import { conSesion, entorno, formulario, Redireccion, responder, UUID } from "../../apoyo/entorno";
 
 vi.mock("@/lib/auth", () => import("../../apoyo/auth-falso"));
 vi.mock("@/features/matricula/confirmar-pago", () => ({ confirmarPago: vi.fn(async () => "CONFIRMADO") }));
