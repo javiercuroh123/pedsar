@@ -22,6 +22,8 @@ import { conSesion, entorno, formulario, Redireccion, responder, UUID } from "..
 
 vi.mock("@/lib/auth", () => import("../../apoyo/auth-falso"));
 vi.mock("@/features/matricula/confirmar-pago", () => ({ confirmarPago: vi.fn(async () => "CONFIRMADO") }));
+const pasarela = vi.hoisted(() => ({ reembolsar: vi.fn() }));
+vi.mock("@/lib/pagos", async (original) => ({ ...(await original<typeof import("@/lib/pagos")>()), getPasarela: () => pasarela }));
 
 const auditadas = () => entorno.admin.de("registro_actividad").map((c) => (c.valores as { accion: string }).accion);
 
@@ -199,6 +201,50 @@ describe("reembolsos (HU-31)", () => {
     expect(entorno.admin.de("inscripciones", "update")[0].valores).toEqual({ estado: "CANCELADA" });
     expect(entorno.admin.de("notificaciones")[0].valores).toMatchObject({ mensaje: "Tu solicitud de reembolso fue aprobada." });
     expect(auditadas()).toEqual(["APROBAR_REEMBOLSO"]);
+  });
+
+  const reembolsoCulqi = (referencia = "chr_1") => ({
+    data: {
+      id: 9,
+      motivo: "No puedo asistir",
+      monto: 144,
+      pago: { id: UUID.pago, inscripcion_id: UUID.inscripcion, metodo: "CULQI", referencia_pasarela: referencia, inscripcion: { estudiante_id: UUID.estudiante } },
+    },
+  });
+
+  it("un pago con tarjeta o Yape por Culqi se devuelve en la pasarela", async () => {
+    conSesion("administrador");
+    responder({}, { "reembolsos.select": reembolsoCulqi() });
+    pasarela.reembolsar.mockResolvedValueOnce({ aprobado: true, referencia: "ref_1", mensaje: "ok", respuesta: {} });
+    await resolverReembolso(formulario({ id: "9", decision: "aprobar" }));
+    expect(pasarela.reembolsar).toHaveBeenCalledWith("chr_1", 144, "No puedo asistir");
+    expect(entorno.admin.de("reembolsos", "update")[0].valores).toEqual({ estado: "PROCESADO" });
+    expect(entorno.admin.de("pagos", "update")[0].valores).toEqual({ estado: "REEMBOLSADO" });
+    expect(entorno.admin.de("inscripciones", "update")[0].valores).toEqual({ estado: "CANCELADA" });
+    expect(auditadas()).toEqual(["APROBAR_REEMBOLSO"]);
+  });
+
+  it.each([
+    ["Culqi lo rechaza", () => pasarela.reembolsar.mockResolvedValueOnce({ aprobado: false, referencia: null, mensaje: "Monto inválido", respuesta: {} })],
+    ["Culqi no responde", () => pasarela.reembolsar.mockRejectedValueOnce(new Error("No pudimos conectar con la pasarela de pagos"))],
+  ])("si %s, el reembolso queda aprobado y se avisa a los administradores", async (_, preparar) => {
+    conSesion("administrador");
+    responder({}, { "reembolsos.select": reembolsoCulqi(), perfiles: { data: [{ id: UUID.admin }] } });
+    preparar();
+    await resolverReembolso(formulario({ id: "9", decision: "aprobar" }));
+    expect(entorno.admin.de("reembolsos", "update")[0].valores).toEqual({ estado: "APROBADO" });
+    expect(entorno.admin.de("pagos", "update")).toHaveLength(0);
+    expect(entorno.admin.de("inscripciones", "update")).toHaveLength(0);
+    const avisos = entorno.admin.de("notificaciones").flatMap((c) => [c.valores].flat()) as { usuario_id: string; mensaje: string }[];
+    expect(avisos).toContainEqual(expect.objectContaining({ usuario_id: UUID.admin, mensaje: expect.stringContaining("no se pudo procesar") }));
+    expect(auditadas()).toContain("REEMBOLSO_FALLIDO");
+  });
+
+  it("un pago directo por Yape no pasa por la pasarela", async () => {
+    conSesion("administrador");
+    responder({}, { "reembolsos.select": reembolso });
+    await resolverReembolso(formulario({ id: "9", decision: "aprobar" }));
+    expect(pasarela.reembolsar).not.toHaveBeenCalled();
   });
 
   it("rechazar solo cambia la solicitud; uno inexistente no hace nada", async () => {

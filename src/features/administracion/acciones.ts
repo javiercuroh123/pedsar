@@ -16,7 +16,8 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { uno } from "@/features/academico/consultas";
 import { confirmarPago } from "@/features/matricula/confirmar-pago";
-import { notificarUsuario as notificar } from "@/features/notificaciones/enviar";
+import { notificarAdministradores, notificarUsuario as notificar } from "@/features/notificaciones/enviar";
+import { getPasarela } from "@/lib/pagos";
 import type { EstadoFormulario } from "@/features/usuarios/esquemas";
 
 /**
@@ -281,17 +282,35 @@ export async function resolverReembolso(formData: FormData) {
   const id = z.coerce.number().int().parse(formData.get("id"));
   const aprobar = formData.get("decision") === "aprobar";
   const db = createAdminClient();
-  const { data: r } = await db.from("reembolsos").select("id, pago:pagos(id, inscripcion_id, inscripcion:inscripciones(estudiante_id))").eq("id", id).single();
+  const { data: r } = await db
+    .from("reembolsos")
+    .select("id, motivo, monto, pago:pagos(id, inscripcion_id, metodo, referencia_pasarela, inscripcion:inscripciones(estudiante_id))")
+    .eq("id", id)
+    .single();
   if (!r) return;
-  await db.from("reembolsos").update({ estado: aprobar ? "APROBADO" : "RECHAZADO" }).eq("id", id);
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const pago = (Array.isArray(r.pago) ? r.pago[0] : r.pago) as any;
-  if (aprobar && pago) {
-    // TODO: ejecutar getPasarela().reembolsar(...) y marcar el reembolso como PROCESADO.
+  const pago = uno<{ id: string; inscripcion_id: string; metodo?: string; referencia_pasarela?: string | null; inscripcion: unknown }>(r.pago);
+
+  // HU-50 · Los cargos de Culqi (tarjeta o Yape) se devuelven en la pasarela; los pagos directos, a mano.
+  const enPasarela = aprobar && pago?.metodo === "CULQI" && Boolean(pago.referencia_pasarela?.startsWith("chr_"));
+  let devuelto = aprobar && !enPasarela;
+  if (enPasarela) {
+    const motivoFallo = await getPasarela("culqi")
+      .reembolsar(pago!.referencia_pasarela!, Number(r.monto), r.motivo)
+      .then((res) => (res.aprobado ? null : res.mensaje))
+      .catch((e: Error) => e.message);
+    devuelto = motivoFallo === null;
+    if (motivoFallo !== null) {
+      await notificarAdministradores(`El reembolso ${id} no se pudo procesar en Culqi: ${motivoFallo}. Revísalo en CulqiPanel.`, "/admin/inscripciones");
+      await registrarActividad(usuario.id, "REEMBOLSO_FALLIDO", { reembolso: id, motivo: motivoFallo });
+    }
+  }
+
+  await db.from("reembolsos").update({ estado: !aprobar ? "RECHAZADO" : enPasarela && devuelto ? "PROCESADO" : "APROBADO" }).eq("id", id);
+  if (devuelto && pago) {
     await db.from("pagos").update({ estado: "REEMBOLSADO" }).eq("id", pago.id);
     await db.from("inscripciones").update({ estado: "CANCELADA" }).eq("id", pago.inscripcion_id);
   }
-  const estudiante = (Array.isArray(pago?.inscripcion) ? pago.inscripcion[0] : pago?.inscripcion)?.estudiante_id;
+  const estudiante = uno<{ estudiante_id: string }>(pago?.inscripcion)?.estudiante_id;
   if (estudiante) await notificar(estudiante, aprobar ? "Tu solicitud de reembolso fue aprobada." : "Tu solicitud de reembolso fue rechazada.", "/estudiante/pagos");
   await registrarActividad(usuario.id, aprobar ? "APROBAR_REEMBOLSO" : "RECHAZAR_REEMBOLSO", { reembolso: id });
   revalidatePath("/admin", "layout");
