@@ -7,6 +7,8 @@ import { resolverPago } from "@/features/administracion/acciones";
 import { GraficoBarras } from "@/features/administracion/grafico-barras";
 import { GraficoDona } from "@/features/administracion/grafico-dona";
 import { uno } from "@/features/academico/consultas";
+import { cursosMejorEvaluados } from "@/features/comunidad/consultas-resenas";
+import { Estrellas, formatearPromedio } from "@/features/comunidad/estrellas";
 import { requireRol } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { ETIQUETA_MODALIDAD, etiquetaPago, formatearSoles, hoyISO, nombreCompleto } from "@/lib/formato";
@@ -28,7 +30,7 @@ export default async function AdminPage() {
   hace12.setUTCMonth(hace12.getUTCMonth() - 11);
   const desde = `${hace12.toISOString().slice(0, 7)}-01`;
 
-  const [usuarios, usuariosMes, inscripciones, pagos, certificados, cursos, pendientes] = await Promise.all([
+  const [usuarios, usuariosMes, inscripciones, pagos, certificados, cursos, pendientes, mejorEvaluados] = await Promise.all([
     supabase.from("perfiles").select("id", { head: true, count: "exact" }),
     supabase.from("perfiles").select("id", { head: true, count: "exact" }).gte("fecha_registro", inicioMes),
     supabase.from("inscripciones").select("id, curso_id, estado, fecha_inscripcion").gte("fecha_inscripcion", desde),
@@ -41,6 +43,7 @@ export default async function AdminPage() {
       .eq("estado", "PENDIENTE")
       .order("fecha_inscripcion", { ascending: false })
       .limit(6),
+    cursosMejorEvaluados(5),
   ]);
 
   const filasIns = (inscripciones.data ?? []) as { id: string; curso_id: string; estado: string; fecha_inscripcion: string }[];
@@ -145,24 +148,51 @@ export default async function AdminPage() {
             <p className="px-5 py-10 text-center text-sm text-muted-foreground">No hay pagos por verificar. ✨</p>
           )}
         </PanelTabla>
-        <section className="rounded-2xl border bg-card p-5 shadow-xs">
-          <h2 className="text-lg font-semibold tracking-tight">Ocupación por curso</h2>
-          {ocupacion.length ? (
-            <ul className="mt-5 space-y-4">
-              {ocupacion.map((c) => (
-                <li key={c.id}>
-                  <div className="flex justify-between gap-3 text-sm">
-                    <span className="truncate">{c.titulo}</span>
-                    <span className="font-mono text-xs text-muted-foreground">{c.p}%</span>
-                  </div>
-                  <BarraProgreso valor={c.p} tono={c.p >= 100 ? "rojo" : c.p >= 80 ? "ambar" : "indigo"} className="mt-1.5 h-1.5" etiqueta={c.titulo} />
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <p className="mt-5 text-sm text-muted-foreground">Sin cursos publicados.</p>
-          )}
-        </section>
+        <div className="space-y-6">
+          <section className="rounded-2xl border bg-card p-5 shadow-xs">
+            <h2 className="text-lg font-semibold tracking-tight">Ocupación por curso</h2>
+            {ocupacion.length ? (
+              <ul className="mt-5 space-y-4">
+                {ocupacion.map((c) => (
+                  <li key={c.id}>
+                    <div className="flex justify-between gap-3 text-sm">
+                      <span className="truncate">{c.titulo}</span>
+                      <span className="font-mono text-xs text-muted-foreground">{c.p}%</span>
+                    </div>
+                    <BarraProgreso valor={c.p} tono={c.p >= 100 ? "rojo" : c.p >= 80 ? "ambar" : "indigo"} className="mt-1.5 h-1.5" etiqueta={c.titulo} />
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="mt-5 text-sm text-muted-foreground">Sin cursos publicados.</p>
+            )}
+          </section>
+          {/* HU-20 · HU-24 · Promedio de las reseñas visibles */}
+          <section className="rounded-2xl border bg-card p-5 shadow-xs">
+            <div className="flex items-center justify-between gap-3">
+              <h2 className="text-lg font-semibold tracking-tight">Cursos mejor evaluados</h2>
+              <Link href="/admin/resenas" className="text-sm font-medium text-primary hover:underline">
+                Reseñas
+              </Link>
+            </div>
+            {mejorEvaluados.length ? (
+              <ol className="mt-4 space-y-3">
+                {mejorEvaluados.map((c) => (
+                  <li key={c.id} className="flex items-center justify-between gap-3 text-sm">
+                    <span className="min-w-0 truncate">{c.titulo}</span>
+                    <span className="flex shrink-0 items-center gap-1.5">
+                      <Estrellas valor={c.promedio} className="text-xs" />
+                      <span className="font-mono text-xs tabular-nums">{formatearPromedio(c.promedio)}</span>
+                      <span className="text-xs text-muted-foreground">({c.cantidad})</span>
+                    </span>
+                  </li>
+                ))}
+              </ol>
+            ) : (
+              <p className="mt-4 text-sm text-muted-foreground">Aún no hay cursos calificados.</p>
+            )}
+          </section>
+        </div>
       </div>
     </div>
   );

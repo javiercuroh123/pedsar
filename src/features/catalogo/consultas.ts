@@ -68,8 +68,8 @@ async function nombresInstructores(ids: string[]) {
   return new Map((data ?? []).map((i: { id: string; nombres: string; apellidos: string }) => [i.id, nombreCompleto(i)]));
 }
 
-/** HU-24 · Calificación de varios cursos con una sola consulta. */
-async function calificaciones(ids: string[]) {
+/** HU-24 · Calificación de varios cursos con una sola consulta (solo reseñas visibles). */
+export async function calificaciones(ids: string[]) {
   const mapa = new Map<string, Calificacion>();
   if (!ids.length) return mapa;
   const supabase = await createClient();
