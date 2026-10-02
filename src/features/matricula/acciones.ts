@@ -11,16 +11,17 @@ import type { EstadoFormulario } from "@/features/usuarios/esquemas";
 import { registrarActividad } from "@/lib/auditoria";
 import { requireRol } from "@/lib/auth";
 import { programarCorreo } from "@/lib/email";
-import { correoInscripcionRegistrada } from "@/lib/email/plantillas";
+import { correoInscripcionPorPagar, correoInscripcionRegistrada } from "@/lib/email/plantillas";
 import { publicEnv } from "@/lib/env";
+import { pagoManualHabilitado, pasarelaActiva } from "@/lib/pagos";
 import { ETIQUETA_METODO, formatearFechaHora, formatearSoles, hoyISO } from "@/lib/formato";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 
 const inscripcionSchema = z.object({
   cursoId: z.uuid(),
-  // Mientras no esté el checkout de la pasarela, solo se acepta el pago directo por Yape / Plin.
-  metodo: z.enum(["YAPE", "PLIN"], "Por ahora solo aceptamos pagos por Yape o Plin"),
+  // CULQI: pago en línea (tarjeta, Yape, billeteras); YAPE / PLIN: pago directo validado por el administrador.
+  metodo: z.enum(["CULQI", "YAPE", "PLIN"], "Elige cómo pagar"),
   cupon: z.string().trim().toUpperCase().optional(),
   telefono: z.string().trim().max(20).optional(),
   documento: z.string().trim().max(12).optional(),
@@ -64,13 +65,17 @@ export async function validarCupon(codigo: string): Promise<ResultadoCupon> {
 /**
  * HU-07 · Inscripción a cursos · HU-12 · Pagos en línea.
  * Crea la inscripción PENDIENTE (el trigger de BD valida el cupo, HU-17) y su
- * pago PENDIENTE con el monto final. La pasarela confirma el pago por webhook
- * → /api/pagos/webhook/[proveedor] → CONFIRMADA; el administrador también
- * puede validarlo manualmente desde Inscripciones y pagos.
+ * pago PENDIENTE con el monto final. El pago en línea se hace después, en
+ * «Pagos» (pago-en-linea.ts); el directo por Yape / Plin lo valida el administrador.
  */
 export async function inscribirse(formData: FormData) {
   const estudiante = await requireRol("estudiante");
   const datos = inscripcionSchema.parse(Object.fromEntries(formData));
+  const enLinea = datos.metodo === "CULQI";
+  const noDisponible = enLinea
+    ? !pasarelaActiva() && "El pago en línea aún no está disponible"
+    : !pagoManualHabilitado() && "El pago directo por Yape o Plin no está disponible";
+  if (noDisponible) redirect(`/estudiante/cursos?error=${encodeURIComponent(noDisponible)}`);
   const supabase = await createClient();
 
   const { data: curso } = await supabase.from("cursos").select("id, titulo, precio, slug").eq("id", datos.cursoId).single();
@@ -99,9 +104,11 @@ export async function inscribirse(formData: FormData) {
   const monto = Math.round(Number(curso.precio) * (1 - (cupon?.porcentaje ?? 0) / 100) * 100) / 100;
 
   // Los pagos solo los escribe el servidor (sin política de inserción para estudiantes).
+  const datosFacturacion =
+    datos.comprobante === "FACTURA" ? { tipo: "FACTURA", ruc: datos.ruc ?? null, razon_social: datos.razonSocial ?? null } : { tipo: "BOLETA" };
   await createAdminClient()
     .from("pagos")
-    .insert({ inscripcion_id: inscripcion.id, cupon_id: cupon?.id ?? null, monto, metodo: datos.metodo });
+    .insert({ inscripcion_id: inscripcion.id, cupon_id: cupon?.id ?? null, monto, metodo: datos.metodo, datos_facturacion: datosFacturacion });
 
   await registrarActividad(estudiante.id, "INSCRIPCION_CREADA", {
     inscripcion: inscripcion.id,
@@ -112,26 +119,29 @@ export async function inscribirse(formData: FormData) {
     ...(datos.comprobante === "FACTURA" ? { ruc: datos.ruc, razon_social: datos.razonSocial } : {}),
   });
 
-  // HU-21 · Confirmación de la inscripción con las instrucciones de pago y el plazo de la reserva.
+  // HU-21 · Confirmación de la inscripción con el plazo de la reserva y cómo pagar.
+  const comun = {
+    nombre: estudiante.nombres || "estudiante",
+    curso: curso.titulo,
+    codigo: inscripcion.codigo,
+    monto: formatearSoles(monto),
+    venceEn: inscripcion.vence_en ? formatearFechaHora(inscripcion.vence_en) : `${PLAZO_PAGO_HORAS} horas`,
+    url: `${publicEnv.NEXT_PUBLIC_SITE_URL}/estudiante/pagos${enLinea ? `?pagar=${inscripcion.codigo}` : ""}`,
+  };
   programarCorreo({
     para: estudiante.correo,
-    ...correoInscripcionRegistrada({
-      nombre: estudiante.nombres || "estudiante",
-      curso: curso.titulo,
-      codigo: inscripcion.codigo,
-      monto: formatearSoles(monto),
-      app: datos.metodo === "YAPE" ? "Yape" : "Plin",
-      celular: EMPRESA.pagoDirecto.celular,
-      titular: EMPRESA.pagoDirecto.titular,
-      venceEn: inscripcion.vence_en ? formatearFechaHora(inscripcion.vence_en) : `${PLAZO_PAGO_HORAS} horas`,
-      url: `${publicEnv.NEXT_PUBLIC_SITE_URL}/estudiante/pagos`,
-    }),
+    ...(enLinea
+      ? correoInscripcionPorPagar(comun)
+      : correoInscripcionRegistrada({
+          ...comun,
+          app: datos.metodo === "YAPE" ? "Yape" : "Plin",
+          celular: EMPRESA.pagoDirecto.celular,
+          titular: EMPRESA.pagoDirecto.titular,
+        })),
   });
 
-  // TODO: con la pasarela activa, cobrar con getPasarela().cobrar(...) usando el token del checkout
-  // y emitir el comprobante electrónico (SUNAT) cuando el pago se apruebe.
   revalidatePath("/estudiante", "layout");
-  redirect(`/estudiante/pagos?inscripcion=${inscripcion.codigo}`);
+  redirect(enLinea ? `/estudiante/pagos?pagar=${inscripcion.codigo}` : `/estudiante/pagos?inscripcion=${inscripcion.codigo}`);
 }
 
 const pagoManualSchema = z.object({

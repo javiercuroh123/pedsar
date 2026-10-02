@@ -82,6 +82,24 @@ export function correoInscripcionRegistrada(p: {
   };
 }
 
+/** Inscripción PENDIENTE con pago en línea: enlace para pagar y plazo de la reserva. */
+export function correoInscripcionPorPagar(p: { nombre: string; curso: string; codigo: string; monto: string; venceEn: string; url: string }) {
+  return {
+    asunto: `Completa el pago de tu inscripción en ${p.curso}`,
+    html: marco(`
+      ${saludo(p.nombre)}
+      <p style="margin:0 0 12px">Registramos tu inscripción en <strong>${escapar(p.curso)}</strong> y tu cupo está reservado hasta el <strong>${escapar(p.venceEn)}</strong>.</p>
+      <p style="margin:0">Paga en línea con tarjeta, Yape, Plin u otra billetera y tu matrícula se confirmará al instante.</p>
+      ${datos([
+        ["Inscripción", escapar(p.codigo)],
+        ["Monto", escapar(p.monto)],
+        ["Plazo para pagar", escapar(p.venceEn)],
+      ])}
+      ${boton("Pagar ahora", p.url)}
+      ${pie("Si no pagas dentro del plazo, liberaremos el cupo para otro estudiante.")}`),
+  };
+}
+
 /** El administrador devolvió el pago para corregir el N.º de operación o la captura. */
 export function correoPagoObservado(p: { nombre: string; curso: string; motivo: string; venceEn: string; url: string }) {
   return {
