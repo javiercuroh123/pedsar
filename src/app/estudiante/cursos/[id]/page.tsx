@@ -11,6 +11,7 @@ import {
   FileTextIcon,
   FolderOpenIcon,
   LinkIcon,
+  MessagesSquareIcon,
 } from "lucide-react";
 import { BarraProgreso, EstadoVacio } from "@/components/comunes";
 import { BotonEnviar } from "@/components/boton-enviar";
@@ -81,13 +82,19 @@ export default async function AulaPage({ params, searchParams }: PageProps<"/est
 
   return (
     <div className="space-y-4">
-      <nav className="flex items-center gap-1.5 text-sm text-muted-foreground" aria-label="Ruta">
-        <Link href="/estudiante/cursos" className="hover:text-foreground">
-          Mis cursos
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <nav className="flex items-center gap-1.5 text-sm text-muted-foreground" aria-label="Ruta">
+          <Link href="/estudiante/cursos" className="hover:text-foreground">
+            Mis cursos
+          </Link>
+          <ChevronRightIcon className="size-3.5" />
+          <span className="text-foreground">{curso.titulo}</span>
+        </nav>
+        {/* HU-19 · Consulta privada al instructor del curso */}
+        <Link href={`/estudiante/mensajes/${id}`} className={buttonVariants({ variant: "outline", size: "sm" })}>
+          <MessagesSquareIcon /> Escribir al instructor
         </Link>
-        <ChevronRightIcon className="size-3.5" />
-        <span className="text-foreground">{curso.titulo}</span>
-      </nav>
+      </div>
 
       {!actual ? (
         <EstadoVacio icono={FolderOpenIcon} titulo="Aún no hay contenidos publicados" descripcion="Tu instructor irá subiendo los materiales de cada módulo." />
