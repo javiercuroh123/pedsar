@@ -94,7 +94,7 @@ export default async function InstructorSesionesPage({ searchParams }: PageProps
                       confirmar="¿Eliminar esta sesión? También se borrará su asistencia."
                       variant="ghost"
                       size="icon-sm"
-                      className="text-rose-600 dark:text-rose-400"
+                      className="text-red-600 dark:text-red-400"
                       aria-label="Eliminar sesión"
                     >
                       <Trash2Icon />

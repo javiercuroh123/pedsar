@@ -108,7 +108,7 @@ export function FiltrosCatalogo({
 
   return (
     <Form ref={formRef} action="/cursos" replace scroll={false} onChange={onChange} className="mt-8 grid gap-8 lg:grid-cols-[260px_minmax(0,1fr)]">
-      <aside className="lg:sticky lg:top-24 lg:self-start">
+      <aside className="animar-entrada lg:sticky lg:top-24 lg:self-start [--i:2]">
         <details className="group rounded-2xl border bg-card p-4 shadow-xs lg:open:block" open>
           <summary className="flex cursor-pointer list-none items-center justify-between text-sm font-semibold lg:pointer-events-none">
             <span className="flex items-center gap-2">

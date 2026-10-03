@@ -14,8 +14,8 @@ export const metadata: Metadata = { title: "Contenidos" };
 
 const TIPO: Record<TipoContenido, { icono: typeof FileTextIcon; clase: string; etiqueta: string }> = {
   VIDEO: { icono: CirclePlayIcon, clase: "bg-brand-50 text-brand-600 dark:bg-brand-500/10 dark:text-brand-300", etiqueta: "Video" },
-  PDF: { icono: FileTextIcon, clase: "bg-rose-50 text-rose-600 dark:bg-rose-500/10 dark:text-rose-300", etiqueta: "PDF" },
-  ENLACE: { icono: LinkIcon, clase: "bg-sky-50 text-sky-600 dark:bg-sky-500/10 dark:text-sky-300", etiqueta: "Enlace" },
+  PDF: { icono: FileTextIcon, clase: "bg-red-50 text-red-600 dark:bg-red-500/10 dark:text-red-300", etiqueta: "PDF" },
+  ENLACE: { icono: LinkIcon, clase: "bg-brand-50 text-brand-700 dark:bg-brand-500/10 dark:text-brand-300", etiqueta: "Enlace" },
 };
 
 // HU-08 · HU-52 · HU-55 · Contenidos por módulos
@@ -54,8 +54,8 @@ export default async function InstructorContenidosPage({ searchParams }: PagePro
         <div className="space-y-4">
           {modulos.map((m, i) => (
             <section key={m.id} className="overflow-hidden rounded-2xl border bg-card shadow-xs">
-              <div className="flex items-center gap-3 border-b bg-linear-to-r from-brand-50/80 to-transparent px-4 py-3 dark:from-brand-500/10">
-                <span className="grid size-7 place-items-center rounded-lg bg-linear-to-br from-brand-500 to-violet-600 font-mono text-xs font-bold text-white">
+              <div className="flex items-center gap-3 border-b bg-muted/40 px-4 py-3">
+                <span className="grid size-7 place-items-center rounded-lg bg-brand-50 font-mono text-xs font-semibold text-brand-800 dark:bg-brand-500/15 dark:text-brand-200">
                   {i + 1}
                 </span>
                 <h2 className="flex-1 text-sm font-semibold">{m.titulo}</h2>
@@ -66,7 +66,7 @@ export default async function InstructorContenidosPage({ searchParams }: PagePro
                   confirmar={`¿Eliminar el módulo "${m.titulo}" y todos sus contenidos?`}
                   variant="ghost"
                   size="icon-sm"
-                  className="text-rose-600 dark:text-rose-400"
+                  className="text-red-600 dark:text-red-400"
                   aria-label="Eliminar módulo"
                 >
                   <Trash2Icon />
@@ -92,7 +92,7 @@ export default async function InstructorContenidosPage({ searchParams }: PagePro
                           confirmar={`¿Eliminar "${c.titulo}"?`}
                           variant="ghost"
                           size="icon-sm"
-                          className="text-rose-600 dark:text-rose-400"
+                          className="text-red-600 dark:text-red-400"
                           aria-label={`Eliminar ${c.titulo}`}
                         >
                           <Trash2Icon />

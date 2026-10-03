@@ -60,8 +60,8 @@ export default async function CuentaPerfilPage({ searchParams }: PageProps<"/cue
                 <DownloadIcon /> Descargar JSON
               </a>
             </div>
-            <div className="rounded-2xl border border-rose-200 bg-rose-50/50 p-6 dark:border-rose-500/30 dark:bg-rose-500/5">
-              <h2 className="flex items-center gap-2 font-semibold text-rose-700 dark:text-rose-400">
+            <div className="rounded-2xl border border-red-200 bg-red-50/50 p-6 dark:border-red-500/30 dark:bg-red-500/5">
+              <h2 className="flex items-center gap-2 font-semibold text-red-700 dark:text-red-400">
                 <ShieldAlertIcon className="size-4" /> Eliminar cuenta
               </h2>
               <p className="mt-1 text-sm text-muted-foreground">

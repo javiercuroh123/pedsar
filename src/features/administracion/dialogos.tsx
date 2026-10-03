@@ -4,7 +4,36 @@ import { PencilIcon, PlusIcon, UserPlusIcon } from "lucide-react";
 import { CampoForm, claseControl, DialogoFormulario } from "@/components/dialogo-formulario";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { crearCupon, guardarCategoria, invitarUsuario } from "./acciones";
+import { PLAZO_PAGO_HORAS } from "@/config/matricula";
+import { crearCupon, guardarCategoria, invitarUsuario, observarPago } from "./acciones";
+
+/** Validar comprobantes · devuelve el pago al estudiante con el motivo, sin cancelar la inscripción. */
+export function DialogoObservarPago({ inscripcionId, codigo }: { inscripcionId: string; codigo: string }) {
+  return (
+    <DialogoFormulario
+      disparador="Observar"
+      varianteDisparador="outline"
+      tamanoDisparador="sm"
+      titulo={`Observar pago ${codigo}`}
+      descripcion={`El estudiante verá el motivo y tendrá ${PLAZO_PAGO_HORAS} horas para registrar de nuevo el N.º de operación o la captura. La inscripción sigue pendiente.`}
+      accion={observarPago}
+      textoEnviar="Devolver al estudiante"
+    >
+      <input type="hidden" name="inscripcionId" value={inscripcionId} />
+      <CampoForm etiqueta="¿Qué debe corregir?" htmlFor={`obs-${inscripcionId}`}>
+        <Textarea
+          id={`obs-${inscripcionId}`}
+          name="motivo"
+          rows={3}
+          required
+          minLength={5}
+          maxLength={300}
+          placeholder="Ej. No encontramos la operación en Yape; verifica el número o adjunta la captura."
+        />
+      </CampoForm>
+    </DialogoFormulario>
+  );
+}
 
 export function DialogoCategoria({ categoria }: { categoria?: { id: number; nombre: string; descripcion: string | null } }) {
   return (

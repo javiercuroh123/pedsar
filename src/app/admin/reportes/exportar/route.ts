@@ -1,16 +1,17 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { rangoPorDefecto, reporteInscripciones } from "@/features/administracion/reportes";
+import { reporteAExcel, reporteAPdf } from "@/features/administracion/exportar-reporte";
+import { generarReporte, rangoPorDefecto } from "@/features/administracion/reportes";
 import { registrarActividad } from "@/lib/auditoria";
 import { getUsuarioActual } from "@/lib/auth";
-import { ETIQUETA_METODO, ETIQUETA_MODALIDAD, hoyISO } from "@/lib/formato";
-import type { MetodoPago } from "@/types/dominio";
+import { TIPO_XLSX } from "@/lib/excel";
+import { hoyISO } from "@/lib/formato";
 
 const fecha = (v: string | null) => (v && /^\d{4}-\d{2}-\d{2}$/.test(v) ? v : null);
-const celda = (v: string | number) => `"${String(v).replace(/"/g, '""')}"`;
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /**
- * HU-42 · Exportación del reporte en CSV compatible con Excel
- * (separador ";" y BOM UTF-8 para que Excel en español respete las tildes).
+ * RF-10 · Exportación del reporte del administrador:
+ * GET /admin/reportes/exportar?formato=xlsx|pdf&desde=AAAA-MM-DD&hasta=AAAA-MM-DD&curso=<uuid>
  */
 export async function GET(request: NextRequest) {
   const usuario = await getUsuarioActual();
@@ -20,29 +21,19 @@ export async function GET(request: NextRequest) {
   const def = rangoPorDefecto(hoyISO());
   const desde = fecha(sp.get("desde")) ?? def.desde;
   const hasta = fecha(sp.get("hasta")) ?? def.hasta;
-  const filas = await reporteInscripciones(desde, hasta, sp.get("curso") || undefined);
+  const curso = sp.get("curso");
+  const formato = sp.get("formato") === "pdf" ? "pdf" : "xlsx";
+  const reporte = await generarReporte(desde, hasta, curso && UUID.test(curso) ? curso : undefined);
 
-  const metodos = Object.keys(ETIQUETA_METODO) as MetodoPago[];
-  const lineas = [
-    ["Curso", "Modalidad", "Cupo", "Inscritos", "Confirmados", "Ocupación %", "Ingresos (S/)", ...metodos.map((m) => ETIQUETA_METODO[m])],
-    ...filas.map((f) => [
-      f.titulo,
-      ETIQUETA_MODALIDAD[f.modalidad],
-      f.cupo,
-      f.inscritos,
-      f.confirmados,
-      Math.round((f.inscritos / f.cupo) * 100),
-      f.ingresos.toFixed(2),
-      ...metodos.map((m) => (f.porMetodo[m] ?? 0).toFixed(2)),
-    ]),
-  ];
-  const csv = "﻿" + lineas.map((l) => l.map(celda).join(";")).join("\r\n");
+  const nombre = `reporte-pedsar-${desde}_${hasta}.${formato}`;
+  const contenido = formato === "pdf" ? Buffer.from(await reporteAPdf(reporte)) : await reporteAExcel(reporte);
+  await registrarActividad(usuario.id, "EXPORTAR_REPORTE", { formato, desde, hasta, curso: reporte.curso });
 
-  await registrarActividad(usuario.id, "EXPORTAR_REPORTE", { desde, hasta });
-  return new NextResponse(csv, {
+  return new NextResponse(new Uint8Array(contenido), {
     headers: {
-      "Content-Type": "text/csv; charset=utf-8",
-      "Content-Disposition": `attachment; filename="reporte-inscripciones-${desde}_${hasta}.csv"`,
+      "Content-Type": formato === "pdf" ? "application/pdf" : TIPO_XLSX,
+      "Content-Disposition": `attachment; filename="${nombre}"`,
+      "Cache-Control": "private, no-store",
     },
   });
 }

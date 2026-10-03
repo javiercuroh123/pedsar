@@ -1,0 +1,63 @@
+# Integración continua (Definición de Terminado): cada push y pull request
+# pasa por lint, tipos, pruebas unitarias con cobertura ≥ 70 %, compilación
+# y pruebas de la base de datos (RLS, triggers) contra un Supabase local.
+# El despliegue lo hace Vercel al recibir el push (preview = staging, main = producción).
+name: Calidad
+
+on:
+  push:
+    branches: [main, "fase-*"]
+  pull_request:
+
+concurrency:
+  group: calidad-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  aplicacion:
+    name: Lint, tipos, pruebas y build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      # Valores de prueba: la compilación no se conecta a Supabase.
+      NEXT_PUBLIC_SITE_URL: https://pedsar.test
+      NEXT_PUBLIC_SUPABASE_URL: http://127.0.0.1:54321
+      NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: clave-publica-de-prueba
+      NEXT_TELEMETRY_DISABLED: "1"
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm run test:cobertura
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: cobertura
+          path: coverage/
+          retention-days: 14
+      - run: npm run build
+
+  base-de-datos:
+    name: Pruebas de la base de datos (pgTAP)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+      - uses: supabase/setup-cli@v1
+        with:
+          version: 2.118.0 # la misma del devDependency «supabase»
+      # Solo los servicios que necesitan las migraciones (auth, storage) y la BD.
+      - run: supabase start -x studio,imgproxy,edge-runtime,logflare,vector,supavisor,realtime,postgres-meta
+      - name: Pruebas pgTAP
+        run: |
+          set -o pipefail
+          supabase test db 2>&1 | tee pgtap.log
+      # Los fallos quedan como anotaciones del commit (visibles sin abrir el log).
+      - name: Fallos de pgTAP
+        if: failure()
+        run: grep -E "not ok|# +(Failed|Looks like)|ERROR|psql:" pgtap.log | head -40 | sed 's/^/::error title=pgTAP::/'

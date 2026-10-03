@@ -18,7 +18,9 @@ export type IconoNav =
   | "reportes"
   | "auditoria"
   | "perfil"
-  | "notificaciones";
+  | "notificaciones"
+  | "mensajes"
+  | "resenas";
 
 export interface ItemNav {
   titulo: string;
@@ -55,6 +57,7 @@ export const NAV_POR_ROL: Record<Rol, GrupoNav[]> = {
         { titulo: "Inicio", href: "/estudiante", icono: "inicio" },
         { titulo: "Mis cursos", href: "/estudiante/cursos", icono: "cursos" },
         { titulo: "Evaluaciones", href: "/estudiante/evaluaciones", icono: "evaluaciones" },
+        { titulo: "Mensajes", href: "/estudiante/mensajes", icono: "mensajes" },
         { titulo: "Certificados", href: "/estudiante/certificados", icono: "certificados" },
         { titulo: "Pagos y comprobantes", href: "/estudiante/pagos", icono: "pagos" },
       ],
@@ -71,6 +74,7 @@ export const NAV_POR_ROL: Record<Rol, GrupoNav[]> = {
         { titulo: "Asistencia", href: "/instructor/asistencia", icono: "asistencia" },
         { titulo: "Evaluaciones", href: "/instructor/evaluaciones", icono: "evaluaciones" },
         { titulo: "Estudiantes y notas", href: "/instructor/notas", icono: "notas" },
+        { titulo: "Mensajes", href: "/instructor/mensajes", icono: "mensajes" },
       ],
     },
     CUENTA,
@@ -89,6 +93,7 @@ export const NAV_POR_ROL: Record<Rol, GrupoNav[]> = {
         { titulo: "Cursos", href: "/admin/cursos", icono: "cursos" },
         { titulo: "Categorías", href: "/admin/categorias", icono: "categorias" },
         { titulo: "Certificados", href: "/admin/certificados", icono: "certificados" },
+        { titulo: "Reseñas", href: "/admin/resenas", icono: "resenas" },
       ],
     },
     {
@@ -115,4 +120,6 @@ export const RUTAS_PROTEGIDAS: { prefijo: string; roles: Rol[] | "cualquiera" }[
   { prefijo: "/instructor", roles: ["instructor", "administrador"] },
   { prefijo: "/estudiante", roles: ["estudiante"] },
   { prefijo: "/cuenta", roles: "cualquiera" },
+  // PDF de certificados: RLS decide quién lo descarga (estudiante, instructor del curso o admin).
+  { prefijo: "/certificados", roles: "cualquiera" },
 ];

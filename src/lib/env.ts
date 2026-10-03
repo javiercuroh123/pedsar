@@ -15,8 +15,20 @@ const publicEnvSchema = z.object({
   NEXT_PUBLIC_CULQI_PUBLIC_KEY: z.string().optional(),
 });
 
+/**
+ * En Vercel, si no se fija NEXT_PUBLIC_SITE_URL, se usa el dominio de producción o el de
+ * la rama (staging), para que los enlaces de correos, QR y Auth apunten al despliegue correcto.
+ */
+function urlVercel() {
+  const dominio =
+    process.env.NEXT_PUBLIC_VERCEL_ENV === "production"
+      ? process.env.NEXT_PUBLIC_VERCEL_PROJECT_PRODUCTION_URL
+      : process.env.NEXT_PUBLIC_VERCEL_BRANCH_URL;
+  return dominio ? `https://${dominio}` : undefined;
+}
+
 export const publicEnv = publicEnvSchema.parse({
-  NEXT_PUBLIC_SITE_URL: process.env.NEXT_PUBLIC_SITE_URL,
+  NEXT_PUBLIC_SITE_URL: process.env.NEXT_PUBLIC_SITE_URL || urlVercel(),
   NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL,
   NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY,
   NEXT_PUBLIC_GA_ID: process.env.NEXT_PUBLIC_GA_ID || undefined,

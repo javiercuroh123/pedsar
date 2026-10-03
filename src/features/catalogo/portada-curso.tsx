@@ -1,19 +1,43 @@
-import { BuildingIcon, MonitorIcon, ShuffleIcon } from "lucide-react";
+import {
+  BuildingIcon,
+  ChartColumnIcon,
+  CodeIcon,
+  GlobeIcon,
+  GraduationCapIcon,
+  MonitorIcon,
+  NetworkIcon,
+  ShieldCheckIcon,
+  ShuffleIcon,
+  SparklesIcon,
+  WrenchIcon,
+  type LucideIcon,
+} from "lucide-react";
+import { createElement, type ComponentProps } from "react";
 import { indiceDeTexto } from "@/components/comunes";
 import { ETIQUETA_MODALIDAD } from "@/lib/formato";
 import { cn } from "@/lib/utils";
 import type { Modalidad } from "@/types/dominio";
 
-// Cada categoría recibe un degradado propio para que el catálogo se vea variado.
+// Degradado «color de la categoría → grafito» (mismo criterio que las portadas de Figma).
 const DEGRADADOS = [
-  "from-brand-500 via-indigo-500 to-violet-600",
-  "from-orange-400 via-rose-400 to-pink-500",
-  "from-teal-400 via-emerald-500 to-green-600",
-  "from-sky-400 via-blue-500 to-indigo-600",
-  "from-fuchsia-500 via-purple-500 to-violet-600",
-  "from-amber-400 via-orange-400 to-rose-500",
-  "from-cyan-400 via-sky-500 to-blue-600",
+  "from-brand-600 to-zinc-900",
+  "from-brand-800 to-zinc-950",
+  "from-green-700 to-zinc-900",
+  "from-violet-700 to-zinc-900",
+  "from-rose-700 to-zinc-900",
+  "from-amber-700 to-zinc-900",
+  "from-zinc-600 to-zinc-950",
 ];
+
+const POR_CATEGORIA: Record<string, { degradado: string; icono: LucideIcon }> = {
+  programacion: { degradado: "from-brand-600 to-zinc-900", icono: CodeIcon },
+  "desarrollo-web": { degradado: "from-brand-800 to-zinc-950", icono: GlobeIcon },
+  "datos-ofimatica": { degradado: "from-green-700 to-zinc-900", icono: ChartColumnIcon },
+  redes: { degradado: "from-zinc-600 to-zinc-950", icono: NetworkIcon },
+  ciberseguridad: { degradado: "from-rose-700 to-zinc-900", icono: ShieldCheckIcon },
+  "inteligencia-artificial": { degradado: "from-violet-700 to-zinc-900", icono: SparklesIcon },
+  "soporte-tecnico": { degradado: "from-amber-700 to-zinc-900", icono: WrenchIcon },
+};
 
 export const ICONO_MODALIDAD: Record<Modalidad, typeof MonitorIcon> = {
   VIRTUAL: MonitorIcon,
@@ -21,35 +45,45 @@ export const ICONO_MODALIDAD: Record<Modalidad, typeof MonitorIcon> = {
   SEMIPRESENCIAL: ShuffleIcon,
 };
 
-export const degradadoCategoria = (clave?: string | null) => DEGRADADOS[indiceDeTexto(clave ?? "pedsar", DEGRADADOS.length)];
+export const degradadoCategoria = (clave?: string | null) =>
+  POR_CATEGORIA[clave ?? ""]?.degradado ?? DEGRADADOS[indiceDeTexto(clave ?? "pedsar", DEGRADADOS.length)];
+
+export const iconoCategoria = (clave?: string | null): LucideIcon => POR_CATEGORIA[clave ?? ""]?.icono ?? GraduationCapIcon;
+
+/** Ícono temático de la categoría (código, globo, gráfico, escudo…). */
+export function IconoCategoria({ slug, ...props }: { slug?: string | null } & ComponentProps<LucideIcon>) {
+  return createElement(iconoCategoria(slug), props);
+}
 
 /** Sigla del curso a partir del título (p. ej. "Excel empresarial" → "EX"). */
 export const siglaCurso = (titulo: string) =>
   (titulo.replace(/[^\p{L}\p{N} ]/gu, "").trim().split(/\s+/)[0] ?? "").slice(0, 2).toUpperCase() || "PE";
 
-/** Mini-portada cuadrada (listas y tablas). */
+/** Mini-portada cuadrada (listas y tablas): degradado e ícono de la categoría. */
 export function SiglaCurso({ titulo, categoria, className }: { titulo: string; categoria?: string | null; className?: string }) {
   return (
     <span
       aria-hidden
+      title={titulo}
       className={cn(
-        "grid size-11 shrink-0 place-items-center rounded-xl bg-linear-to-br font-mono text-sm font-bold text-white shadow-sm",
+        "grid size-11 shrink-0 place-items-center rounded-xl bg-linear-to-br text-brand-100 shadow-sm",
         degradadoCategoria(categoria),
         className,
       )}
     >
-      {siglaCurso(titulo)}
+      <IconoCategoria slug={categoria} className="size-[45%]" strokeWidth={1.8} />
     </span>
   );
 }
 
-/** Portada del curso: imagen subida o, si no hay, un degradado por categoría con la sigla. */
+/** Portada del curso: imagen subida o, si no hay, el degradado y el ícono de su categoría. */
 export function PortadaCurso({
   titulo,
   imagen,
   categoria,
   modalidad,
   sinCupo,
+  destacado,
   className,
 }: {
   titulo: string;
@@ -57,29 +91,44 @@ export function PortadaCurso({
   categoria?: { nombre: string; slug: string } | null;
   modalidad: Modalidad;
   sinCupo?: boolean;
+  destacado?: boolean;
   className?: string;
 }) {
-  const Icono = ICONO_MODALIDAD[modalidad];
+  const IconoModalidad = ICONO_MODALIDAD[modalidad];
   return (
-    <div className={cn("relative h-40 overflow-hidden bg-linear-to-br text-white", degradadoCategoria(categoria?.slug), className)}>
+    <div className={cn("relative h-42 overflow-hidden bg-linear-to-br text-white", degradadoCategoria(categoria?.slug), className)}>
       {imagen ? (
         // eslint-disable-next-line @next/next/no-img-element
-        <img src={imagen} alt="" className="absolute inset-0 size-full object-cover" />
+        <img
+          src={imagen}
+          alt=""
+          className="absolute inset-0 size-full object-cover transition-transform duration-700 ease-(--ease-salida) group-hover:scale-105"
+        />
       ) : (
         <>
-          <div className="fondo-puntos absolute inset-0 text-white/25" />
-          <div className="absolute -right-10 -bottom-16 size-48 rounded-full bg-white/15 blur-2xl" />
-          <span className="absolute bottom-3 left-4 font-mono text-4xl font-bold tracking-tight drop-shadow-sm">
-            {siglaCurso(titulo)}
-          </span>
+          <div className="fondo-puntos absolute inset-0 text-white/[0.08]" />
+          <div className="absolute -top-16 -right-10 size-48 rounded-full bg-white/10 blur-2xl transition-transform duration-700 group-hover:scale-125" />
+          <IconoCategoria
+            slug={categoria?.slug}
+            aria-label={titulo}
+            className="absolute bottom-5 left-5 size-10 text-brand-200 transition-transform duration-500 ease-(--ease-salida) group-hover:-translate-y-1 group-hover:-rotate-6 group-hover:scale-110"
+            strokeWidth={1.8}
+          />
         </>
       )}
-      <span className="absolute top-3 left-3 inline-flex items-center gap-1 rounded-full bg-white/90 px-2 py-0.5 text-xs font-medium text-zinc-800 shadow-sm backdrop-blur dark:bg-zinc-950/75 dark:text-zinc-100">
-        <Icono className="size-3" />
-        {ETIQUETA_MODALIDAD[modalidad]}
-      </span>
+      <div className="absolute inset-x-4 top-4 flex items-start justify-between gap-2">
+        {destacado ? (
+          <span className="rounded-full bg-rose-50 px-2.5 py-0.5 text-xs font-medium text-rose-700 shadow-sm">Destacado</span>
+        ) : (
+          <span />
+        )}
+        <span className="inline-flex items-center gap-1 rounded-full bg-white/15 px-2.5 py-0.5 text-xs font-medium text-white ring-1 ring-white/20 backdrop-blur">
+          <IconoModalidad className="size-3" />
+          {ETIQUETA_MODALIDAD[modalidad]}
+        </span>
+      </div>
       {sinCupo && (
-        <span className="absolute top-3 right-3 rounded-full bg-rose-600 px-2 py-0.5 text-xs font-semibold text-white shadow-sm">
+        <span className="absolute right-4 bottom-4 rounded-full bg-red-600 px-2.5 py-0.5 text-xs font-semibold text-white shadow-sm">
           Cupo lleno
         </span>
       )}

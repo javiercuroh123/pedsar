@@ -13,6 +13,7 @@ import { requireRol } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { ETIQUETA_MODALIDAD, formatearSoles, nombreCompleto } from "@/lib/formato";
 import { cn } from "@/lib/utils";
+import { Constants } from "@/types/database";
 
 export const metadata: Metadata = { title: "Cursos" };
 
@@ -28,7 +29,7 @@ export default async function AdminCursosPage({ searchParams }: PageProps<"/admi
   await requireRol("administrador");
   const { q, estado } = await searchParams;
   const texto = typeof q === "string" ? q.trim() : "";
-  const filtro = typeof estado === "string" ? estado : "";
+  const filtro = Constants.public.Enums.estado_curso.find((e) => e === estado) ?? "";
   const supabase = await createClient();
 
   let consulta = supabase
@@ -151,7 +152,7 @@ export default async function AdminCursosPage({ searchParams }: PageProps<"/admi
                           confirmar={`¿Eliminar "${c.titulo}"? Esta acción no se puede deshacer.`}
                           variant="ghost"
                           size="icon-sm"
-                          className="text-rose-600 dark:text-rose-400"
+                          className="text-red-600 dark:text-red-400"
                           aria-label="Eliminar"
                           title="Eliminar"
                         >

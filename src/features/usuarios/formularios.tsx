@@ -67,10 +67,10 @@ function Mensaje({ estado }: { estado: EstadoFormulario }) {
     <p
       role="status"
       className={cn(
-        "flex items-start gap-2 rounded-lg px-3 py-2 text-sm",
+        "animar-escala flex items-start gap-2 rounded-lg px-3 py-2.5 text-sm",
         estado.ok
-          ? "bg-emerald-50 text-emerald-800 dark:bg-emerald-500/10 dark:text-emerald-300"
-          : "bg-rose-50 text-rose-700 dark:bg-rose-500/10 dark:text-rose-300",
+          ? "bg-green-50 text-green-800 dark:bg-green-500/10 dark:text-green-300"
+          : "bg-red-50 text-red-700 dark:bg-red-500/10 dark:text-red-300",
       )}
     >
       {estado.ok ? <MailCheckIcon className="mt-0.5 size-4 shrink-0" /> : <CircleAlertIcon className="mt-0.5 size-4 shrink-0" />}
@@ -79,7 +79,7 @@ function Mensaje({ estado }: { estado: EstadoFormulario }) {
   );
 }
 
-const botonPrincipal = "h-10 w-full bg-linear-to-r from-brand-600 to-violet-600 text-sm shadow-md shadow-brand-600/25 hover:opacity-90";
+const botonPrincipal = "h-11 w-full text-[0.95rem]";
 
 export function LoginForm({ next }: { next?: string }) {
   const [estado, accion, pendiente] = useActionState(iniciarSesion, {});
@@ -120,7 +120,7 @@ function ReglasContrasena({ valor }: { valor: string }) {
       {REGLAS.map((r) => {
         const ok = r.ok(valor);
         return (
-          <li key={r.t} className={cn("flex items-center gap-1", ok ? "text-emerald-600 dark:text-emerald-400" : "text-muted-foreground")}>
+          <li key={r.t} className={cn("flex items-center gap-1", ok ? "text-green-600 dark:text-green-400" : "text-muted-foreground")}>
             {ok ? <CheckCircle2Icon className="size-3.5 shrink-0" /> : <CircleIcon className="size-3.5 shrink-0" />}
             {r.t}
           </li>
@@ -135,7 +135,7 @@ export function RegistroForm() {
   const [clave, setClave] = useState("");
   if (estado.ok) {
     return (
-      <div className="rounded-2xl bg-emerald-50 p-6 text-center text-emerald-800 dark:bg-emerald-500/10 dark:text-emerald-300" role="status">
+      <div className="rounded-2xl bg-green-50 p-6 text-center text-green-800 dark:bg-green-500/10 dark:text-green-300" role="status">
         <MailCheckIcon className="mx-auto size-10" />
         <p className="mt-3 font-semibold">¡Cuenta creada!</p>
         <p className="mt-1 text-sm">{estado.mensaje}</p>

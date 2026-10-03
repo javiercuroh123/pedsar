@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
-import { BadgeCheckIcon, ShieldCheckIcon, ShieldXIcon } from "lucide-react";
+import { BadgeCheckIcon, QrCodeIcon, SearchIcon, ShieldCheckIcon, ShieldXIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { esCertificadoDeAprobacion, formatearNota } from "@/config/academico";
 import { verificarCertificado } from "@/features/certificacion/consultas";
 import { VistaCertificado } from "@/features/certificacion/vista-certificado";
 import { formatearFecha } from "@/lib/formato";
@@ -15,40 +16,44 @@ export default async function VerificarPage({ searchParams }: PageProps<"/verifi
   const certificado = buscado ? await verificarCertificado(buscado) : null;
 
   return (
-    <div className="relative overflow-hidden">
-      <div className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[28rem] bg-linear-to-b from-brand-100/70 via-fuchsia-50/40 to-transparent dark:from-brand-900/40 dark:via-transparent" />
-      <div className="mx-auto max-w-4xl px-4 py-16 sm:px-6 lg:px-8">
-        <div className="text-center">
-          <span className="mx-auto grid size-14 place-items-center rounded-2xl bg-linear-to-br from-brand-500 to-violet-600 text-white shadow-lg shadow-brand-600/30">
+    <div>
+      <section className="fondo-marca relative overflow-hidden text-white">
+        <div className="fondo-puntos pointer-events-none absolute inset-0 text-white/[0.06]" />
+        <div className="relative mx-auto max-w-4xl px-4 pt-16 pb-24 text-center sm:px-6 lg:px-8">
+          <span className="animar-escala mx-auto grid size-14 place-items-center rounded-2xl bg-white/10 text-brand-300 ring-1 ring-white/15">
             <ShieldCheckIcon className="size-7" />
           </span>
-          <h1 className="mt-5 text-3xl font-extrabold tracking-tight sm:text-4xl">Verificación de certificados</h1>
-          <p className="mx-auto mt-3 max-w-lg text-muted-foreground">
+          <h1 className="animar-entrada mt-5 text-4xl font-bold tracking-tight [--i:1] sm:text-[2.5rem]">Verificar certificado</h1>
+          <p className="animar-entrada mx-auto mt-3 max-w-lg text-lg text-zinc-300 [--i:2]">
             Ingresa el código único impreso en el certificado para comprobar su autenticidad.
           </p>
+          <form className="animar-entrada mx-auto mt-8 flex max-w-xl flex-col gap-2 rounded-xl bg-card p-1.5 text-foreground shadow-2xl [--i:3] sm:flex-row">
+            <label className="relative flex-1">
+              <span className="sr-only">Código del certificado</span>
+              <QrCodeIcon className="pointer-events-none absolute top-1/2 left-3 size-5 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                name="codigo"
+                defaultValue={buscado ?? ""}
+                placeholder="PED-2026-XXXXXXXX"
+                required
+                className="h-11 border-0 bg-transparent pl-10 font-mono text-base tracking-wider uppercase shadow-none focus-visible:ring-0 dark:bg-transparent"
+              />
+            </label>
+            <Button type="submit" size="lg">
+              <SearchIcon />
+              Verificar
+            </Button>
+          </form>
+          <p className="animar-entrada mt-3 text-xs text-zinc-400 [--i:4]">El código está en la parte inferior del certificado, junto al QR.</p>
         </div>
+      </section>
 
-        <form className="mx-auto mt-8 flex max-w-xl flex-col gap-2 rounded-2xl border bg-card p-2 shadow-lg shadow-brand-900/5 sm:flex-row">
-          <label className="flex-1">
-            <span className="sr-only">Código del certificado</span>
-            <Input
-              name="codigo"
-              defaultValue={buscado ?? ""}
-              placeholder="PED-2026-XXXXXXXX"
-              required
-              className="h-11 border-0 bg-transparent text-center font-mono tracking-wider uppercase shadow-none focus-visible:ring-0 sm:text-left dark:bg-transparent"
-            />
-          </label>
-          <Button type="submit" className="h-11 px-6 text-base">
-            Verificar
-          </Button>
-        </form>
-
+      <div className="mx-auto max-w-4xl px-4 pb-16 sm:px-6 lg:px-8">
         {buscado && (
-          <div className="mt-10" aria-live="polite">
+          <div className="animar-escala relative -mt-12" aria-live="polite">
             {certificado ? (
-              <div className="overflow-hidden rounded-3xl border bg-card shadow-xl shadow-brand-900/5">
-                <div className="flex items-center gap-3 border-b border-emerald-200 bg-linear-to-r from-emerald-50 to-teal-50 px-6 py-4 text-emerald-800 dark:border-emerald-500/20 dark:from-emerald-500/10 dark:to-teal-500/5 dark:text-emerald-300">
+              <div className="overflow-hidden rounded-2xl border bg-card shadow-(--sombra-lg)">
+                <div className="flex items-center gap-3 border-b border-green-100 bg-green-50 px-6 py-4 text-green-700 dark:border-green-500/20 dark:bg-green-500/10 dark:text-green-300">
                   <BadgeCheckIcon className="size-7 shrink-0" />
                   <div>
                     <p className="font-bold">Certificado válido</p>
@@ -62,6 +67,9 @@ export default async function VerificarPage({ searchParams }: PageProps<"/verifi
                       ["Egresado(a)", certificado.estudiante],
                       ["Curso", certificado.curso],
                       ["Duración", `${certificado.duracion_horas} horas`],
+                      // Figura 15: la nota final se publica solo en los certificados de aprobación.
+                      ["Resultado", esCertificadoDeAprobacion(certificado.nota_final) ? `Aprobado · nota final ${formatearNota(certificado.nota_final!)}/20` : "Participación"],
+                      ...(certificado.instructor ? [["Instructor(a)", certificado.instructor]] : []),
                       ["Fecha de emisión", formatearFecha(certificado.fecha_emision)],
                     ].map(([k, v]) => (
                       <div key={k}>
@@ -77,7 +85,7 @@ export default async function VerificarPage({ searchParams }: PageProps<"/verifi
                 </div>
               </div>
             ) : (
-              <div className="mx-auto flex max-w-xl items-start gap-3 rounded-2xl border border-rose-200 bg-rose-50 p-5 text-rose-800 dark:border-rose-500/25 dark:bg-rose-500/10 dark:text-rose-300">
+              <div className="mx-auto flex max-w-xl items-start gap-3 rounded-2xl border border-red-100 bg-red-50 p-5 text-red-700 shadow-(--sombra-lg) dark:border-red-500/25 dark:bg-red-950 dark:text-red-300">
                 <ShieldXIcon className="size-6 shrink-0" />
                 <div>
                   <p className="font-semibold">No encontramos un certificado con el código {buscado}</p>

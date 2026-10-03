@@ -1,4 +1,5 @@
-import type { EstadoCurso, EstadoInscripcion, EstadoPago, MetodoPago, Modalidad, Nivel } from "@/types/dominio";
+import { reservaVencida } from "@/config/matricula";
+import type { EstadoCurso, EstadoInscripcion, EstadoPago, MedioPago, MetodoPago, Modalidad, Nivel } from "@/types/dominio";
 
 // Todas las fechas se muestran en hora de Perú, aunque el servidor corra en UTC.
 const ZONA = "America/Lima";
@@ -53,12 +54,40 @@ export const ETIQUETA_NIVEL: Record<Nivel, string> = {
 };
 
 export const ETIQUETA_METODO: Record<MetodoPago, string> = {
-  CULQI: "Tarjeta (Culqi)",
+  CULQI: "Pago en línea (Culqi)",
   IZIPAY: "Tarjeta (Izipay)",
   NIUBIZ: "Tarjeta (Niubiz)",
   YAPE: "Yape",
   PLIN: "Plin",
 };
+
+export const ETIQUETA_MEDIO: Record<MedioPago, string> = {
+  TARJETA: "Tarjeta",
+  YAPE: "Yape",
+  BILLETERA: "Billetera (Plin u otra)",
+  BANCA_MOVIL: "Banca móvil",
+  AGENTE: "Agente o bodega",
+};
+
+/** «Culqi · Tarjeta» para el pago en línea con su medio; el nombre del método en los demás casos. */
+export const etiquetaPago = (metodo: MetodoPago, medio: MedioPago | null | undefined) =>
+  metodo === "CULQI" && medio ? `Culqi · ${ETIQUETA_MEDIO[medio]}` : ETIQUETA_METODO[metodo];
+
+/** Situación de un pago directo (Yape / Plin) pendiente, vista por el estudiante. */
+export function situacionPagoPendiente(
+  pago: { metodo?: MetodoPago; reportado_en: string | null; observacion: string | null },
+  inscripcion: { estado: string; vence_en: string | null },
+) {
+  if (pago.reportado_en) return { texto: "pago en validación", accion: "Ver pago" };
+  if (reservaVencida(inscripcion)) return { texto: "tu reserva venció", accion: "Ver detalle" };
+  if (pago.metodo === "CULQI") {
+    return pago.observacion
+      ? { texto: "tu último intento de pago no se aprobó", accion: "Reintentar pago" }
+      : { texto: "falta pagar en línea", accion: "Pagar en línea" };
+  }
+  if (pago.observacion) return { texto: "revisa la observación de tu pago", accion: "Corregir pago" };
+  return { texto: "falta registrar tu pago", accion: "Registrar pago" };
+}
 
 export const ETIQUETA_ESTADO: Record<EstadoCurso | EstadoInscripcion | EstadoPago | string, string> = {
   PUBLICADO: "Publicado",
@@ -70,6 +99,7 @@ export const ETIQUETA_ESTADO: Record<EstadoCurso | EstadoInscripcion | EstadoPag
   APROBADO: "Aprobado",
   RECHAZADO: "Rechazado",
   REEMBOLSADO: "Reembolsado",
+  VENCIDO: "Vencido",
   SOLICITADO: "Solicitado",
   PROCESADO: "Procesado",
 };

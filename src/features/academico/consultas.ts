@@ -1,6 +1,6 @@
 import "server-only";
 import { createClient } from "@/lib/supabase/server";
-import type { EstadoInscripcion, EstadoPago, MetodoPago, Modalidad, TipoContenido } from "@/types/dominio";
+import type { EstadoInscripcion, EstadoPago, MedioPago, MetodoPago, Modalidad, TipoContenido } from "@/types/dominio";
 
 /** PostgREST devuelve objeto o arreglo según detecte la relación; esto lo normaliza. */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -11,6 +11,8 @@ export interface InscripcionEstudiante {
   codigo: string;
   estado: EstadoInscripcion;
   fecha_inscripcion: string;
+  /** Fin del plazo para registrar el pago (solo inscripciones pendientes). */
+  vence_en: string | null;
   curso: {
     id: string;
     slug: string;
@@ -23,11 +25,27 @@ export interface InscripcionEstudiante {
     id: string;
     monto: number;
     metodo: MetodoPago;
+    /** Medio del pago en línea (Culqi); null en el pago directo. */
+    medio: MedioPago | null;
     estado: EstadoPago;
     fecha_pago: string | null;
-    comprobante: { tipo: string; serie: string; numero: string; pdf_url: string | null } | null;
+    /** Pago manual (Yape / Plin): N.º de operación informado y observación del administrador. */
+    numero_operacion: string | null;
+    reportado_en: string | null;
+    observacion: string | null;
+    /** Comprobante interno CP01; el PDF se descarga en /comprobantes/{id}/pdf. */
+    comprobante: { id: number; tipo: string; serie: string; numero: string } | null;
   } | null;
-  certificado: { codigo_unico: string; fecha_emision: string } | null;
+  /** Datos congelados al emitir (null en los campos si el certificado es anterior a ese cambio). */
+  certificado: {
+    codigo_unico: string;
+    fecha_emision: string;
+    estudiante_nombre: string | null;
+    curso_titulo: string | null;
+    duracion_horas: number | null;
+    instructor_nombre: string | null;
+    nota_final: number | null;
+  } | null;
   progreso: { completadas: number; total: number; porcentaje: number };
 }
 
@@ -74,10 +92,10 @@ export async function listarMisInscripciones(estudianteId: string): Promise<Insc
   const { data, error } = await supabase
     .from("inscripciones")
     .select(
-      `id, codigo, estado, fecha_inscripcion,
+      `id, codigo, estado, fecha_inscripcion, vence_en,
        curso:cursos(id, slug, titulo, modalidad, duracion_horas, categoria:categorias(nombre, slug)),
-       pagos(id, monto, metodo, estado, fecha_pago, comprobantes(tipo, serie, numero, pdf_url)),
-       certificados(codigo_unico, fecha_emision)`,
+       pagos(id, monto, metodo, medio, estado, fecha_pago, numero_operacion, reportado_en, observacion, comprobantes(id, tipo, serie, numero)),
+       certificados(codigo_unico, fecha_emision, estudiante_nombre, curso_titulo, duracion_horas, instructor_nombre, nota_final)`,
     )
     .eq("estudiante_id", estudianteId)
     .order("fecha_inscripcion", { ascending: false });
@@ -97,14 +115,19 @@ export async function listarMisInscripciones(estudianteId: string): Promise<Insc
       codigo: f.codigo,
       estado: f.estado,
       fecha_inscripcion: f.fecha_inscripcion,
+      vence_en: f.vence_en,
       curso: { ...curso, categoria: uno(curso.categoria) },
       pago: pago
         ? {
             id: pago.id as string,
             monto: Number(pago.monto),
             metodo: pago.metodo as MetodoPago,
+            medio: (pago.medio as MedioPago | null) ?? null,
             estado: pago.estado as EstadoPago,
             fecha_pago: pago.fecha_pago as string | null,
+            numero_operacion: pago.numero_operacion as string | null,
+            reportado_en: pago.reportado_en as string | null,
+            observacion: pago.observacion as string | null,
             comprobante: uno(pago.comprobantes),
           }
         : null,

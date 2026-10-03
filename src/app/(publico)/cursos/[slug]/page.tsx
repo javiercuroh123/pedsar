@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import {
+  ArrowRightIcon,
   AwardIcon,
   CalendarDaysIcon,
   CheckCircle2Icon,
@@ -9,14 +10,18 @@ import {
   ClockIcon,
   FolderDownIcon,
   LayersIcon,
+  MessageSquareQuoteIcon,
   ReceiptIcon,
+  StarIcon,
   UsersIcon,
 } from "lucide-react";
 import { AvatarIniciales, EstadoVacio, tabla } from "@/components/comunes";
 import { buttonVariants } from "@/components/ui/button";
+import { reservaVencida } from "@/config/matricula";
 import { obtenerCursoPorSlug } from "@/features/catalogo/consultas";
 import { IndicadorCupo } from "@/features/catalogo/curso-card";
-import { degradadoCategoria, ICONO_MODALIDAD, PortadaCurso } from "@/features/catalogo/portada-curso";
+import { ICONO_MODALIDAD, PortadaCurso } from "@/features/catalogo/portada-curso";
+import { Estrellas, formatearPromedio } from "@/features/comunidad/estrellas";
 import { getUsuarioActual } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import {
@@ -43,18 +48,18 @@ export default async function CursoPage({ params }: PageProps<"/cursos/[slug]">)
   const [curso, usuario] = await Promise.all([obtenerCursoPorSlug(slug), getUsuarioActual()]);
   if (!curso) notFound();
 
-  // ¿El estudiante ya está inscrito? Así no se le ofrece inscribirse otra vez.
+  // ¿El estudiante ya está inscrito? Así no se le ofrece inscribirse otra vez (una reserva vencida no cuenta).
   let inscripcion: { estado: string } | null = null;
   if (usuario?.rol === "estudiante") {
     const supabase = await createClient();
     const { data } = await supabase
       .from("inscripciones")
-      .select("estado")
+      .select("estado, vence_en")
       .eq("curso_id", curso.id)
       .eq("estudiante_id", usuario.id)
       .neq("estado", "CANCELADA")
       .maybeSingle();
-    inscripcion = data;
+    inscripcion = data && !reservaVencida(data) ? data : null;
   }
 
   const sinCupo = curso.cupo_disponible <= 0;
@@ -66,11 +71,10 @@ export default async function CursoPage({ params }: PageProps<"/cursos/[slug]">)
 
   return (
     <>
-      <section className={cn("relative overflow-hidden bg-linear-to-br text-white", degradadoCategoria(curso.categoria?.slug))}>
-        <div className="fondo-puntos pointer-events-none absolute inset-0 text-white/15" />
-        <div className="pointer-events-none absolute inset-0 bg-linear-to-t from-black/30 to-transparent" />
+      <section className="fondo-marca relative overflow-hidden text-white">
+        <div className="fondo-puntos pointer-events-none absolute inset-0 text-white/[0.06]" />
         <div className="relative mx-auto max-w-7xl px-4 pt-8 pb-12 sm:px-6 lg:px-8 lg:pb-16">
-          <nav className="flex items-center gap-1.5 text-sm text-white/80" aria-label="Ruta">
+          <nav className="animar-entrada flex items-center gap-1.5 text-sm text-zinc-400" aria-label="Ruta">
             <Link href="/cursos" className="hover:text-white">
               Catálogo
             </Link>
@@ -84,16 +88,17 @@ export default async function CursoPage({ params }: PageProps<"/cursos/[slug]">)
             )}
           </nav>
           <div className="max-w-3xl lg:max-w-[calc(100%-400px)]">
-            <div className="mt-6 flex flex-wrap gap-2 text-xs font-semibold">
-              <span className="rounded-full bg-white/20 px-2.5 py-1 backdrop-blur">{ETIQUETA_NIVEL[curso.nivel]}</span>
-              <span className="inline-flex items-center gap-1 rounded-full bg-white/20 px-2.5 py-1 backdrop-blur">
+            <div className="animar-entrada mt-6 flex flex-wrap gap-2 text-xs font-medium [--i:1]">
+              {curso.destacado && <span className="rounded-full bg-rose-50 px-2.5 py-1 text-rose-700">Destacado</span>}
+              <span className="rounded-full bg-brand-50 px-2.5 py-1 text-brand-800">{ETIQUETA_NIVEL[curso.nivel]}</span>
+              <span className="inline-flex items-center gap-1 rounded-full bg-violet-50 px-2.5 py-1 text-violet-700">
                 <IconoModalidad className="size-3" />
                 {ETIQUETA_MODALIDAD[curso.modalidad]}
               </span>
             </div>
-            <h1 className="mt-4 text-3xl font-extrabold tracking-tight sm:text-4xl lg:text-5xl">{curso.titulo}</h1>
-            {curso.descripcion && <p className="mt-4 text-lg text-white/85">{curso.descripcion}</p>}
-            <div className="mt-6 flex flex-wrap gap-x-6 gap-y-2 text-sm text-white/90">
+            <h1 className="animar-entrada mt-4 text-3xl font-bold tracking-tight [--i:2] sm:text-4xl lg:text-[2.75rem] lg:leading-[1.15]">{curso.titulo}</h1>
+            {curso.descripcion && <p className="animar-entrada mt-4 text-lg text-zinc-300 [--i:3]">{curso.descripcion}</p>}
+            <div className="animar-entrada mt-6 flex flex-wrap gap-x-6 gap-y-2 text-sm text-zinc-300 [--i:4]">
               <span className="flex items-center gap-1.5">
                 <ClockIcon className="size-4" />
                 {curso.duracion_horas} horas académicas
@@ -106,6 +111,13 @@ export default async function CursoPage({ params }: PageProps<"/cursos/[slug]">)
                 <UsersIcon className="size-4" />
                 {curso.cupo_maximo - Math.max(curso.cupo_disponible, 0)} inscritos
               </span>
+              {curso.calificacion && (
+                <a href="#resenas" className="flex items-center gap-1.5 hover:text-white">
+                  <StarIcon className="size-4 fill-amber-400 text-amber-400" />
+                  <span className="font-semibold text-white">{formatearPromedio(curso.calificacion.promedio)}</span>
+                  ({curso.calificacion.cantidad} {curso.calificacion.cantidad === 1 ? "reseña" : "reseñas"})
+                </a>
+              )}
               {inicio && (
                 <span className="flex items-center gap-1.5">
                   <CalendarDaysIcon className="size-4" />
@@ -184,13 +196,56 @@ export default async function CursoPage({ params }: PageProps<"/cursos/[slug]">)
               </div>
             </section>
           )}
+
+          {/* HU-24 · Reseñas de quienes completaron el curso (las ocultas por moderación no se publican) */}
+          <section id="resenas" className="scroll-mt-24">
+            <div className="flex flex-wrap items-end justify-between gap-3">
+              <h2 className="text-xl font-bold tracking-tight">Reseñas</h2>
+              {curso.calificacion && (
+                <p className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <span className="text-2xl font-bold text-foreground tabular-nums">{formatearPromedio(curso.calificacion.promedio)}</span>
+                  <Estrellas valor={curso.calificacion.promedio} className="text-base" />
+                  {curso.calificacion.cantidad} {curso.calificacion.cantidad === 1 ? "reseña" : "reseñas"}
+                </p>
+              )}
+            </div>
+            {curso.resenas.length ? (
+              <ul className="mt-4 grid gap-4 sm:grid-cols-2">
+                {curso.resenas.map((r, i) => (
+                  <li key={i} className="rounded-2xl border bg-card p-5">
+                    <div className="flex items-center gap-3">
+                      <AvatarIniciales nombre={r.autor} className="size-9 text-xs" />
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-semibold">{r.autor}</p>
+                        <p className="text-xs text-muted-foreground">{formatearFecha(r.fecha)}</p>
+                      </div>
+                      <Estrellas valor={r.estrellas} className="text-sm" />
+                    </div>
+                    {r.texto && <p className="mt-3 text-sm leading-relaxed break-words whitespace-pre-line text-muted-foreground">{r.texto}</p>}
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <div className="mt-4 flex items-center gap-3 rounded-2xl border border-dashed p-5 text-sm text-muted-foreground">
+                <MessageSquareQuoteIcon className="size-5 shrink-0" />
+                Aún no tiene reseñas. Quienes completen el curso podrán calificarlo.
+              </div>
+            )}
+          </section>
         </div>
 
-        <aside className="lg:sticky lg:top-24 lg:-mt-40 lg:self-start">
-          <div className="overflow-hidden rounded-3xl border bg-card shadow-xl shadow-brand-900/10">
-            <PortadaCurso titulo={curso.titulo} imagen={curso.imagen_url} categoria={curso.categoria} modalidad={curso.modalidad} sinCupo={sinCupo} />
+        <aside className="animar-escala lg:sticky lg:top-24 lg:-mt-40 lg:self-start [--i:3]">
+          <div className="overflow-hidden rounded-2xl border bg-card shadow-(--sombra-lg)">
+            <PortadaCurso
+              titulo={curso.titulo}
+              imagen={curso.imagen_url}
+              categoria={curso.categoria}
+              modalidad={curso.modalidad}
+              sinCupo={sinCupo}
+              destacado={curso.destacado}
+            />
             <div className="p-6">
-              <p className="text-3xl font-extrabold tabular-nums">{formatearSoles(curso.precio)}</p>
+              <p className="text-[2.5rem] leading-none font-bold tracking-tight tabular-nums">{formatearSoles(curso.precio)}</p>
               <p className="text-xs text-muted-foreground">Pago único · incluye certificado</p>
               <div className="mt-4">
                 <IndicadorCupo disponible={curso.cupo_disponible} maximo={curso.cupo_maximo} />
@@ -205,11 +260,10 @@ export default async function CursoPage({ params }: PageProps<"/cursos/[slug]">)
               ) : (
                 <Link
                   href={`/cursos/${curso.slug}/inscripcion`}
-                  className={buttonVariants({
-                    className: "mt-5 h-11 w-full bg-linear-to-r from-brand-600 to-violet-600 text-base shadow-lg shadow-brand-600/25 hover:opacity-90",
-                  })}
+                  className={buttonVariants({ size: "lg", className: "group mt-5 w-full" })}
                 >
                   Inscribirme ahora
+                  <ArrowRightIcon className="transition-transform group-hover:translate-x-1" />
                 </Link>
               )}
               <dl className="mt-6 space-y-3 border-t pt-5 text-sm">
@@ -228,15 +282,15 @@ export default async function CursoPage({ params }: PageProps<"/cursos/[slug]">)
               </dl>
               <ul className="mt-5 space-y-2 rounded-xl bg-muted/60 p-4 text-sm">
                 <li className="flex items-center gap-2">
-                  <AwardIcon className="size-4 text-orange-500" />
+                  <AwardIcon className="size-4 text-rose-500" />
                   Certificado digital verificable
                 </li>
                 <li className="flex items-center gap-2">
-                  <FolderDownIcon className="size-4 text-teal-500" />
+                  <FolderDownIcon className="size-4 text-violet-600 dark:text-violet-400" />
                   Materiales descargables
                 </li>
                 <li className="flex items-center gap-2">
-                  <ReceiptIcon className="size-4 text-brand-500" />
+                  <ReceiptIcon className="size-4 text-brand-600 dark:text-brand-400" />
                   Boleta o factura electrónica
                 </li>
               </ul>

@@ -1,26 +1,86 @@
-import type { MetodoPago } from "@/types/dominio";
+import type { Json } from "@/types/database";
+import type { MedioPago } from "@/types/dominio";
+
+export interface ClientePasarela {
+  nombres: string;
+  apellidos: string;
+  correo: string;
+  telefono: string | null;
+}
+
+/** Orden para pagar con billetera, banca móvil o agente; vence junto con la reserva. */
+export interface SolicitudOrden {
+  pagoId: string;
+  montoSoles: number;
+  descripcion: string;
+  /** Único por orden (Culqi no acepta repetidos). */
+  numeroOrden: string;
+  cliente: ClientePasarela;
+  venceEn: Date;
+}
+
+/** Parámetros que devuelve la verificación 3DS del banco (Culqi3DS). */
+export interface Autenticacion3DS {
+  eci: string;
+  xid: string;
+  cavv: string;
+  protocolVersion: string;
+  directoryServerTransactionId: string;
+}
 
 export interface SolicitudCobro {
   pagoId: string;
   montoSoles: number;
   descripcion: string;
   correo: string;
-  metodo: MetodoPago;
-  /** Token generado en el navegador por el checkout de la pasarela. */
-  tokenCliente?: string;
+  /** Token generado en el navegador por el checkout (tarjeta o Yape). */
+  token: string;
+  huellaDispositivo?: string;
+  autenticacion3DS?: Autenticacion3DS;
 }
 
 export interface ResultadoCobro {
+  estado: "APROBADO" | "RECHAZADO" | "REQUIERE_3DS";
+  referencia: string | null;
+  medio: MedioPago | null;
+  mensaje: string;
+  respuesta: Json;
+}
+
+/** Lo único que se toma de un webhook: qué consultar. El estado se pregunta a la API. */
+export interface AvisoPasarela {
+  tipo: "orden" | "cargo";
+  id: string;
+}
+
+export interface ConsultaPasarela {
+  estado: "PAGADO" | "PENDIENTE" | "RECHAZADO" | "EXPIRADO";
+  pagoId: string | null;
+  montoCentimos: number;
+  medio: MedioPago | null;
+  referencia: string;
+  respuesta: Json;
+}
+
+export interface ResultadoReembolso {
   aprobado: boolean;
   referencia: string | null;
   mensaje: string;
-  respuesta: unknown;
+  respuesta: Json;
 }
 
-export interface EventoWebhook {
-  referencia: string;
-  estado: "APROBADO" | "RECHAZADO" | "REEMBOLSADO";
-  respuesta: unknown;
+/**
+ * La pasarela no respondió (red, límite de tiempo o error 5xx: se puede reintentar) o
+ * rechazó la solicitud (`status` 4xx, con la respuesta en `detalle` para el registro).
+ */
+export class ErrorPasarela extends Error {
+  constructor(
+    public detalle?: unknown,
+    public status?: number,
+  ) {
+    super("No pudimos conectar con la pasarela de pagos");
+    this.name = "ErrorPasarela";
+  }
 }
 
 /**
@@ -29,8 +89,9 @@ export interface EventoWebhook {
  */
 export interface PasarelaPago {
   nombre: "culqi" | "izipay" | "niubiz";
+  crearOrden(solicitud: SolicitudOrden): Promise<{ id: string }>;
   cobrar(solicitud: SolicitudCobro): Promise<ResultadoCobro>;
-  reembolsar(referencia: string, montoSoles: number, motivo: string): Promise<ResultadoCobro>;
-  /** Valida la firma del webhook y lo traduce a un evento del dominio. */
-  procesarWebhook(cuerpo: string, headers: Headers): Promise<EventoWebhook | null>;
+  consultar(aviso: AvisoPasarela): Promise<ConsultaPasarela>;
+  reembolsar(referencia: string, montoSoles: number, motivo: string): Promise<ResultadoReembolso>;
+  leerWebhook(cuerpo: string): AvisoPasarela | null;
 }
