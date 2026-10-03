@@ -8,4 +8,12 @@ export const EMPRESA = {
   whatsapp: "51956000000",
   correo: "informes@pedsar.pe",
   horario: "Lunes a viernes de 9:00 a 18:00 · Sábados de 9:00 a 13:00",
+  /**
+   * Cobro directo por Yape / Plin mientras se activa la pasarela (Tabla 12 del proyecto).
+   * TODO: reemplazar por el celular y el titular reales de la cuenta Yape / Plin de la empresa.
+   */
+  pagoDirecto: {
+    celular: "956 000 000",
+    titular: "PEDSAR E.I.R.L.",
+  },
 };

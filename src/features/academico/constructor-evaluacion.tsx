@@ -83,7 +83,7 @@ export function ConstructorEvaluacion({ cursos, cursoId }: { cursos: { id: strin
         {preguntas.map((p, i) => (
           <div key={p.clave} className="rounded-2xl border bg-card p-5 shadow-xs">
             <div className="flex items-center gap-3">
-              <span className="grid size-7 place-items-center rounded-lg bg-linear-to-br from-orange-400 to-rose-500 font-mono text-xs font-bold text-white">{i + 1}</span>
+              <span className="grid size-7 place-items-center rounded-lg bg-brand-50 font-mono text-xs font-semibold text-brand-800 dark:bg-brand-500/15 dark:text-brand-200">{i + 1}</span>
               <p className="flex-1 text-sm font-semibold">Pregunta {i + 1}</p>
               <label className="flex items-center gap-2 text-xs text-muted-foreground">
                 Puntos
@@ -92,7 +92,7 @@ export function ConstructorEvaluacion({ cursos, cursoId }: { cursos: { id: strin
               <Button
                 variant="ghost"
                 size="icon-sm"
-                className="text-rose-600 dark:text-rose-400"
+                className="text-red-600 dark:text-red-400"
                 aria-label={`Eliminar pregunta ${i + 1}`}
                 disabled={preguntas.length === 1}
                 onClick={() => setPreguntas((ps) => ps.filter((x) => x.clave !== p.clave))}
@@ -110,7 +110,7 @@ export function ConstructorEvaluacion({ cursos, cursoId }: { cursos: { id: strin
             />
             <div className="mt-3 space-y-2" role="radiogroup" aria-label="Respuesta correcta">
               {p.opciones.map((o, k) => (
-                <label key={k} className={cn("flex items-center gap-3 rounded-lg p-1 pr-0", p.correcta === k && "bg-emerald-50 dark:bg-emerald-500/10")}>
+                <label key={k} className={cn("flex items-center gap-3 rounded-lg p-1 pr-0", p.correcta === k && "bg-green-50 dark:bg-green-500/10")}>
                   <input
                     type="radio"
                     name={`correcta-${p.clave}`}

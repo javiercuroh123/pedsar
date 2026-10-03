@@ -81,7 +81,7 @@ export default async function InstructorEvaluacionesPage({ searchParams }: PageP
                       confirmar={`¿Eliminar "${e.titulo}"? Se borrarán también los intentos de los estudiantes.`}
                       variant="ghost"
                       size="icon-sm"
-                      className="text-rose-600 dark:text-rose-400"
+                      className="text-red-600 dark:text-red-400"
                       aria-label="Eliminar evaluación"
                     >
                       <Trash2Icon />

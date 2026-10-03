@@ -5,9 +5,19 @@ import { z } from "zod";
 import { registrarActividad } from "@/lib/auditoria";
 import { requireRol } from "@/lib/auth";
 import { generarCodigoCertificado } from "@/lib/certificados";
+import { programarCorreo } from "@/lib/email";
+import { correoCertificadoEmitido, correoPagoObservado, correoPagoRechazado } from "@/lib/email/plantillas";
+import { formatearFechaHora, nombreCompleto } from "@/lib/formato";
+import { evaluarAptitud } from "@/config/academico";
+import { PLAZO_PAGO_HORAS } from "@/config/matricula";
+import { obtenerResultados } from "@/features/certificacion/consultas";
 import { publicEnv } from "@/lib/env";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
+import { uno } from "@/features/academico/consultas";
+import { conciliarPago, confirmarPago, type ResultadoConciliacion } from "@/features/matricula/confirmar-pago";
+import { notificarAdministradores, notificarUsuario as notificar } from "@/features/notificaciones/enviar";
+import { getPasarela } from "@/lib/pagos";
 import type { EstadoFormulario } from "@/features/usuarios/esquemas";
 
 /**
@@ -17,10 +27,6 @@ import type { EstadoFormulario } from "@/features/usuarios/esquemas";
 const admin = () => requireRol("administrador");
 const fallo = (e: z.ZodError): EstadoFormulario => ({ ok: false, mensaje: e.issues[0]?.message ?? "Datos no válidos" });
 const vacioANull = (v: unknown) => (v === "" ? null : v);
-
-async function notificar(usuarioId: string, mensaje: string, enlace?: string) {
-  await createAdminClient().from("notificaciones").insert({ usuario_id: usuarioId, mensaje, enlace: enlace ?? null, tipo: "IN_APP" });
-}
 
 const slugDe = (texto: string) =>
   texto
@@ -105,10 +111,14 @@ export async function duplicarCurso(formData: FormData) {
   const usuario = await admin();
   const id = z.uuid().parse(formData.get("id"));
   const supabase = await createClient();
-  const { data: original } = await supabase.from("cursos").select("*, modulos(titulo, orden)").eq("id", id).single();
+  // Se copian solo los datos del curso: la copia nace en borrador, sin publicación programada.
+  const { data: original } = await supabase
+    .from("cursos")
+    .select("titulo, descripcion, imagen_url, nivel, modalidad, precio, cupo_maximo, duracion_horas, categoria_id, instructor_id, modulos(titulo, orden)")
+    .eq("id", id)
+    .single();
   if (!original) return;
   const { modulos, ...resto } = original;
-  for (const campo of ["id", "slug", "creado_en", "actualizado_en"]) delete resto[campo];
   const titulo = `${original.titulo} (copia)`;
   const { data: copia } = await supabase
     .from("cursos")
@@ -116,7 +126,7 @@ export async function duplicarCurso(formData: FormData) {
     .select("id")
     .single();
   if (copia && modulos?.length) {
-    await supabase.from("modulos").insert(modulos.map((m: { titulo: string; orden: number }) => ({ ...m, curso_id: copia.id })));
+    await supabase.from("modulos").insert(modulos.map((m) => ({ ...m, curso_id: copia.id })));
   }
   await registrarActividad(usuario.id, "DUPLICAR_CURSO", { original: id, copia: copia?.id });
   revalidatePath("/admin/cursos");
@@ -173,46 +183,220 @@ export async function resolverPago(formData: FormData) {
   const aprobar = formData.get("decision") === "aprobar";
   const db = createAdminClient();
 
-  const { data: ins } = await db.from("inscripciones").select("id, codigo, estudiante_id, curso:cursos(titulo)").eq("id", inscripcionId).single();
-  if (!ins) return;
-  await db
-    .from("pagos")
-    .update({ estado: aprobar ? "APROBADO" : "RECHAZADO", fecha_pago: aprobar ? new Date().toISOString() : null })
-    .eq("inscripcion_id", inscripcionId);
-  await db.from("inscripciones").update({ estado: aprobar ? "CONFIRMADA" : "CANCELADA" }).eq("id", inscripcionId);
+  const { data: ins } = await db
+    .from("inscripciones")
+    .select("id, codigo, estado, estudiante_id, estudiante:perfiles(nombres, correo), curso:cursos(titulo, slug), pagos(id)")
+    .eq("id", inscripcionId)
+    .single();
+  // Solo se resuelve una vez (evita confirmar dos veces y duplicar correos).
+  if (!ins || ins.estado !== "PENDIENTE") return;
+  const pago = uno<{ id: string }>(ins.pagos);
 
-  const curso = (Array.isArray(ins.curso) ? ins.curso[0] : ins.curso) as { titulo: string } | null;
-  await notificar(
-    ins.estudiante_id,
-    aprobar
-      ? `¡Tu inscripción en ${curso?.titulo ?? "el curso"} fue confirmada! Ya puedes ingresar al aula virtual.`
-      : `No pudimos validar el pago de tu inscripción ${ins.codigo}. Comunícate con nosotros.`,
-    aprobar ? "/estudiante/cursos" : "/estudiante/pagos",
-  );
-  await registrarActividad(usuario.id, aprobar ? "CONFIRMAR_PAGO" : "RECHAZAR_PAGO", { inscripcion: ins.codigo });
-  // TODO: emitir comprobante electrónico (SUNAT) al aprobar.
+  if (aprobar) {
+    // Mismo camino que el pago en línea: confirma, emite el comprobante y avisa.
+    if (pago) await confirmarPago(pago.id, { actor: usuario.id });
+    revalidatePath("/admin", "layout");
+    return;
+  }
+
+  await db.from("pagos").update({ estado: "RECHAZADO", fecha_pago: null }).eq("inscripcion_id", inscripcionId);
+  await db.from("inscripciones").update({ estado: "CANCELADA" }).eq("id", inscripcionId);
+
+  const curso = uno<{ titulo: string; slug: string }>(ins.curso);
+  const estudiante = uno<{ nombres: string; correo: string }>(ins.estudiante);
+  await notificar(ins.estudiante_id, `No pudimos validar el pago de tu inscripción ${ins.codigo}. Si aún hay cupos, puedes volver a inscribirte.`, "/estudiante/pagos");
+  if (estudiante?.correo && curso) {
+    programarCorreo({
+      para: estudiante.correo,
+      ...correoPagoRechazado({
+        nombre: estudiante.nombres || "estudiante",
+        curso: curso.titulo,
+        codigo: ins.codigo,
+        url: `${publicEnv.NEXT_PUBLIC_SITE_URL}/cursos/${curso.slug}`,
+      }),
+    });
+  }
+  await registrarActividad(usuario.id, "RECHAZAR_PAGO", { inscripcion: ins.codigo });
   revalidatePath("/admin", "layout");
 }
 
-export async function resolverReembolso(formData: FormData) {
+const observacionSchema = z.object({
+  inscripcionId: z.uuid(),
+  motivo: z.string().trim().min(5, "Indica qué debe corregir el estudiante").max(300),
+});
+
+/**
+ * Validar comprobantes · devuelve un pago manual al estudiante para que corrija
+ * el N.º de operación o la captura, sin cancelar su inscripción (que bloquearía
+ * una nueva matrícula en el mismo curso).
+ */
+export async function observarPago(_: EstadoFormulario, formData: FormData): Promise<EstadoFormulario> {
+  const usuario = await admin();
+  const d = observacionSchema.safeParse(Object.fromEntries(formData));
+  if (!d.success) return fallo(d.error);
+  const db = createAdminClient();
+
+  const { data: ins } = await db
+    .from("inscripciones")
+    .select("id, codigo, estado, estudiante_id, estudiante:perfiles(nombres, correo), curso:cursos(titulo), pagos(id, estado, numero_operacion)")
+    .eq("id", d.data.inscripcionId)
+    .single();
+  const pago = uno<{ id: string; estado: string; numero_operacion: string | null }>(ins?.pagos);
+  if (!ins || !pago || ins.estado !== "PENDIENTE" || pago.estado !== "PENDIENTE") return { ok: false, mensaje: "El pago ya no está pendiente" };
+
+  const { error } = await db
+    .from("pagos")
+    .update({ observacion: d.data.motivo, numero_operacion: null, voucher_ruta: null, reportado_en: null })
+    .eq("id", pago.id);
+  if (error) return { ok: false, mensaje: error.message };
+  // El estudiante tiene de nuevo el plazo completo para corregir el pago.
+  const venceEn = new Date(Date.now() + PLAZO_PAGO_HORAS * 3600 * 1000);
+  await db.from("inscripciones").update({ vence_en: venceEn.toISOString() }).eq("id", ins.id);
+
+  const curso = uno<{ titulo: string }>(ins.curso);
+  await notificar(
+    ins.estudiante_id,
+    `Revisamos tu pago de ${curso?.titulo ?? "tu curso"}: ${d.data.motivo}. Corrígelo en «Pagos» antes del ${formatearFechaHora(venceEn)}.`,
+    "/estudiante/pagos",
+  );
+  const estudiante = uno<{ nombres: string; correo: string }>(ins.estudiante);
+  if (estudiante?.correo) {
+    programarCorreo({
+      para: estudiante.correo,
+      ...correoPagoObservado({
+        nombre: estudiante.nombres || "estudiante",
+        curso: curso?.titulo ?? "tu curso",
+        motivo: d.data.motivo,
+        venceEn: formatearFechaHora(venceEn),
+        url: `${publicEnv.NEXT_PUBLIC_SITE_URL}/estudiante/pagos`,
+      }),
+    });
+  }
+  await registrarActividad(usuario.id, "OBSERVAR_PAGO", { inscripcion: ins.codigo, numero_operacion: pago.numero_operacion, motivo: d.data.motivo });
+  revalidatePath("/admin", "layout");
+  return { ok: true, mensaje: "Pago devuelto al estudiante para corrección" };
+}
+
+type EstadoReembolso = "SOLICITADO" | "APROBADO" | "RECHAZADO" | "PROCESADO";
+
+type PagoReembolsable = {
+  id: string;
+  inscripcion_id: string;
+  metodo: string;
+  monto: number;
+  estado: string;
+  referencia_pasarela: string | null;
+  inscripcion: unknown;
+};
+
+/**
+ * HU-50 · Reembolsos. «aprobar» o «rechazar» una solicitud (una sola vez: la fila se
+ * toma con una actualización condicionada). Los cargos de Culqi (tarjeta o Yape) se
+ * devuelven en la pasarela por lo que se pagó; si Culqi falla, el reembolso queda
+ * APROBADO y el administrador puede «reintentar» o marcarlo como devuelto a «manual».
+ * Los pagos directos (y las órdenes de billetera) se devuelven a mano.
+ */
+export async function resolverReembolso(formData: FormData): Promise<EstadoFormulario> {
   const usuario = await admin();
   const id = z.coerce.number().int().parse(formData.get("id"));
-  const aprobar = formData.get("decision") === "aprobar";
+  const decision = z.enum(["aprobar", "rechazar", "reintentar", "manual"]).parse(formData.get("decision"));
   const db = createAdminClient();
-  const { data: r } = await db.from("reembolsos").select("id, pago:pagos(id, inscripcion_id, inscripcion:inscripciones(estudiante_id))").eq("id", id).single();
-  if (!r) return;
-  await db.from("reembolsos").update({ estado: aprobar ? "APROBADO" : "RECHAZADO" }).eq("id", id);
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const pago = (Array.isArray(r.pago) ? r.pago[0] : r.pago) as any;
-  if (aprobar && pago) {
-    // TODO: ejecutar getPasarela().reembolsar(...) y marcar el reembolso como PROCESADO.
+  const { data: r } = await db
+    .from("reembolsos")
+    .select("id, estado, motivo, monto, pago:pagos(id, inscripcion_id, metodo, monto, estado, referencia_pasarela, inscripcion:inscripciones(estudiante_id))")
+    .eq("id", id)
+    .maybeSingle();
+  const pago = uno<PagoReembolsable>(r?.pago);
+  if (!r || !pago) return { ok: false, mensaje: "No encontramos la solicitud" };
+  const yaAtendida = { ok: false, mensaje: "Esta solicitud ya fue atendida" };
+  const estudiante = uno<{ estudiante_id: string }>(pago.inscripcion)?.estudiante_id;
+
+  // Toma la solicitud: si otro administrador (o un doble clic) ya la resolvió, no hace nada.
+  const tomar = async (desde: EstadoReembolso, a: EstadoReembolso) => {
+    const { data } = await db.from("reembolsos").update({ estado: a }).eq("id", id).eq("estado", desde).select("id").maybeSingle();
+    return Boolean(data);
+  };
+  const cerrar = async (estadoFinal: "APROBADO" | "PROCESADO") => {
+    if (estadoFinal === "PROCESADO") await db.from("reembolsos").update({ estado: "PROCESADO" }).eq("id", id);
     await db.from("pagos").update({ estado: "REEMBOLSADO" }).eq("id", pago.id);
     await db.from("inscripciones").update({ estado: "CANCELADA" }).eq("id", pago.inscripcion_id);
+    revalidatePath("/admin", "layout");
+  };
+  const enPasarela = pago.metodo === "CULQI" && Boolean(pago.referencia_pasarela?.startsWith("chr_"));
+  /** Devuelve en Culqi; null si salió bien o el motivo del fallo. */
+  const devolverEnCulqi = () =>
+    getPasarela("culqi")
+      .reembolsar(pago.referencia_pasarela!, Number(pago.monto), r.motivo)
+      .then((res) => (res.aprobado ? null : res.mensaje))
+      .catch((e: Error) => e.message);
+  const fallo = async (motivo: string) => {
+    await notificarAdministradores(`El reembolso ${id} no se pudo procesar en Culqi: ${motivo}. Reintenta o devuélvelo en CulqiPanel.`, "/admin/inscripciones?tab=reembolsos");
+    await registrarActividad(usuario.id, "REEMBOLSO_FALLIDO", { reembolso: id, motivo });
+    revalidatePath("/admin", "layout");
+    return { ok: false, mensaje: `Culqi no procesó el reembolso: ${motivo}. Puedes reintentar o marcarlo como devuelto a mano.` };
+  };
+
+  if (decision === "rechazar") {
+    if (!(await tomar("SOLICITADO", "RECHAZADO"))) return yaAtendida;
+    if (estudiante) await notificar(estudiante, "Tu solicitud de reembolso fue rechazada.", "/estudiante/pagos");
+    await registrarActividad(usuario.id, "RECHAZAR_REEMBOLSO", { reembolso: id });
+    revalidatePath("/admin", "layout");
+    return { ok: true, mensaje: "Solicitud rechazada" };
   }
-  const estudiante = (Array.isArray(pago?.inscripcion) ? pago.inscripcion[0] : pago?.inscripcion)?.estudiante_id;
-  if (estudiante) await notificar(estudiante, aprobar ? "Tu solicitud de reembolso fue aprobada." : "Tu solicitud de reembolso fue rechazada.", "/estudiante/pagos");
-  await registrarActividad(usuario.id, aprobar ? "APROBAR_REEMBOLSO" : "RECHAZAR_REEMBOLSO", { reembolso: id });
-  revalidatePath("/admin", "layout");
+
+  if (decision === "aprobar") {
+    if (!(await tomar("SOLICITADO", "APROBADO"))) return yaAtendida;
+    if (estudiante) await notificar(estudiante, "Tu solicitud de reembolso fue aprobada.", "/estudiante/pagos");
+    await registrarActividad(usuario.id, "APROBAR_REEMBOLSO", { reembolso: id });
+    if (!enPasarela) {
+      await cerrar("APROBADO");
+      return { ok: true, mensaje: "Reembolso aprobado: devuelve el dinero al estudiante." };
+    }
+    const motivo = await devolverEnCulqi();
+    if (motivo !== null) return fallo(motivo);
+    await cerrar("PROCESADO");
+    return { ok: true, mensaje: "Reembolso procesado en Culqi" };
+  }
+
+  // reintentar / manual: solo para un reembolso aprobado cuyo pago aún no se devolvió.
+  if (r.estado !== "APROBADO" || pago.estado !== "APROBADO") return yaAtendida;
+  if (decision === "manual") {
+    await registrarActividad(usuario.id, "REEMBOLSO_MANUAL", { reembolso: id });
+    await cerrar("PROCESADO");
+    return { ok: true, mensaje: "Reembolso marcado como devuelto" };
+  }
+  if (!enPasarela) return { ok: false, mensaje: "Este pago se devuelve a mano" };
+  const motivo = await devolverEnCulqi();
+  if (motivo !== null) return fallo(motivo);
+  await cerrar("PROCESADO");
+  return { ok: true, mensaje: "Reembolso procesado en Culqi" };
+}
+
+const MENSAJE_CONCILIACION: Record<ResultadoConciliacion, [boolean, string]> = {
+  CONFIRMADO: [true, "Pago verificado en Culqi: la matrícula quedó confirmada."],
+  YA_APROBADO: [true, "El pago ya estaba confirmado."],
+  DUPLICADO: [false, "Culqi registra un cobro duplicado: revísalo y reembolsa en CulqiPanel."],
+  SIN_CUPO: [false, "El pago está en Culqi, pero ya no hay cupo: hay que reembolsar al estudiante."],
+  NO_ENCONTRADO: [false, "No encontramos ese pago."],
+  NO_PAGADO: [false, "Culqi aún no registra este pago."],
+  MONTO_DISTINTO: [false, "El monto pagado en Culqi no coincide; revísalo en CulqiPanel."],
+  SIN_REFERENCIA: [false, "Este pago aún no tiene una orden ni un cargo en Culqi."],
+};
+
+/**
+ * Conciliación manual de un pago en línea cuyo aviso no llegó: se pregunta a la API de
+ * Culqi y solo se confirma si allí está pagado con el monto correcto.
+ */
+export async function verificarPagoEnCulqi(formData: FormData): Promise<EstadoFormulario> {
+  const usuario = await admin();
+  const pagoId = z.uuid().parse(formData.get("pagoId"));
+  try {
+    const [ok, mensaje] = MENSAJE_CONCILIACION[await conciliarPago(pagoId, usuario.id)];
+    revalidatePath("/admin", "layout");
+    return { ok, mensaje };
+  } catch (e) {
+    return { ok: false, mensaje: (e as Error).message };
+  }
 }
 
 // ---------- Cupones (HU-32) ----------
@@ -251,25 +435,90 @@ export async function alternarCupon(formData: FormData) {
 }
 
 // ---------- Certificados (HU-11 · HU-60) ----------
+const emisionSchema = z.object({
+  ids: z.array(z.uuid()).min(1, "Selecciona al menos un estudiante"),
+  // Motivo para emitir a quien no cumple los requisitos (p. ej. faltas justificadas).
+  motivo: z.preprocess((v) => (typeof v === "string" && v.trim() ? v.trim() : undefined), z.string().min(10, "Explica el motivo de la excepción (mínimo 10 caracteres)").max(300).optional()),
+});
+
+/**
+ * Emite los certificados de las inscripciones confirmadas que cumplen los requisitos
+ * (evaluarAptitud). Las que no los cumplen solo se emiten si el administrador indica un
+ * motivo, que queda en el certificado (no se publica) y en la auditoría. Los datos del
+ * documento (nombre, curso, horas, instructor, nota y asistencia) se congelan al emitir.
+ */
 export async function emitirCertificados(formData: FormData): Promise<EstadoFormulario> {
   const usuario = await admin();
-  const ids = z.array(z.uuid()).min(1, "Selecciona al menos un estudiante").safeParse(formData.getAll("inscripcion"));
-  if (!ids.success) return fallo(ids.error);
+  const d = emisionSchema.safeParse({ ids: formData.getAll("inscripcion"), motivo: formData.get("motivo") });
+  if (!d.success) return fallo(d.error);
+  const { ids, motivo } = d.data;
   const supabase = await createClient();
-  const { data: filas } = await supabase.from("inscripciones").select("id, estudiante_id, curso:cursos(titulo)").in("id", ids.data).eq("estado", "CONFIRMADA");
+  const [{ data: filas }, resultados] = await Promise.all([
+    supabase
+      .from("inscripciones")
+      .select(
+        "id, estudiante_id, estudiante:perfiles(nombres, apellidos, correo), curso:cursos(titulo, duracion_horas, instructor:perfiles(nombres, apellidos))",
+      )
+      .in("id", ids)
+      .eq("estado", "CONFIRMADA"),
+    obtenerResultados(ids),
+  ]);
 
   let emitidos = 0;
+  let excepciones = 0;
+  const omitidos: string[] = [];
   for (const ins of filas ?? []) {
+    const estudiante = uno<{ nombres: string; apellidos: string; correo: string }>(ins.estudiante);
+    const curso = uno<{ titulo: string; duracion_horas: number; instructor: unknown }>(ins.curso);
+    const resultado = resultados.get(ins.id);
+    const { apto, motivos } = evaluarAptitud(resultado);
+    if (!apto && !motivo) {
+      omitidos.push(`${nombreCompleto(estudiante) || estudiante?.correo}: ${motivos.join("; ")}`);
+      continue;
+    }
+
     const codigo = generarCodigoCertificado();
-    const { error } = await supabase.from("certificados").insert({ inscripcion_id: ins.id, codigo_unico: codigo });
+    const { error } = await supabase.from("certificados").insert({
+      inscripcion_id: ins.id,
+      codigo_unico: codigo,
+      estudiante_nombre: nombreCompleto(estudiante) || estudiante?.correo || "",
+      curso_titulo: curso?.titulo ?? "",
+      duracion_horas: curso?.duracion_horas ?? 0,
+      instructor_nombre: nombreCompleto(uno<{ nombres: string; apellidos: string }>(curso?.instructor)) || null,
+      nota_final: resultado?.nota_final ?? null,
+      asistencia: resultado?.asistencia ?? null,
+      motivo_excepcion: apto ? null : motivo,
+    });
     if (error) continue; // ya tenía certificado (inscripcion_id es único)
     emitidos++;
-    const curso = (Array.isArray(ins.curso) ? ins.curso[0] : ins.curso) as { titulo: string } | null;
+    if (!apto) excepciones++;
     await notificar(ins.estudiante_id, `¡Felicidades! Ya puedes descargar tu certificado de ${curso?.titulo ?? "tu curso"}.`, "/estudiante/certificados");
-    await registrarActividad(usuario.id, "EMITIR_CERTIFICADO", { codigo, inscripcion: ins.id });
+    if (estudiante?.correo) {
+      programarCorreo({
+        para: estudiante.correo,
+        ...correoCertificadoEmitido({
+          nombre: estudiante.nombres || "estudiante",
+          curso: curso?.titulo ?? "tu curso",
+          codigo,
+          url: `${publicEnv.NEXT_PUBLIC_SITE_URL}/verificar?codigo=${codigo}`,
+        }),
+      });
+    }
+    await registrarActividad(usuario.id, apto ? "EMITIR_CERTIFICADO" : "EMITIR_CERTIFICADO_EXCEPCION", {
+      codigo,
+      inscripcion: ins.id,
+      nota_final: resultado?.nota_final ?? null,
+      asistencia: resultado?.asistencia ?? null,
+      ...(apto ? {} : { motivo, requisitos_no_cumplidos: motivos }),
+    });
   }
   revalidatePath("/admin/certificados");
-  return emitidos ? { ok: true, mensaje: `${emitidos} certificado(s) emitido(s)` } : { ok: false, mensaje: "No se emitió ningún certificado" };
+
+  const partes = [
+    emitidos && `${emitidos} certificado(s) emitido(s)${excepciones ? ` (${excepciones} como excepción)` : ""}`,
+    omitidos.length && `${omitidos.length} sin emitir por no cumplir los requisitos — ${omitidos.join(" · ")}`,
+  ].filter(Boolean);
+  return { ok: emitidos > 0, mensaje: partes.join(". ") || "No se emitió ningún certificado" };
 }
 
 // ---------- Usuarios y roles (HU-03 · HU-34 · HU-53) ----------

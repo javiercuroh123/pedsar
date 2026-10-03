@@ -21,7 +21,7 @@ const esActivo = (pathname: string, href: string) => (href === "/" ? pathname ==
 export function NavPublica() {
   const pathname = usePathname();
   return (
-    <nav className="hidden items-center gap-1 lg:flex" aria-label="Principal">
+    <nav className="hidden items-center gap-7 self-stretch lg:flex" aria-label="Principal">
       {ENLACES_PUBLICOS.map((e) => {
         const activo = esActivo(pathname, e.href);
         return (
@@ -30,10 +30,11 @@ export function NavPublica() {
             href={e.href}
             aria-current={activo ? "page" : undefined}
             className={cn(
-              "rounded-full px-3 py-1.5 text-sm font-medium transition-colors",
+              "relative flex h-full items-center text-sm font-medium transition-colors duration-200",
+              "after:absolute after:inset-x-0 after:-bottom-px after:h-0.5 after:rounded-full after:transition-transform after:duration-300 after:ease-(--ease-salida)",
               activo
-                ? "bg-brand-50 text-brand-700 dark:bg-brand-500/15 dark:text-brand-200"
-                : "text-muted-foreground hover:bg-muted hover:text-foreground",
+                ? "text-primary after:scale-x-100 after:bg-primary"
+                : "text-muted-foreground after:scale-x-0 after:bg-foreground/20 hover:text-foreground hover:after:scale-x-100",
             )}
           >
             {e.titulo}
@@ -62,7 +63,7 @@ export function MenuMovilPublico({ panel }: { panel: string | null }) {
               onClick={() => setAbierto(false)}
               className={cn(
                 "rounded-lg px-3 py-2.5 text-sm font-medium",
-                esActivo(pathname, e.href) ? "bg-brand-50 text-brand-700 dark:bg-brand-500/15 dark:text-brand-200" : "hover:bg-muted",
+                esActivo(pathname, e.href) ? "bg-accent text-accent-foreground" : "hover:bg-muted",
               )}
             >
               {e.titulo}

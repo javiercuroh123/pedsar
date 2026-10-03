@@ -21,7 +21,7 @@ export function FormularioContacto({ asunto }: { asunto?: string }) {
 
   if (estado.ok) {
     return (
-      <div className="flex flex-col items-center rounded-2xl bg-emerald-50 p-10 text-center text-emerald-800 dark:bg-emerald-500/10 dark:text-emerald-300" role="status">
+      <div className="flex flex-col items-center rounded-2xl bg-green-50 p-10 text-center text-green-800 dark:bg-green-500/10 dark:text-green-300" role="status">
         <CheckCircle2Icon className="size-10" />
         <p className="mt-4 font-semibold">{estado.mensaje}</p>
       </div>

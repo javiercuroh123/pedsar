@@ -1,16 +1,16 @@
 import "server-only";
 import type { PasarelaPago } from "./tipos";
 
+const pendiente = async (): Promise<never> => {
+  throw new Error("Izipay: integración pendiente");
+};
+
 /** Izipay (tarjetas + Yape/Plin). Docs: https://developers.izipay.pe */
 export const izipay: PasarelaPago = {
   nombre: "izipay",
-  async cobrar() {
-    throw new Error("Izipay: integración pendiente (Sprint 2)");
-  },
-  async reembolsar() {
-    throw new Error("Izipay: integración pendiente");
-  },
-  async procesarWebhook() {
-    return null;
-  },
+  crearOrden: pendiente,
+  cobrar: pendiente,
+  consultar: pendiente,
+  reembolsar: pendiente,
+  leerWebhook: () => null,
 };

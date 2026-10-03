@@ -19,6 +19,20 @@ export interface CursoResumen {
   instructor: string | null;
   cupo_disponible: number;
   proxima_sesion: { fecha: string; hora_inicio: string } | null;
+  /** Promedio de estrellas y cantidad de reseñas visibles (HU-24); null sin reseñas. */
+  calificacion: Calificacion | null;
+}
+
+export interface Calificacion {
+  promedio: number;
+  cantidad: number;
+}
+
+export interface ResenaPublica {
+  estrellas: number;
+  texto: string | null;
+  autor: string;
+  fecha: string;
 }
 
 export type OrdenCatalogo = "relevancia" | "inicio" | "precio-asc" | "precio-desc";
@@ -50,8 +64,20 @@ async function nombresInstructores(ids: string[]) {
   const unicos = [...new Set(ids.filter(Boolean))];
   if (!unicos.length) return new Map<string, string>();
   const supabase = await createClient();
-  const { data } = await supabase.from("instructores_publicos").select("id, nombres, apellidos").in("id", unicos);
+  const { data } = await supabase.rpc("instructores_publicos", { p_ids: unicos });
   return new Map((data ?? []).map((i: { id: string; nombres: string; apellidos: string }) => [i.id, nombreCompleto(i)]));
+}
+
+/** HU-24 · Calificación de varios cursos con una sola consulta (solo reseñas visibles). */
+export async function calificaciones(ids: string[]) {
+  const mapa = new Map<string, Calificacion>();
+  if (!ids.length) return mapa;
+  const supabase = await createClient();
+  const { data } = await supabase.rpc("calificacion_cursos", { p_ids: ids });
+  for (const c of (data ?? []) as { curso_id: string; promedio: number; cantidad: number }[]) {
+    mapa.set(c.curso_id, { promedio: Number(c.promedio), cantidad: c.cantidad });
+  }
+  return mapa;
 }
 
 function proximaSesion(sesiones: FilaSesion[] | null) {
@@ -86,9 +112,10 @@ export async function listarCursosPublicados(filtros: FiltrosCatalogo = {}): Pro
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const filas = (data ?? []) as any[];
-  const [instructores, cupos] = await Promise.all([
+  const [instructores, cupos, notas] = await Promise.all([
     nombresInstructores(filas.map((f) => f.instructor_id)),
     Promise.all(filas.map((f) => supabase.rpc("cupo_disponible", { p_curso: f.id }))),
+    calificaciones(filas.map((f) => f.id)),
   ]);
 
   let cursos: CursoResumen[] = filas.map((f, i) => ({
@@ -107,6 +134,7 @@ export async function listarCursosPublicados(filtros: FiltrosCatalogo = {}): Pro
     instructor: instructores.get(f.instructor_id) ?? null,
     cupo_disponible: (cupos[i].data as number | null) ?? f.cupo_maximo,
     proxima_sesion: proximaSesion(f.sesiones),
+    calificacion: notas.get(f.id) ?? null,
   }));
 
   if (filtros.q) {
@@ -131,7 +159,7 @@ export async function obtenerCursoPorSlug(slug: string) {
   const { data, error } = await supabase
     .from("cursos")
     .select(
-      `id, slug, titulo, descripcion, imagen_url, nivel, modalidad, precio, cupo_maximo, duracion_horas, instructor_id,
+      `id, slug, titulo, descripcion, imagen_url, nivel, modalidad, precio, cupo_maximo, duracion_horas, destacado, instructor_id,
        categoria:categorias(nombre, slug),
        modulos(id, titulo, orden),
        sesiones(id, fecha, hora_inicio, duracion_minutos, modalidad)`,
@@ -142,15 +170,13 @@ export async function obtenerCursoPorSlug(slug: string) {
   if (error) throw new Error(`Curso: ${error.message}`);
   if (!data) return null;
 
-  const [{ data: cupo }, { data: instructor }] = await Promise.all([
+  const [{ data: cupo }, { data: instructor }, notas, { data: resenas }] = await Promise.all([
     supabase.rpc("cupo_disponible", { p_curso: data.id }),
     data.instructor_id
-      ? supabase
-          .from("instructores_publicos")
-          .select("nombres, apellidos, especialidad, avatar_url")
-          .eq("id", data.instructor_id)
-          .maybeSingle()
+      ? supabase.rpc("instructores_publicos", { p_ids: [data.instructor_id] }).maybeSingle()
       : Promise.resolve({ data: null }),
+    calificaciones([data.id]),
+    supabase.rpc("resenas_publicas", { p_curso: data.id, p_limite: 6 }),
   ]);
 
   return {
@@ -161,6 +187,8 @@ export async function obtenerCursoPorSlug(slug: string) {
     categoria: data.categoria as unknown as { nombre: string; slug: string } | null,
     precio: Number(data.precio),
     cupo_disponible: (cupo as number | null) ?? 0,
+    calificacion: notas.get(data.id) ?? null,
+    resenas: ((resenas ?? []) as ResenaPublica[]).map((r) => ({ estrellas: r.estrellas, texto: r.texto, autor: r.autor, fecha: r.fecha })),
     instructor: instructor as { nombres: string; apellidos: string; especialidad: string | null; avatar_url: string | null } | null,
     modulos: [...((data.modulos ?? []) as { id: number; titulo: string; orden: number }[])].sort((a, b) => a.orden - b.orden),
     sesiones: [

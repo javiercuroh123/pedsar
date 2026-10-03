@@ -1,6 +1,6 @@
 "use client";
 
-import { CheckIcon, CopyIcon, PrinterIcon } from "lucide-react";
+import { CheckIcon, CopyIcon } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -24,14 +24,6 @@ export function BotonCopiar({ texto, etiqueta = "Copiar" }: { texto: string; eti
       }}
     >
       {copiado ? <CheckIcon /> : <CopyIcon />} {etiqueta}
-    </Button>
-  );
-}
-
-export function BotonImprimir({ children = "Descargar PDF" }: { children?: React.ReactNode }) {
-  return (
-    <Button type="button" onClick={() => window.print()}>
-      <PrinterIcon /> {children}
     </Button>
   );
 }
