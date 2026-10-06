@@ -31,6 +31,9 @@ export async function iniciarSesion(_: EstadoFormulario, formData: FormData): Pr
     email: datos.data.correo,
     password: datos.data.contrasena,
   });
+  // Supabase solo responde email_not_confirmed si la contraseña es correcta: no revela qué correos existen.
+  if (error?.code === "email_not_confirmed")
+    return { mensaje: "Aún no confirmas tu correo. Abre el enlace que te enviamos para activar tu cuenta." };
   if (error) return { mensaje: "Correo o contraseña incorrectos" };
 
   const { data: perfil } = await supabase.from("perfiles").select("rol").eq("id", data.user.id).single();
