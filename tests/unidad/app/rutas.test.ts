@@ -272,6 +272,21 @@ describe("salud y verificación de correo", () => {
     expect((await confirmarCorreo(pedido("/auth/confirm?token_hash=abc&type=email&next=//evil.com"))).headers.get("location")).toBe("https://pedsar.test/");
     entorno.servidor.cliente.auth.verifyOtp.mockResolvedValueOnce({ data: {}, error: { message: "expirado" } } as never);
     expect((await confirmarCorreo(pedido("/auth/confirm?token_hash=abc&type=email"))).headers.get("location")).toBe("https://pedsar.test/login?error=enlace-invalido");
-    expect((await confirmarCorreo(pedido("/auth/confirm"))).headers.get("location")).toBe("https://pedsar.test/login?error=enlace-invalido");
+  });
+
+  // Con las plantillas por defecto de Supabase (sin SMTP propio) los enlaces no traen token_hash.
+  it("canjea el código PKCE de la recuperación de contraseña y del registro", async () => {
+    const r = await confirmarCorreo(pedido("/auth/confirm?next=/cuenta/nueva-contrasena&code=c0d1g0"));
+    expect(entorno.servidor.cliente.auth.exchangeCodeForSession).toHaveBeenCalledWith("c0d1g0");
+    expect(r.headers.get("location")).toBe("https://pedsar.test/cuenta/nueva-contrasena");
+    entorno.servidor.cliente.auth.exchangeCodeForSession.mockResolvedValueOnce({ data: {}, error: { message: "sin verificador" } } as never);
+    expect((await confirmarCorreo(pedido("/auth/confirm?code=c0d1g0"))).headers.get("location")).toBe("https://pedsar.test/login?error=enlace-invalido");
+  });
+
+  it("deja al navegador leer la sesión del fragmento cuando el enlace es una invitación", async () => {
+    // La invitación del administrador vuelve con #access_token=…, que el servidor no ve.
+    const r = await confirmarCorreo(pedido("/auth/confirm?next=/cuenta/nueva-contrasena"));
+    expect(r.headers.get("location")).toBe("https://pedsar.test/auth/sesion?next=%2Fcuenta%2Fnueva-contrasena");
+    expect((await confirmarCorreo(pedido("/auth/confirm?next=//evil.com"))).headers.get("location")).toBe("https://pedsar.test/auth/sesion?next=%2F");
   });
 });

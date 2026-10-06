@@ -16,6 +16,11 @@ describe("inicio de sesión (HU-02)", () => {
     });
     entorno.servidor.cliente.auth.signInWithPassword.mockResolvedValueOnce({ data: { user: null }, error: { message: "Invalid login credentials" } } as never);
     await expect(iniciarSesion({}, formulario({ correo: "ana@pedsar.test", contrasena: "mala" }))).resolves.toEqual({ mensaje: "Correo o contraseña incorrectos" });
+    // Un correo sin confirmar no es una contraseña equivocada.
+    entorno.servidor.cliente.auth.signInWithPassword.mockResolvedValueOnce({ data: { user: null }, error: { message: "Email not confirmed", code: "email_not_confirmed" } } as never);
+    await expect(iniciarSesion({}, formulario({ correo: "ana@pedsar.test", contrasena: "Clave123" }))).resolves.toEqual({
+      mensaje: "Aún no confirmas tu correo. Abre el enlace que te enviamos para activar tu cuenta.",
+    });
   });
 
   it("lleva a cada rol a su panel, o al destino interno pedido", async () => {
