@@ -104,6 +104,7 @@ export function supabaseFalso(manejadores: Record<string, Manejador> = {}) {
       resetPasswordForEmail: ok({}),
       updateUser: ok({ user: null }),
       verifyOtp: ok({}),
+      exchangeCodeForSession: ok({}),
       admin: { inviteUserByEmail: ok({ user: { id: "invitado" } }) },
     },
   };
