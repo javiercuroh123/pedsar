@@ -3,8 +3,8 @@
 
 :root {
   /* Primitivos */
-  --cian-50: #ecfeff; --cian-100: #cffafe; --cian-200: #a5f3fc; --cian-300: #67e8f9; --cian-400: #22d3ee;
-  --cian-500: #06b6d4; --cian-600: #0891b2; --cian-700: #0e7490; --cian-800: #155e75; --cian-900: #164e63; --cian-950: #083344;
+  --cian-50: #f5f3ff; --cian-100: #ede9fe; --cian-200: #ddd6fe; --cian-300: #c4b5fd; --cian-400: #a78bfa;
+  --cian-500: #8b5cf6; --cian-600: #7c3aed; --cian-700: #6d28d9; --cian-800: #5b21b6; --cian-900: #4c1d95; --cian-950: #2e1065;
   --rosa-50: #fff1f2; --rosa-100: #ffe4e6; --rosa-200: #fecdd3; --rosa-400: #fb7185; --rosa-500: #f43f5e; --rosa-600: #e11d48; --rosa-700: #be123c;
   --grafito-0: #ffffff; --grafito-50: #fafafa; --grafito-100: #f4f4f5; --grafito-200: #e4e4e7; --grafito-300: #d4d4d8; --grafito-400: #a1a1aa;
   --grafito-500: #71717a; --grafito-600: #52525b; --grafito-700: #3f3f46; --grafito-800: #27272a; --grafito-900: #18181b; --grafito-950: #09090b;
@@ -39,7 +39,7 @@
   --sombra-sm: 0 1px 2px rgba(9, 9, 11, 0.06);
   --sombra-md: 0 1px 3px rgba(9, 9, 11, 0.06), 0 8px 16px -4px rgba(9, 9, 11, 0.08);
   --sombra-lg: 0 2px 6px rgba(9, 9, 11, 0.05), 0 24px 48px -12px rgba(9, 9, 11, 0.18);
-  --anillo: 0 0 0 4px rgba(6, 182, 212, 0.35);
+  --anillo: 0 0 0 4px rgba(139, 92, 246, 0.35);
   --degradado-marca: linear-gradient(135deg, var(--cian-700), var(--grafito-900));
   --degradado-profundo: linear-gradient(135deg, var(--cian-900), var(--grafito-950));
 }

@@ -40,18 +40,18 @@
   --color-popover: var(--popover);
   --color-card-foreground: var(--card-foreground);
   --color-card: var(--card);
-  /* Identidad PEDSAR «Grafito y cian»: cian (marca y acciones) + rosa (acento) sobre neutros grafito. */
-  --color-brand-50: #ecfeff;
-  --color-brand-100: #cffafe;
-  --color-brand-200: #a5f3fc;
-  --color-brand-300: #67e8f9;
-  --color-brand-400: #22d3ee;
-  --color-brand-500: #06b6d4;
-  --color-brand-600: #0891b2;
-  --color-brand-700: #0e7490;
-  --color-brand-800: #155e75;
-  --color-brand-900: #164e63;
-  --color-brand-950: #083344;
+  /* Identidad PEDSAR «Morado y blanco»: morado/violeta (marca y acciones) + rosa (acento) sobre neutros grafito y blanco. */
+  --color-brand-50: #f5f3ff;
+  --color-brand-100: #ede9fe;
+  --color-brand-200: #ddd6fe;
+  --color-brand-300: #c4b5fd;
+  --color-brand-400: #a78bfa;
+  --color-brand-500: #8b5cf6;
+  --color-brand-600: #7c3aed;
+  --color-brand-700: #6d28d9;
+  --color-brand-800: #5b21b6;
+  --color-brand-900: #4c1d95;
+  --color-brand-950: #2e1065;
   --color-coral-400: #fb7185;
   --color-coral-500: #f43f5e;
   --color-coral-600: #e11d48;
@@ -66,42 +66,42 @@
 }
 
 :root {
-  --background: #fafafa;
+  --background: #ffffff;
   --foreground: #18181b;
   --card: #ffffff;
   --card-foreground: #18181b;
   --popover: #ffffff;
   --popover-foreground: #18181b;
-  /* Cian 700 para acciones: contraste 5.4:1 con texto blanco (WCAG AA). */
-  --primary: #0e7490;
-  --primary-hover: #155e75;
+  /* Violeta 700 para acciones: contraste alto con texto blanco (WCAG AA). */
+  --primary: #6d28d9;
+  --primary-hover: #5b21b6;
   --primary-foreground: #ffffff;
   --secondary: #f4f4f5;
   --secondary-foreground: #18181b;
   --muted: #f4f4f5;
   --muted-foreground: #52525b;
-  --accent: #ecfeff;
-  --accent-foreground: #155e75;
+  --accent: #f5f3ff;
+  --accent-foreground: #5b21b6;
   --destructive: #dc2626;
   --border: #e4e4e7;
   --input: #d4d4d8;
-  --ring: #06b6d4;
-  --chart-1: #0891b2;
+  --ring: #8b5cf6;
+  --chart-1: #7c3aed;
   --chart-2: #f43f5e;
-  --chart-3: #7c3aed;
+  --chart-3: #0891b2;
   --chart-4: #f59e0b;
   --chart-5: #3f3f46;
   --radius: 0.5rem;
   --sombra-lg: 0 2px 6px rgb(9 9 11 / 0.05), 0 24px 48px -12px rgb(9 9 11 / 0.18);
-  /* Barra lateral de los portales: grafito 900 con acentos cian */
+  /* Barra lateral de los portales: grafito 900 con acentos morados */
   --sidebar: #18181b;
   --sidebar-foreground: #d4d4d8;
-  --sidebar-primary: #22d3ee;
-  --sidebar-primary-foreground: #083344;
+  --sidebar-primary: #a78bfa;
+  --sidebar-primary-foreground: #2e1065;
   --sidebar-accent: #27272a;
   --sidebar-accent-foreground: #ffffff;
   --sidebar-border: rgb(255 255 255 / 8%);
-  --sidebar-ring: #22d3ee;
+  --sidebar-ring: #a78bfa;
 }
 
 .dark {
@@ -111,33 +111,33 @@
   --card-foreground: #fafafa;
   --popover: #18181b;
   --popover-foreground: #fafafa;
-  --primary: #22d3ee;
-  --primary-hover: #67e8f9;
-  --primary-foreground: #083344;
+  --primary: #a78bfa;
+  --primary-hover: #c4b5fd;
+  --primary-foreground: #2e1065;
   --secondary: #27272a;
   --secondary-foreground: #fafafa;
   --muted: #27272a;
   --muted-foreground: #a1a1aa;
-  --accent: rgb(6 182 212 / 12%);
-  --accent-foreground: #a5f3fc;
+  --accent: rgb(139 92 246 / 12%);
+  --accent-foreground: #ddd6fe;
   --destructive: #f87171;
   --border: rgb(255 255 255 / 10%);
   --input: rgb(255 255 255 / 15%);
-  --ring: #22d3ee;
-  --chart-1: #22d3ee;
+  --ring: #a78bfa;
+  --chart-1: #a78bfa;
   --chart-2: #fb7185;
-  --chart-3: #a78bfa;
+  --chart-3: #22d3ee;
   --chart-4: #fbbf24;
   --chart-5: #a1a1aa;
   --sombra-lg: 0 2px 6px rgb(0 0 0 / 0.3), 0 24px 48px -12px rgb(0 0 0 / 0.6);
   --sidebar: #111113;
   --sidebar-foreground: #d4d4d8;
-  --sidebar-primary: #22d3ee;
-  --sidebar-primary-foreground: #083344;
+  --sidebar-primary: #a78bfa;
+  --sidebar-primary-foreground: #2e1065;
   --sidebar-accent: #27272a;
   --sidebar-accent-foreground: #ffffff;
   --sidebar-border: rgb(255 255 255 / 8%);
-  --sidebar-ring: #22d3ee;
+  --sidebar-ring: #a78bfa;
 }
 
 /* Alto contraste (RNF-08): bordes y textos secundarios más marcados */
@@ -199,7 +199,7 @@
 /* Degradado profundo de marca (héroes, panel de acceso, cabeceras oscuras). */
 @utility fondo-marca {
   background-image:
-    radial-gradient(60% 80% at 85% 0%, rgb(6 182 212 / 0.35), transparent 60%),
+    radial-gradient(60% 80% at 85% 0%, rgb(139 92 246 / 0.35), transparent 60%),
     radial-gradient(50% 70% at 100% 100%, rgb(244 63 94 / 0.16), transparent 60%),
     linear-gradient(135deg, var(--color-brand-900), #09090b);
 }

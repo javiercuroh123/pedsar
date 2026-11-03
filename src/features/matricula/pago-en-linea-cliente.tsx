@@ -94,7 +94,7 @@ export function PagoEnLinea({ pagoId, curso, codigo, monto, venceEn, abrirAlCarg
     setEstado("3ds");
     tresDS.reset?.();
     tresDS.settings = { charge: { totalAmount: datos.current.montoCentimos, returnUrl: window.location.href }, card: { email: datos.current.correo } };
-    tresDS.options = { showModal: true, showLoading: true, showIcon: true, style: { btnColor: "#0E7490", btnTextColor: "#FFFFFF" } };
+    tresDS.options = { showModal: true, showLoading: true, showIcon: true, style: { btnColor: "#6D28D9", btnTextColor: "#FFFFFF" } };
     tresDS.initAuthentication(id);
   };
 
@@ -127,7 +127,7 @@ export function PagoEnLinea({ pagoId, curso, codigo, monto, venceEn, abrirAlCarg
         paymentMethods: { tarjeta: true, yape: true, billetera: conOrden, bancaMovil: conOrden, agente: conOrden, cuotealo: false },
         paymentMethodsSort: conOrden ? ["tarjeta", "yape", "billetera", "bancaMovil", "agente"] : ["tarjeta", "yape"],
       },
-      appearance: { theme: "default", menuType: "sidebar", defaultStyle: { bannerColor: "#0E7490", buttonBackground: "#0E7490", menuColor: "#0E7490" } },
+      appearance: { theme: "default", menuType: "sidebar", defaultStyle: { bannerColor: "#6D28D9", buttonBackground: "#6D28D9", menuColor: "#6D28D9" } },
     });
     checkout.culqi = () => {
       if (checkout.token) {

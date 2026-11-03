@@ -8,7 +8,7 @@ import { EMPRESA } from "@/config/empresa";
 const ENTIDADES: Record<string, string> = { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" };
 const escapar = (s: string) => s.replace(/[&<>"']/g, (c) => ENTIDADES[c]);
 
-const COLOR = { grafito: "#18181b", texto: "#3f3f46", suave: "#71717a", borde: "#e4e4e7", cian: "#0e7490", ambar: "#fef3c7", ambarTexto: "#92400e" };
+const COLOR = { grafito: "#18181b", texto: "#3f3f46", suave: "#71717a", borde: "#e4e4e7", cian: "#6d28d9", ambar: "#fef3c7", ambarTexto: "#92400e" };
 
 const marco = (contenido: string) => `
 <div style="background:#f4f4f5;padding:24px 12px;font-family:Inter,Segoe UI,Arial,sans-serif;color:${COLOR.grafito}">

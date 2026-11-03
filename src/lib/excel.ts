@@ -26,7 +26,7 @@ const FORMATO_NUMERICO: Partial<Record<FormatoExcel, string>> = {
   fecha: "dd/mm/yyyy",
 };
 
-const CIAN = "#0E7490";
+const CIAN = "#6D28D9";
 
 function celda(valor: ValorExcel, formato: FormatoExcel = "texto", estilo: Partial<Exclude<Cell, null | undefined | string>> = {}): Cell {
   if (valor === null || valor === "") return { value: "", type: String, ...estilo };

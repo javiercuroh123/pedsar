@@ -28,7 +28,7 @@ export function VistaCertificado({ datos }: { datos: DatosCertificado }) {
       role="img"
       aria-label={`Certificado de ${datos.estudiante} por el curso ${datos.curso}`}
     >
-      <div className="absolute inset-0 bg-[radial-gradient(60%_60%_at_0%_0%,#cffafe,transparent_70%),radial-gradient(50%_50%_at_100%_100%,#ffe4e6,transparent_70%)]" />
+      <div className="absolute inset-0 bg-[radial-gradient(60%_60%_at_0%_0%,#ede9fe,transparent_70%),radial-gradient(50%_50%_at_100%_100%,#ffe4e6,transparent_70%)]" />
       <div className="absolute inset-[3%] rounded-md border-[0.4cqw] border-brand-700/80" />
       <div className="absolute inset-[4.4%] rounded-sm border border-brand-700/30" />
       <div className="relative flex h-full flex-col items-center justify-between px-[11%] py-[8%] text-center">
