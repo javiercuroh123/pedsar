@@ -179,6 +179,10 @@
   input[type="range"] {
     accent-color: var(--primary);
   }
+  button:not(:disabled),
+  [role="button"]:not(:disabled) {
+    cursor: pointer;
+  }
 }
 
 @utility texto-degradado {

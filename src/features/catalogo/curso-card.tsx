@@ -53,7 +53,7 @@ export function CursoCard({ curso }: { curso: CursoResumen }) {
       <div className="flex flex-1 flex-col p-5">
         {curso.categoria && <p className="text-xs font-semibold tracking-[0.08em] text-brand-700 uppercase dark:text-brand-300">{curso.categoria.nombre}</p>}
         <h3 className="mt-1.5 text-lg leading-snug font-semibold tracking-tight">
-          <Link href={`/cursos/${curso.slug}`} className="transition-colors after:absolute after:inset-0 hover:text-primary">
+          <Link href={`/cursos/${curso.slug}`} className="transition-colors after:absolute after:inset-0 after:z-10 after:cursor-pointer hover:text-primary">
             {curso.titulo}
           </Link>
         </h3>
@@ -92,7 +92,7 @@ export function CursoCard({ curso }: { curso: CursoResumen }) {
         </div>
         <div className="mt-auto flex items-end justify-between border-t pt-4" style={{ marginTop: "1.25rem" }}>
           <p className="text-[1.375rem] font-semibold tracking-tight tabular-nums">{formatearSoles(curso.precio)}</p>
-          <span className="relative inline-flex h-9 items-center gap-1.5 rounded-lg border border-border bg-card px-3.5 text-sm font-medium transition-colors duration-300 group-hover:border-primary group-hover:bg-primary group-hover:text-primary-foreground">
+          <span className="pointer-events-none inline-flex h-9 items-center gap-1.5 rounded-lg border border-border bg-card px-3.5 text-sm font-medium transition-colors duration-300 group-hover:border-primary group-hover:bg-primary group-hover:text-primary-foreground">
             Ver curso
             <ArrowRightIcon className="size-4 -translate-x-1 opacity-0 transition-all duration-300 group-hover:translate-x-0 group-hover:opacity-100" />
           </span>
