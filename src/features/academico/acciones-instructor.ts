@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
+import { notificarInscritosDelCurso } from "@/features/notificaciones/enviar";
 import { registrarActividad } from "@/lib/auditoria";
 import { requireRol } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
@@ -93,6 +94,11 @@ export async function crearSesion(_: EstadoFormulario, formData: FormData): Prom
     enlace_virtual: d.data.enlace || null,
   });
   if (error) return { ok: false, mensaje: "No se pudo programar la sesión" };
+  await notificarInscritosDelCurso(
+    d.data.cursoId,
+    `Nueva sesión programada para el ${d.data.fecha} a las ${d.data.horaInicio}.`,
+    "/estudiante/horarios",
+  );
   await registrarActividad(usuario.id, "PROGRAMAR_SESION", { curso: d.data.cursoId, fecha: d.data.fecha });
   revalidatePath("/instructor", "layout");
   return { ok: true, mensaje: "Sesión programada" };
@@ -191,6 +197,11 @@ export async function crearEvaluacion(datos: NuevaEvaluacion): Promise<EstadoFor
     await supabase.from("evaluaciones").delete().eq("id", evaluacion.id);
     return { ok: false, mensaje: "No se pudieron guardar las preguntas" };
   }
+  await notificarInscritosDelCurso(
+    d.data.cursoId,
+    `Nueva evaluación disponible: «${d.data.titulo}».`,
+    `/estudiante/evaluaciones/${evaluacion.id}`,
+  );
   await registrarActividad(usuario.id, "CREAR_EVALUACION", { evaluacion: evaluacion.id, preguntas: d.data.preguntas.length });
   revalidatePath("/instructor/evaluaciones");
   return { ok: true, mensaje: "Evaluación publicada" };

@@ -9,13 +9,16 @@ import { Input } from "@/components/ui/input";
 import { ETIQUETA_MODALIDAD, ETIQUETA_NIVEL } from "@/lib/formato";
 
 export const PRECIO_TOPE = 1000;
+export const DURACION_TOPE = 120;
 
 export interface ValoresFiltro {
   q: string;
   categorias: string[];
   niveles: string[];
   modalidades: string[];
+  precioMin: number;
   precioMax: number;
+  duracionMax: number;
   orden: string;
 }
 
@@ -46,7 +49,9 @@ export function FiltrosCatalogo({
 }) {
   const formRef = useRef<HTMLFormElement>(null);
   const espera = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const [precioMin, setPrecioMin] = useState(valores.precioMin);
   const [precio, setPrecio] = useState(valores.precioMax);
+  const [duracion, setDuracion] = useState(valores.duracionMax);
 
   // Si la URL cambia desde fuera (chips, "Limpiar filtros", atrás/adelante), refleja los valores
   // en el formulario sin volver a montarlo, para no perder el foco mientras se escribe.
@@ -63,7 +68,9 @@ export function FiltrosCatalogo({
     if (q && document.activeElement !== q) q.value = v.q;
     const orden = form.elements.namedItem("orden") as HTMLSelectElement | null;
     if (orden) orden.value = v.orden;
+    setPrecioMin(v.precioMin);
     setPrecio(v.precioMax);
+    setDuracion(v.duracionMax);
   }, [firma]);
 
   const enviar = (retraso = 0) => {
@@ -126,6 +133,27 @@ export function FiltrosCatalogo({
             ))}
             <fieldset className="px-2">
               <legend className="flex w-full justify-between text-xs font-semibold tracking-wider text-muted-foreground uppercase">
+                Precio mínimo
+                <span className="font-mono font-semibold text-primary normal-case">S/ {precioMin}</span>
+              </legend>
+              <input
+                type="range"
+                name="precioMin"
+                min={0}
+                max={PRECIO_TOPE}
+                step={10}
+                value={precioMin}
+                onChange={(e) => setPrecioMin(Number(e.target.value))}
+                className="mt-3 w-full"
+                aria-label="Precio mínimo"
+              />
+              <div className="flex justify-between text-xs text-muted-foreground">
+                <span>S/ 0</span>
+                <span>S/ {PRECIO_TOPE}</span>
+              </div>
+            </fieldset>
+            <fieldset className="px-2">
+              <legend className="flex w-full justify-between text-xs font-semibold tracking-wider text-muted-foreground uppercase">
                 Precio máximo
                 <span className="font-mono font-semibold text-primary normal-case">S/ {precio}</span>
               </legend>
@@ -143,6 +171,27 @@ export function FiltrosCatalogo({
               <div className="flex justify-between text-xs text-muted-foreground">
                 <span>S/ 50</span>
                 <span>S/ {PRECIO_TOPE}</span>
+              </div>
+            </fieldset>
+            <fieldset className="px-2">
+              <legend className="flex w-full justify-between text-xs font-semibold tracking-wider text-muted-foreground uppercase">
+                Duración máxima
+                <span className="font-mono font-semibold text-primary normal-case">{duracion} h</span>
+              </legend>
+              <input
+                type="range"
+                name="duracion"
+                min={4}
+                max={DURACION_TOPE}
+                step={4}
+                value={duracion}
+                onChange={(e) => setDuracion(Number(e.target.value))}
+                className="mt-3 w-full"
+                aria-label="Duración máxima"
+              />
+              <div className="flex justify-between text-xs text-muted-foreground">
+                <span>4 h</span>
+                <span>{DURACION_TOPE} h</span>
               </div>
             </fieldset>
             <Link href="/cursos" className={buttonVariants({ variant: "outline", className: "w-full" })}>

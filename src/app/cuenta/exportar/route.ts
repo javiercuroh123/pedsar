@@ -10,10 +10,16 @@ export async function GET() {
 
   const supabase = await createClient();
   const [{ data: perfil }, { data: inscripciones }, { data: notificaciones }, { data: mensajes }, { data: resenas }] = await Promise.all([
-    supabase.from("perfiles").select("nombres, apellidos, correo, telefono, documento, rol, especialidad, fecha_registro").eq("id", usuario.id).single(),
+    supabase
+      .from("perfiles")
+      .select("nombres, apellidos, correo, telefono, documento, rol, especialidad, fecha_registro, privacidad_version, privacidad_aceptada_en")
+      .eq("id", usuario.id)
+      .single(),
     supabase
       .from("inscripciones")
-      .select("codigo, estado, fecha_inscripcion, curso:cursos(titulo), pagos(monto, metodo, estado, fecha_pago), certificados(codigo_unico, fecha_emision)")
+      .select(
+        "codigo, estado, fecha_inscripcion, curso:cursos(titulo), pagos(monto, metodo, estado, fecha_pago), certificados(codigo_unico, fecha_emision), progreso(lecciones_completadas, total_lecciones, porcentaje, actualizado_en), asistencias(fecha, estado), intentos_evaluacion(evaluacion_id, numero_intento, puntaje_obtenido, fecha)",
+      )
       .eq("estudiante_id", usuario.id),
     supabase.from("notificaciones").select("mensaje, tipo, leida, fecha_envio").eq("usuario_id", usuario.id),
     // Solo los mensajes que escribió: los del otro participante son datos de otra persona.

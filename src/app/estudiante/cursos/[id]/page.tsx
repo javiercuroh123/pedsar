@@ -18,8 +18,10 @@ import { BotonEnviar } from "@/components/boton-enviar";
 import { buttonVariants } from "@/components/ui/button";
 import { marcarCompletado } from "@/features/academico/acciones-estudiante";
 import { listarModulosConContenidos, type ContenidoAula } from "@/features/academico/consultas";
+import { listarTemasCurso } from "@/features/comunidad/consultas-foro";
 import { datosResenaPropia } from "@/features/comunidad/consultas-resenas";
 import { FormularioResena } from "@/features/comunidad/formulario-resena";
+import { SeccionForo } from "@/features/comunidad/seccion-foro";
 import { requireRol } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
@@ -63,10 +65,11 @@ export default async function AulaPage({ params, searchParams }: PageProps<"/est
   if (!inscripcion) notFound();
   const curso = (Array.isArray(inscripcion.curso) ? inscripcion.curso[0] : inscripcion.curso) as { id: string; titulo: string; descripcion: string | null };
 
-  const [modulos, { data: completados }, { resena, certificado }] = await Promise.all([
+  const [modulos, { data: completados }, { resena, certificado }, temasForo] = await Promise.all([
     listarModulosConContenidos(id),
     supabase.from("contenidos_completados").select("contenido_id").eq("inscripcion_id", inscripcion.id),
     datosResenaPropia(inscripcion.id),
+    listarTemasCurso(id, usuario.id),
   ]);
   const hechos = new Set((completados ?? []).map((x: { contenido_id: number }) => x.contenido_id));
   const todos = modulos.flatMap((m, mi) => m.contenidos.map((ct, ci) => ({ ...ct, modulo: m.titulo, mi, ci })));
@@ -250,6 +253,15 @@ export default async function AulaPage({ params, searchParams }: PageProps<"/est
           </aside>
         </div>
       )}
+
+      {/* HU-22 · Foro del curso y HU-23 · Comentarios y preguntas por lección */}
+      <div className="max-w-3xl pt-2">
+        <SeccionForo
+          cursoId={id}
+          contenidoActual={actual ? { id: actual.id, titulo: actual.titulo } : null}
+          temas={temasForo}
+        />
+      </div>
 
       {/* HU-24 · Fuera del aula de contenidos: un curso sin módulos también se califica con el certificado. */}
       {puedeResenar && (

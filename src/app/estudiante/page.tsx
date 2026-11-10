@@ -14,6 +14,8 @@ import {
 import { BarraProgreso, EncabezadoPagina, EstadoVacio, TarjetaKpi } from "@/components/comunes";
 import { buttonVariants } from "@/components/ui/button";
 import { listarEvaluacionesEstudiante, listarMisInscripciones, listarSesionesProximas } from "@/features/academico/consultas";
+import { recomendarCursos } from "@/features/catalogo/consultas";
+import { CursoCard } from "@/features/catalogo/curso-card";
 import { SiglaCurso } from "@/features/catalogo/portada-curso";
 import { requireRol } from "@/lib/auth";
 import {
@@ -38,12 +40,13 @@ export default async function EstudiantePage() {
   const certificados = inscripciones.filter((i) => i.certificado);
   const confirmadas = inscripciones.filter((i) => i.estado === "CONFIRMADA");
 
-  const [sesiones, evaluaciones] = await Promise.all([
+  const [sesiones, evaluaciones, recomendados] = await Promise.all([
     listarSesionesProximas(
       activas.map((i) => i.curso.id),
       hoyISO(),
     ),
     listarEvaluacionesEstudiante(confirmadas.map((i) => ({ id: i.id, cursoId: i.curso.id, titulo: i.curso.titulo }))),
+    recomendarCursos(inscripciones, 3),
   ]);
   const evalPendientes = evaluaciones.filter((e) => e.intentos.length === 0);
   const promedio = activas.length ? Math.round(activas.reduce((a, i) => a + i.progreso.porcentaje, 0) / activas.length) : 0;
@@ -193,6 +196,25 @@ export default async function EstudiantePage() {
           )}
         </div>
       </div>
+
+      {recomendados.length > 0 && (
+        <section className="space-y-4">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <h2 className="text-lg font-semibold tracking-tight">Recomendados para ti</h2>
+              <p className="text-sm text-muted-foreground">Cursos sugeridos según tus áreas de interés y formación previa.</p>
+            </div>
+            <Link href="/cursos" className="text-sm font-medium text-primary hover:underline">
+              Ver todos →
+            </Link>
+          </div>
+          <div className="escalonado grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+            {recomendados.map((c) => (
+              <CursoCard key={c.id} curso={c} />
+            ))}
+          </div>
+        </section>
+      )}
     </div>
   );
 }

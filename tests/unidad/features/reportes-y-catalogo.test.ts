@@ -1,12 +1,17 @@
 import { describe, expect, it, vi } from "vitest";
 import { reporteAExcel, reporteAPdf } from "@/features/administracion/exportar-reporte";
 import { etiquetaMes, generarReporte, rangoPorDefecto } from "@/features/administracion/reportes";
-import { listarCategorias, listarCursosPublicados, obtenerCursoPorSlug } from "@/features/catalogo/consultas";
+import { listarCategorias, listarCursosPublicados, obtenerCursoPorSlug, recomendarCursos } from "@/features/catalogo/consultas";
 import { leerPdf, leerXlsx } from "../../apoyo/archivos";
 import { entorno, responder } from "../../apoyo/entorno";
 
 describe("reporte general del administrador (RF-10 · HU-20)", () => {
-  const inscripcion = (curso: string, estado: string, fecha: string, pago?: { monto: string; metodo: string; medio?: string; estado: string }) => ({
+  const inscripcion = (
+    curso: string,
+    estado: string,
+    fecha: string,
+    pago?: { monto: string; metodo: string; medio?: string; estado: string; fecha_pago?: string | null },
+  ) => ({
     curso_id: curso,
     estado,
     fecha_inscripcion: fecha,
@@ -78,6 +83,29 @@ describe("reporte general del administrador (RF-10 · HU-20)", () => {
     expect(r.porMetodo.map((m) => m.metodo)).toEqual(["Culqi · Tarjeta", "Culqi · Yape", "Yape"]);
   });
 
+  it("imputa el ingreso mensual según fecha_pago en hora de Perú para coincidir con el panel principal", async () => {
+    responder({
+      cursos: { data: [{ id: "c1", titulo: "Excel", modalidad: "VIRTUAL", cupo_maximo: 30 }] },
+      inscripciones: {
+        data: [
+          inscripcion("c1", "CONFIRMADA", "2026-08-31T22:00:00-05:00", {
+            monto: "180.00",
+            metodo: "YAPE",
+            estado: "APROBADO",
+            fecha_pago: "2026-09-01T09:15:00-05:00",
+          }),
+        ],
+      },
+      perfiles: { count: 1 },
+    });
+    const r = await generarReporte("2026-08-01", "2026-09-30");
+    expect(r.porMes).toEqual([
+      { mes: "2026-08", inscritos: 1, confirmados: 1, ingresos: 0 },
+      { mes: "2026-09", inscritos: 0, confirmados: 0, ingresos: 180 },
+    ]);
+    expect(r.totales).toEqual({ inscritos: 1, confirmados: 1, ingresos: 180 });
+  });
+
   it("filtrado por curso muestra el curso aunque no tenga inscripciones", async () => {
     responder({ cursos: { data: [{ id: "c3", titulo: "Sin inscritos", modalidad: "VIRTUAL", cupo_maximo: 10 }] }, inscripciones: { data: null }, perfiles: { count: null } });
     const r = await generarReporte("2026-01-01", "2026-01-31", "c3");
@@ -136,19 +164,36 @@ describe("catálogo público (HU-05 · HU-06 · HU-33)", () => {
         ],
       },
       "rpc:instructores_publicos": { data: [{ id: "ins-1", nombres: "Luis", apellidos: "Ramos" }] },
-      "rpc:cupo_disponible": (c) => ({ data: (c.valores as { p_curso: string }).p_curso === "excel" ? 4 : null }),
+      "rpc:cupos_disponibles": { data: [{ curso_id: "excel", cupo_disponible: 4 }] },
       "rpc:calificacion_cursos": { data: [{ curso_id: "excel", promedio: 4.5, cantidad: 2 }] },
       "rpc:horarios_publicos": { data: [{ curso_id: "excel", fecha: "2026-10-05", hora_inicio: "09:00" }] },
     });
-    const [excel, sst] = await listarCursosPublicados({ categorias: ["ofimatica"], niveles: ["BASICO"], modalidades: ["VIRTUAL"], precioMax: 200, destacados: true });
-    // HU-24 · Una sola consulta de calificaciones para todo el catálogo.
+    const [excel, sst] = await listarCursosPublicados({
+      categorias: ["ofimatica"],
+      niveles: ["BASICO"],
+      modalidades: ["VIRTUAL"],
+      precioMin: 50,
+      precioMax: 200,
+      duracionMax: 40,
+      destacados: true,
+    });
+    // RNF-02 · Una sola consulta por lotes de cupos disponibles y de calificaciones.
+    expect(entorno.servidor.de("rpc:cupos_disponibles")).toHaveLength(1);
+    expect(entorno.servidor.de("rpc:cupos_disponibles")[0].valores).toEqual({ p_cursos: ["excel", "sst"] });
     expect(entorno.servidor.de("rpc:calificacion_cursos")).toHaveLength(1);
     expect(entorno.servidor.de("rpc:calificacion_cursos")[0].valores).toEqual({ p_ids: ["excel", "sst"] });
     expect(excel.calificacion).toEqual({ promedio: 4.5, cantidad: 2 });
     expect(sst.calificacion).toBeNull();
     expect(entorno.servidor.de("cursos")[0].columnas).toContain("categoria:categorias!inner(nombre, slug)");
     expect(entorno.servidor.de("cursos")[0].filtros).toEqual(
-      expect.arrayContaining([["eq", "estado", "PUBLICADO"], ["in", "categoria.slug", ["ofimatica"]], ["lte", "precio", 200], ["eq", "destacado", true]]),
+      expect.arrayContaining([
+        ["eq", "estado", "PUBLICADO"],
+        ["in", "categoria.slug", ["ofimatica"]],
+        ["gte", "precio", 50],
+        ["lte", "precio", 200],
+        ["lte", "duracion_horas", 40],
+        ["eq", "destacado", true],
+      ]),
     );
     expect(entorno.servidor.de("rpc:instructores_publicos")[0].valores).toEqual({ p_ids: ["ins-1"] });
     expect(excel).toMatchObject({ precio: 180, instructor: "Luis Ramos", cupo_disponible: 4, proxima_sesion: { fecha: "2026-10-05", hora_inicio: "09:00" } });
@@ -208,5 +253,25 @@ describe("catálogo público (HU-05 · HU-06 · HU-33)", () => {
     await expect(listarCategorias()).resolves.toEqual([{ id: 1, nombre: "Ofimática" }]);
     responder();
     await expect(listarCategorias()).resolves.toEqual([]);
+  });
+
+  it("recomienda cursos por afinidad de categoría, destacados y cupo disponible (HU-25)", async () => {
+    responder({
+      cursos: {
+        data: [
+          curso("inscrito", { categoria: { nombre: "Ofimática", slug: "ofimatica" } }),
+          curso("afin", { categoria: { nombre: "Ofimática", slug: "ofimatica" }, destacado: false }),
+          curso("destacado-otro", { categoria: { nombre: "Gestión", slug: "gestion" }, destacado: true }),
+          curso("sin-cupo", { categoria: { nombre: "Ofimática", slug: "ofimatica" }, cupo_maximo: 0 }),
+        ],
+      },
+      "rpc:calificacion_cursos": { data: [{ curso_id: "afin", promedio: 4.8, cantidad: 5 }] },
+      "rpc:cupos_disponibles": { data: [{ curso_id: "sin-cupo", cupo_disponible: 0 }] },
+      "rpc:horarios_publicos": { data: [] },
+    });
+    const recomendados = await recomendarCursos([
+      { estado: "CONFIRMADA", curso: { id: "inscrito", categoria: { slug: "ofimatica" } } },
+    ]);
+    expect(recomendados.map((c) => c.id)).toEqual(["afin", "destacado-otro"]);
   });
 });

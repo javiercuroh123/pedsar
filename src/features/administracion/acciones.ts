@@ -73,6 +73,9 @@ export async function guardarCurso(_: EstadoFormulario, formData: FormData): Pro
   if (!d.success) return fallo(d.error);
   const c = d.data;
   const supabase = await createClient();
+  const publicarEn = c.publicarEn ? new Date(`${c.publicarEn}:00-05:00`).toISOString() : null;
+  const programadoFuturo = publicarEn !== null && new Date(publicarEn).getTime() > Date.now();
+  const estado = programadoFuturo && c.estado === "PUBLICADO" ? "BORRADOR" : c.estado;
   const fila = {
     titulo: c.titulo,
     descripcion: c.descripcion || null,
@@ -83,16 +86,16 @@ export async function guardarCurso(_: EstadoFormulario, formData: FormData): Pro
     precio: c.precio,
     cupo_maximo: c.cupo,
     duracion_horas: c.horas,
-    estado: c.estado,
+    estado,
     destacado: c.destacado,
-    publicar_en: c.publicarEn ? new Date(`${c.publicarEn}:00-05:00`).toISOString() : null,
+    publicar_en: publicarEn,
     imagen_url: c.imagen,
   };
   const { error } = c.id
     ? await supabase.from("cursos").update(fila).eq("id", c.id)
     : await supabase.from("cursos").insert({ ...fila, slug: await slugUnico(c.titulo) });
   if (error) return { ok: false, mensaje: `No se pudo guardar: ${error.message}` };
-  await registrarActividad(usuario.id, c.id ? "EDITAR_CURSO" : "CREAR_CURSO", { titulo: c.titulo, estado: c.estado });
+  await registrarActividad(usuario.id, c.id ? "EDITAR_CURSO" : "CREAR_CURSO", { titulo: c.titulo, estado });
   revalidatePath("/", "layout");
   return { ok: true, mensaje: c.id ? "Curso actualizado" : "Curso creado" };
 }
@@ -102,7 +105,10 @@ export async function cambiarEstadoCurso(formData: FormData) {
   const id = z.uuid().parse(formData.get("id"));
   const estado = z.enum(["PUBLICADO", "DESPUBLICADO", "BORRADOR"]).parse(formData.get("estado"));
   const supabase = await createClient();
-  await supabase.from("cursos").update({ estado }).eq("id", id);
+  await supabase
+    .from("cursos")
+    .update(estado === "PUBLICADO" ? { estado, publicar_en: null } : { estado })
+    .eq("id", id);
   await registrarActividad(usuario.id, estado === "PUBLICADO" ? "PUBLICAR_CURSO" : "DESPUBLICAR_CURSO", { curso: id });
   revalidatePath("/", "layout");
 }

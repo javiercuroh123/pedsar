@@ -3,6 +3,8 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { aprobado } from "@/config/academico";
+import { DIAS_ANTICIPACION_REEMBOLSO, dentroDePlazoReembolso } from "@/config/matricula";
+import { uno } from "@/features/academico/consultas";
 import { registrarActividad } from "@/lib/auditoria";
 import { requireRol } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -73,15 +75,31 @@ const reembolsoSchema = z.object({
   motivo: z.string().trim().min(10, "Describe el motivo (mínimo 10 caracteres)").max(500),
 });
 
-// HU-31 · Solicitud de reembolso
+// HU-31 · HU-50 · Solicitud de reembolso (hasta 7 días antes del inicio del curso)
 export async function solicitarReembolso(_: EstadoFormulario, formData: FormData): Promise<EstadoFormulario> {
   const estudiante = await requireRol("estudiante");
   const datos = reembolsoSchema.safeParse(Object.fromEntries(formData));
   if (!datos.success) return { ok: false, mensaje: datos.error.issues[0]?.message ?? "Datos no válidos" };
 
   const supabase = await createClient();
-  const { data: pago } = await supabase.from("pagos").select("id, monto, estado").eq("id", datos.data.pagoId).maybeSingle();
+  const { data: pago } = await supabase
+    .from("pagos")
+    .select("id, monto, estado, inscripcion:inscripciones(curso:cursos(sesiones(fecha)))")
+    .eq("id", datos.data.pagoId)
+    .maybeSingle();
   if (!pago || pago.estado !== "APROBADO") return { ok: false, mensaje: "Solo se pueden reembolsar pagos aprobados" };
+
+  const sesiones = (
+    uno<{ sesiones?: { fecha: string }[] }>(uno<{ curso?: unknown }>((pago as { inscripcion?: unknown }).inscripcion)?.curso)?.sesiones ?? []
+  )
+    .map((s) => s.fecha)
+    .sort();
+  if (!dentroDePlazoReembolso(sesiones[0] ?? null)) {
+    return {
+      ok: false,
+      mensaje: `Las solicitudes de reembolso se atienden hasta ${DIAS_ANTICIPACION_REEMBOLSO} días antes del inicio del curso`,
+    };
+  }
 
   const { data: existente } = await supabase.from("reembolsos").select("id").eq("pago_id", pago.id).in("estado", ["SOLICITADO", "APROBADO"]).maybeSingle();
   if (existente) return { ok: false, mensaje: "Ya existe una solicitud de reembolso para este pago" };

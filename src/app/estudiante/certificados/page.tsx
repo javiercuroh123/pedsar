@@ -7,7 +7,7 @@ import { buttonVariants } from "@/components/ui/button";
 import { ASISTENCIA_MINIMA, evaluarAptitud, formatearAsistencia, formatearNota, NOTA_MINIMA } from "@/config/academico";
 import { listarMisInscripciones } from "@/features/academico/consultas";
 import { datosCertificado, obtenerResultados } from "@/features/certificacion/consultas";
-import { urlVerificacion } from "@/features/certificacion/qr";
+import { enlacesCompartirCertificado } from "@/features/certificacion/qr";
 import { VistaCertificado } from "@/features/certificacion/vista-certificado";
 import { requireRol } from "@/lib/auth";
 import { publicEnv } from "@/lib/env";
@@ -41,7 +41,11 @@ export default async function EstudianteCertificadosPage() {
         <div className="grid gap-6 md:grid-cols-2">
           {emitidos.map((i) => {
             const datos = datosCertificado(i, nombre);
-            const linkedin = `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(urlVerificacion(publicEnv.NEXT_PUBLIC_SITE_URL, datos.codigo_unico))}`;
+            const compartir = enlacesCompartirCertificado(
+              publicEnv.NEXT_PUBLIC_SITE_URL,
+              datos.codigo_unico,
+              datos.curso,
+            );
             return (
               <div key={i.id} className="overflow-hidden rounded-2xl border bg-card shadow-xs">
                 <div className="bg-linear-to-b from-card to-brand-50 p-5 dark:from-transparent dark:to-brand-500/10">
@@ -68,8 +72,14 @@ export default async function EstudianteCertificadosPage() {
                     <Link href={`/estudiante/certificados/${datos.codigo_unico}`} className={buttonVariants({ variant: "outline", size: "sm" })}>
                       <EyeIcon /> Ver
                     </Link>
-                    <a href={linkedin} target="_blank" rel="noreferrer" className={buttonVariants({ variant: "outline", size: "sm" })}>
-                      <Share2Icon /> Compartir en LinkedIn
+                    <a href={compartir.linkedin} target="_blank" rel="noreferrer" className={buttonVariants({ variant: "outline", size: "sm" })}>
+                      <Share2Icon /> LinkedIn
+                    </a>
+                    <a href={compartir.whatsapp} target="_blank" rel="noreferrer" className={buttonVariants({ variant: "outline", size: "sm" })}>
+                      <Share2Icon /> WhatsApp
+                    </a>
+                    <a href={compartir.facebook} target="_blank" rel="noreferrer" className={buttonVariants({ variant: "outline", size: "sm" })}>
+                      <Share2Icon /> Facebook
                     </a>
                   </div>
                 </div>

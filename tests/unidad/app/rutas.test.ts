@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import { describe, expect, it, vi } from "vitest";
 import { GET as confirmarCorreo } from "@/app/auth/confirm/route";
+import { GET as exportarAuditoria } from "@/app/admin/auditoria/exportar/route";
 import { GET as exportarReporte } from "@/app/admin/reportes/exportar/route";
 import { GET as salud } from "@/app/api/salud/route";
 import { POST as webhook } from "@/app/api/pagos/webhook/[proveedor]/route";
@@ -253,6 +254,51 @@ describe("exportaciones", () => {
     // Solo los mensajes que escribió el usuario: los del otro participante son datos de otra persona.
     expect(entorno.servidor.de("mensajes")[0].filtros).toEqual([["eq", "autor_id", UUID.estudiante]]);
     expect(entorno.servidor.de("resenas")[0].filtros).toEqual([["eq", "estudiante_id", UUID.estudiante]]);
+  });
+
+  it("exporta la bitácora de auditoría en CSV filtrando por fechas y texto (HU-61)", async () => {
+    conSesion("estudiante");
+    expect((await exportarAuditoria(pedido("/admin/auditoria/exportar"))).status).toBe(403);
+
+    conSesion("administrador");
+    responder({
+      registro_actividad: {
+        data: [
+          {
+            id: 1,
+            accion: "=INICIO_SESION",
+            detalle: { ip: "1.2.3.4" },
+            direccion_ip: "127.0.0.1",
+            fecha_hora: "2026-10-05T14:30:00Z",
+            usuario: { nombres: "Ana", apellidos: "Quispe", correo: "ana@pedsar.test", rol: "estudiante" },
+          },
+          {
+            id: 2,
+            accion: "PUBLICAR_CURSO",
+            detalle: null,
+            direccion_ip: null,
+            fecha_hora: "2026-10-05T15:00:00Z",
+            usuario: null,
+          },
+        ],
+      },
+    });
+    const r = await exportarAuditoria(pedido("/admin/auditoria/exportar?desde=2026-10-01&hasta=2026-10-31&q=ana"));
+    expect(r.status).toBe(200);
+    expect(r.headers.get("content-type")).toBe("text/csv; charset=utf-8");
+    const csv = await r.text();
+    expect(csv).toContain("'=INICIO_SESION");
+    expect(csv).not.toContain("PUBLICAR_CURSO");
+    expect(entorno.servidor.de("registro_actividad")[0].filtros).toEqual(
+      expect.arrayContaining([
+        ["gte", "fecha_hora", "2026-10-01T00:00:00-05:00"],
+        ["lte", "fecha_hora", "2026-10-31T23:59:59-05:00"],
+      ]),
+    );
+    expect(entorno.admin.de("registro_actividad")[0].valores).toMatchObject({
+      accion: "EXPORTAR_AUDITORIA",
+      detalle: { formato: "csv", desde: "2026-10-01", hasta: "2026-10-31", registros: 1 },
+    });
   });
 });
 

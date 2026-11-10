@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import { enviarContacto } from "@/features/contacto/acciones";
 import { marcarLeida, marcarTodasLeidas } from "@/features/notificaciones/acciones";
 import { contarNoLeidas, listarNotificaciones } from "@/features/notificaciones/consultas";
-import { notificarUsuario } from "@/features/notificaciones/enviar";
+import { notificarInscritosDelCurso, notificarUsuario } from "@/features/notificaciones/enviar";
 import { actualizarContrasena, cerrarSesion, iniciarSesion, registrarse, solicitarRecuperacion } from "@/features/usuarios/acciones";
 import { actualizarPerfil } from "@/features/usuarios/acciones-perfil";
 import { conSesion, entorno, formulario, Redireccion, responder, UUID } from "../../apoyo/entorno";
@@ -46,12 +46,20 @@ describe("registro y contraseñas (HU-01 · HU-13)", () => {
     expect(distinta.errores?.confirmar).toEqual(["Las contraseñas no coinciden"]);
   });
 
-  it("registra con verificación por correo", async () => {
+  it("registra con verificación por correo y evidencia de privacidad (HU-49)", async () => {
     await expect(registrarse({}, formulario(registro))).resolves.toEqual({ ok: true, mensaje: "Te enviamos un correo para verificar tu cuenta." });
     expect(entorno.servidor.cliente.auth.signUp).toHaveBeenCalledWith({
       email: "ana@pedsar.test",
       password: "Segura123",
-      options: { data: { nombres: "Ana", apellidos: "Quispe" }, emailRedirectTo: "https://pedsar.test/auth/confirm" },
+      options: {
+        data: {
+          nombres: "Ana",
+          apellidos: "Quispe",
+          privacidad_version: "2026-10",
+          privacidad_aceptada_en: expect.any(String),
+        },
+        emailRedirectTo: "https://pedsar.test/auth/confirm",
+      },
     });
     entorno.servidor.cliente.auth.signUp.mockResolvedValueOnce({ data: { user: null }, error: { message: "User already registered" } } as never);
     await expect(registrarse({}, formulario(registro))).resolves.toEqual({ mensaje: "User already registered" });
@@ -68,9 +76,16 @@ describe("registro y contraseñas (HU-01 · HU-13)", () => {
     await expect(actualizarContrasena({}, formulario({ contrasena: "Nueva1234", confirmar: "Nueva1234" }))).resolves.toEqual({ mensaje: "misma contraseña" });
   });
 
-  it("cierra la sesión (HU-14)", async () => {
+  it("cierra la sesión y audita el evento si había usuario autenticado (HU-14 · HU-61)", async () => {
     await expect(cerrarSesion()).rejects.toEqual(new Redireccion("/login"));
     expect(entorno.servidor.cliente.auth.signOut).toHaveBeenCalled();
+
+    conSesion("estudiante");
+    await expect(cerrarSesion()).rejects.toEqual(new Redireccion("/login"));
+    expect(entorno.admin.de("registro_actividad")[0].valores).toMatchObject({
+      usuario_id: UUID.estudiante,
+      accion: "CIERRE_SESION",
+    });
   });
 });
 
@@ -132,8 +147,14 @@ describe("notificaciones in-app (HU-51)", () => {
     ]);
   });
 
-  it("el servidor crea la notificación con el cliente admin", async () => {
+  it("el servidor crea la notificación con el cliente admin y avisa a los inscritos del curso (HU-21 · HU-41)", async () => {
     await notificarUsuario(UUID.estudiante, "Hola");
     expect(entorno.admin.de("notificaciones", "insert")[0].valores).toEqual({ usuario_id: UUID.estudiante, mensaje: "Hola", enlace: null, tipo: "IN_APP" });
+
+    responder({}, { inscripciones: { data: [{ estudiante_id: UUID.estudiante }, { estudiante_id: UUID.estudiante }] } });
+    await notificarInscritosDelCurso(UUID.curso, "Nueva evaluación", "/estudiante/evaluaciones/1");
+    expect(entorno.admin.de("notificaciones", "insert")[0].valores).toEqual([
+      { usuario_id: UUID.estudiante, mensaje: "Nueva evaluación", enlace: "/estudiante/evaluaciones/1", tipo: "IN_APP" },
+    ]);
   });
 });

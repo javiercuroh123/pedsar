@@ -11,7 +11,7 @@ import { DialogoCurso, type CursoEditable } from "@/features/administracion/dial
 import { ICONO_MODALIDAD, SiglaCurso } from "@/features/catalogo/portada-curso";
 import { requireRol } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
-import { ETIQUETA_MODALIDAD, formatearSoles, nombreCompleto } from "@/lib/formato";
+import { ETIQUETA_MODALIDAD, formatearFechaHora, formatearSoles, nombreCompleto } from "@/lib/formato";
 import { cn } from "@/lib/utils";
 import { Constants } from "@/types/database";
 
@@ -129,6 +129,9 @@ export default async function AdminCursosPage({ searchParams }: PageProps<"/admi
                     <td className={cn(tabla.td, "text-right tabular-nums")}>{formatearSoles(Number(c.precio))}</td>
                     <td className={tabla.td}>
                       <EstadoBadge estado={c.estado} />
+                      {c.estado === "BORRADOR" && c.publicar_en && (
+                        <span className="mt-1 block text-xs text-muted-foreground">Programado: {formatearFechaHora(c.publicar_en)}</span>
+                      )}
                     </td>
                     <td className={tabla.td}>
                       <div className="flex justify-end gap-0.5">

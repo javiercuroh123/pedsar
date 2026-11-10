@@ -41,12 +41,13 @@ export interface ReporteGeneral {
 type FilaInscripcion = { curso_id: string; estado: string; fecha_inscripcion: string; pagos: unknown };
 
 /** Mes (AAAA-MM) de un timestamp en hora de Perú. */
-const mesDe = (ts: string) => new Intl.DateTimeFormat("en-CA", { timeZone: "America/Lima", year: "numeric", month: "2-digit" }).format(new Date(ts));
+export const mesDe = (ts: string) => new Intl.DateTimeFormat("en-CA", { timeZone: "America/Lima", year: "numeric", month: "2-digit" }).format(new Date(ts));
 
 /**
  * HU-20 · RF-10 · Inscripciones e ingresos por curso, método de pago y mes en un rango de
  * fechas, más los indicadores de usuarios. Las inscripciones canceladas no cuentan; los
- * ingresos son los pagos aprobados de las inscripciones del periodo.
+ * ingresos son los pagos aprobados de las inscripciones del periodo (imputados al mes de
+ * `fecha_pago` en hora de Perú, o al de `fecha_inscripcion` si no tuviera `fecha_pago`).
  */
 export async function generarReporte(desde: string, hasta: string, cursoId?: string): Promise<ReporteGeneral> {
   const supabase = await createClient();
@@ -54,7 +55,7 @@ export async function generarReporte(desde: string, hasta: string, cursoId?: str
   if (cursoId) cursos = cursos.eq("id", cursoId);
   let ins = supabase
     .from("inscripciones")
-    .select("curso_id, estado, fecha_inscripcion, pagos(monto, metodo, medio, estado)")
+    .select("curso_id, estado, fecha_inscripcion, pagos(monto, metodo, medio, estado, fecha_pago)")
     .neq("estado", "CANCELADA")
     .gte("fecha_inscripcion", `${desde}T00:00:00-05:00`)
     .lte("fecha_inscripcion", `${hasta}T23:59:59-05:00`);
@@ -72,8 +73,10 @@ export async function generarReporte(desde: string, hasta: string, cursoId?: str
   ]);
   const filas = (listaIns ?? []) as FilaInscripcion[];
   const pagoAprobado = (f: FilaInscripcion) => {
-    const p = uno<{ monto: number; metodo: MetodoPago; medio: MedioPago | null; estado: string }>(f.pagos);
-    return p?.estado === "APROBADO" ? { monto: Number(p.monto), metodo: etiquetaPago(p.metodo, p.medio) } : null;
+    const p = uno<{ monto: number; metodo: MetodoPago; medio: MedioPago | null; estado: string; fecha_pago?: string | null }>(f.pagos);
+    return p?.estado === "APROBADO"
+      ? { monto: Number(p.monto), metodo: etiquetaPago(p.metodo, p.medio), fechaPago: p.fecha_pago ?? null }
+      : null;
   };
 
   const porCurso = (listaCursos ?? [])
@@ -109,12 +112,15 @@ export async function generarReporte(desde: string, hasta: string, cursoId?: str
     const m = meses.get(mes) ?? { mes, inscritos: 0, confirmados: 0, ingresos: 0 };
     m.inscritos++;
     if (f.estado === "CONFIRMADA") m.confirmados++;
+    meses.set(mes, m);
     const p = pagoAprobado(f);
     if (p) {
-      m.ingresos += p.monto;
+      const mesPago = mesDe(p.fechaPago ?? f.fecha_inscripcion);
+      const mp = meses.get(mesPago) ?? { mes: mesPago, inscritos: 0, confirmados: 0, ingresos: 0 };
+      mp.ingresos += p.monto;
+      meses.set(mesPago, mp);
       metodos.set(p.metodo, (metodos.get(p.metodo) ?? 0) + p.monto);
     }
-    meses.set(mes, m);
   });
 
   return {

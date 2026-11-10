@@ -71,12 +71,16 @@ describe("pasarelas de pago intercambiables", () => {
     expect((await import("@/lib/pagos")).pasarelaActiva()).toBe(true);
   });
 
-  it("el pago directo queda deshabilitado sin un destino de cobro confirmado", async () => {
+  it("el pago directo queda deshabilitado sin un destino de cobro confirmado y se activa con variables de entorno", async () => {
     vi.resetModules();
     expect((await import("@/lib/pagos")).pagoManualHabilitado()).toBe(false);
     vi.stubEnv("PAGO_MANUAL_HABILITADO", "true");
     vi.resetModules();
     expect((await import("@/lib/pagos")).pagoManualHabilitado()).toBe(false);
+    vi.stubEnv("NEXT_PUBLIC_PAGO_DIRECTO_CELULAR", "956123456");
+    vi.stubEnv("NEXT_PUBLIC_PAGO_DIRECTO_TITULAR", "PEDSAR E.I.R.L.");
+    vi.resetModules();
+    expect((await import("@/lib/pagos")).pagoManualHabilitado()).toBe(true);
   });
 });
 

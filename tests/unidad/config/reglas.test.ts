@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { aprobado, esCertificadoDeAprobacion, evaluarAptitud, formatearAsistencia, formatearNota, type ResultadoAcademico } from "@/config/academico";
-import { PLAZO_PAGO_HORAS, reservaVencida } from "@/config/matricula";
+import { dentroDePlazoReembolso, DIAS_ANTICIPACION_REEMBOLSO, PLAZO_PAGO_HORAS, reservaVencida } from "@/config/matricula";
 import { INICIO_POR_ROL, NAV_POR_ROL, RUTAS_PROTEGIDAS } from "@/config/navegacion";
 
 const resultado = (r: Partial<ResultadoAcademico> = {}): ResultadoAcademico => ({
@@ -94,6 +94,14 @@ describe("plazo de la reserva", () => {
     // En validación (vence_en = null) o ya resuelta, no vence.
     expect(reservaVencida({ estado: "PENDIENTE", vence_en: null })).toBe(false);
     expect(reservaVencida({ estado: "CONFIRMADA", vence_en: "2026-09-01T00:00:00Z" })).toBe(false);
+  });
+
+  it("admite reembolsos hasta 7 días antes del inicio del curso (HU-50)", () => {
+    expect(DIAS_ANTICIPACION_REEMBOLSO).toBe(7);
+    expect(dentroDePlazoReembolso(null, "2026-10-03")).toBe(true);
+    expect(dentroDePlazoReembolso("2026-10-10", "2026-10-03")).toBe(true);
+    expect(dentroDePlazoReembolso("2026-10-09", "2026-10-03")).toBe(false);
+    expect(dentroDePlazoReembolso("fecha-invalida", "2026-10-03")).toBe(true);
   });
 });
 

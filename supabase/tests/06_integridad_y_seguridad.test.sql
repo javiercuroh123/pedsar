@@ -41,6 +41,12 @@ select throws_ok($$insert into public.contenidos_completados(inscripcion_id,cont
 select lives_ok($$insert into public.contenidos_completados(inscripcion_id,contenido_id) select id,96002 from public.inscripciones where curso_id='c6000000-0000-4000-8000-000000000002'$$,'Puede completar su contenido');
 select is((select porcentaje from public.progreso p join public.inscripciones i on i.id=p.inscripcion_id where i.curso_id='c6000000-0000-4000-8000-000000000002'),50.00::numeric,'El trigger calcula el progreso real');
 reset role;
+-- HU-10 · El progreso se recalcula automáticamente al agregar o quitar contenidos o módulos.
+insert into public.contenidos(id,modulo_id,titulo,tipo,url_archivo) overriding system value values
+ (96004,96002,'Tercero','PDF','tercero.pdf'),(96005,96002,'Cuarto','PDF','cuarto.pdf');
+select is((select porcentaje from public.progreso p join public.inscripciones i on i.id=p.inscripcion_id where i.curso_id='c6000000-0000-4000-8000-000000000002'),25.00::numeric,'Agregar contenidos recalcula el porcentaje de progreso');
+delete from public.contenidos where id in (96004,96005);
+select is((select porcentaje from public.progreso p join public.inscripciones i on i.id=p.inscripcion_id where i.curso_id='c6000000-0000-4000-8000-000000000002'),50.00::numeric,'Eliminar contenidos recalcula el porcentaje de progreso');
 select set_config('request.jwt.claims','{}',true);
 update public.perfiles set estado=false where id='a6000000-0000-4000-8000-000000000001';
 select set_config('request.jwt.claims','{"sub":"a6000000-0000-4000-8000-000000000001","role":"authenticated"}',true);
@@ -88,5 +94,37 @@ select lives_ok($$select * from public.registrar_matricula('a6000000-0000-4000-8
 select throws_ok($$select * from public.registrar_matricula('a6000000-0000-4000-8000-000000000002','c6000000-0000-4000-8000-000000000002','YAPE','SEGURIDAD10',90,'{}')$$,'22023',null,'El cupón con último uso reservado no se reutiliza');
 update public.inscripciones set vence_en=now()-interval '1 second' where estado='PENDIENTE' and curso_id='c6000000-0000-4000-8000-000000000002';
 select lives_ok($$select * from public.registrar_matricula('a6000000-0000-4000-8000-000000000002','c6000000-0000-4000-8000-000000000002','YAPE','SEGURIDAD10',90,'{}')$$,'El vencimiento libera el uso del cupón');
+
+-- HU-49 · Consentimiento de política de privacidad persistido al crear usuario.
+insert into auth.users(id,email,raw_user_meta_data) values
+ ('a6000000-0000-4000-8000-000000000004','privacidad@pedsar.test','{"nombres":"Carla","apellidos":"Díaz","privacidad_version":"2026-10","privacidad_aceptada_en":"2026-10-05T14:00:00Z"}');
+select is((select privacidad_version from public.perfiles where id='a6000000-0000-4000-8000-000000000004'),'2026-10','Guarda la versión aceptada de la política de privacidad');
+select ok((select privacidad_aceptada_en is not null from public.perfiles where id='a6000000-0000-4000-8000-000000000004'),'Guarda la fecha y hora de aceptación de privacidad');
+
+-- HU-57 · Publicación automática de cursos programados.
+insert into public.cursos(id,slug,titulo,precio,cupo_maximo,estado,publicar_en) values
+ ('c6000000-0000-4000-8000-000000000003','programado-listo','Programado listo',100,20,'BORRADOR',now()-interval '5 minutes'),
+ ('c6000000-0000-4000-8000-000000000004','programado-futuro','Programado futuro',100,20,'BORRADOR',now()+interval '1 day');
+select is(privado.publicar_cursos_programados(),1,'Publica únicamente los cursos cuyo publicar_en ya venció');
+select is((select estado::text from public.cursos where id='c6000000-0000-4000-8000-000000000003'),'PUBLICADO','El curso programado vencido pasa a PUBLICADO');
+select is((select estado::text from public.cursos where id='c6000000-0000-4000-8000-000000000004'),'BORRADOR','El curso con fecha futura permanece en BORRADOR');
+
+-- RNF-02 · Consulta por lotes de cupos disponibles.
+select is((select count(*)::int from public.cupos_disponibles(array['c6000000-0000-4000-8000-000000000001'::uuid,'c6000000-0000-4000-8000-000000000002'::uuid])),2,'cupos_disponibles devuelve el cupo de múltiples cursos en una sola consulta');
+
+-- RNF-04 · Control de máximo 2 sesiones concurrentes al registrar INICIO_SESION.
+select lives_ok($$insert into public.registro_actividad(usuario_id,accion) values ('a6000000-0000-4000-8000-000000000004','INICIO_SESION')$$,'El trigger de inicio de sesión aplica el límite de sesiones concurrentes');
+
+-- HU-22 · HU-23 · Foro y preguntas por lección restringidos a participantes del curso.
+update public.inscripciones set estado='CONFIRMADA',vence_en=null where estudiante_id='a6000000-0000-4000-8000-000000000002' and curso_id='c6000000-0000-4000-8000-000000000002';
+select set_config('request.jwt.claims','{"sub":"a6000000-0000-4000-8000-000000000002","role":"authenticated"}',true);
+set local role authenticated;
+select lives_ok($$insert into public.foro_temas(curso_id,contenido_id,autor_id,titulo,cuerpo) values ('c6000000-0000-4000-8000-000000000002',96002,'a6000000-0000-4000-8000-000000000002','Pregunta de lección','¿Cómo funciona este módulo?')$$,'Estudiante inscrito puede publicar pregunta en su lección');
+select throws_ok($$insert into public.foro_temas(curso_id,contenido_id,autor_id,titulo,cuerpo) values ('c6000000-0000-4000-8000-000000000002',96001,'a6000000-0000-4000-8000-000000000002','Contenido ajeno','No pertenece al curso')$$,'42501',null,'No permite asociar pregunta a un contenido de otro curso');
+reset role;
+select set_config('request.jwt.claims','{"sub":"a6000000-0000-4000-8000-000000000004","role":"authenticated"}',true);
+set local role authenticated;
+select is_empty($$select id from public.foro_temas where curso_id='c6000000-0000-4000-8000-000000000002'$$,'Usuario no inscrito no puede leer el foro del curso');
+reset role;
 select * from finish();
 rollback;

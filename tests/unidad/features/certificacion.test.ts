@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import type { InscripcionEstudiante } from "@/features/academico/consultas";
 import { datosCertificado, obtenerResultados, verificarCertificado } from "@/features/certificacion/consultas";
 import { generarPdfCertificado, type DatosPdfCertificado } from "@/features/certificacion/pdf-certificado";
-import { trazadoQr, urlVerificacion } from "@/features/certificacion/qr";
+import { enlacesCompartirCertificado, trazadoQr, urlVerificacion } from "@/features/certificacion/qr";
 import { leerPdf } from "../../apoyo/archivos";
 import { entorno, responder } from "../../apoyo/entorno";
 
@@ -19,6 +19,15 @@ describe("QR de verificación", () => {
     // Las tres marcas de posición empiezan en las esquinas.
     expect(d.startsWith("M0 0h1v1h-1z")).toBe(true);
     expect(d).toContain(`M${modulos - 1} 0h1v1h-1z`);
+  });
+
+  it("construye enlaces de compartición en LinkedIn, WhatsApp y Facebook (HU-37)", () => {
+    const enlaces = enlacesCompartirCertificado("https://pedsar.test", "PED-2026-ABCDEFGH", "Excel Avanzado");
+    expect(enlaces.verificacion).toBe("https://pedsar.test/verificar?codigo=PED-2026-ABCDEFGH");
+    expect(enlaces.linkedin).toContain(encodeURIComponent(enlaces.verificacion));
+    expect(enlaces.whatsapp).toContain("https://wa.me/?text=");
+    expect(decodeURIComponent(enlaces.whatsapp)).toContain("Excel Avanzado");
+    expect(enlaces.facebook).toContain(encodeURIComponent(enlaces.verificacion));
   });
 });
 

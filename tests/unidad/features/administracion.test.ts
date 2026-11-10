@@ -68,6 +68,18 @@ describe("cursos (HU-04 · HU-56 · HU-57)", () => {
     expect(auditadas()).toEqual(["CREAR_CURSO"]);
   });
 
+  it("mantiene el curso en BORRADOR si la fecha de publicación programada es futura (HU-57)", async () => {
+    vi.useFakeTimers({ now: new Date("2026-10-01T12:00:00Z") });
+    conSesion("administrador");
+    responder({ "cursos.select": { data: null } });
+    await expect(guardarCurso({}, curso({ estado: "PUBLICADO", publicarEn: "2026-10-05T08:00" }))).resolves.toEqual({ ok: true, mensaje: "Curso creado" });
+    expect(entorno.servidor.de("cursos", "insert")[0].valores).toMatchObject({
+      estado: "BORRADOR",
+      publicar_en: "2026-10-05T13:00:00.000Z",
+    });
+    vi.useRealTimers();
+  });
+
   it("edita sin cambiar el slug e informa los errores", async () => {
     conSesion("administrador");
     responder({ "cursos.update": [{}, { error: { message: "violación de check" } }] });

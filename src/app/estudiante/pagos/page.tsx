@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { CheckCircle2Icon, ReceiptIcon, WalletIcon } from "lucide-react";
 import { EncabezadoPagina, EstadoBadge, EstadoVacio, PanelTabla, TarjetaKpi, tabla } from "@/components/comunes";
-import { PLAZO_PAGO_HORAS, reservaVencida } from "@/config/matricula";
+import { dentroDePlazoReembolso, PLAZO_PAGO_HORAS, reservaVencida } from "@/config/matricula";
 import { listarMisInscripciones } from "@/features/academico/consultas";
 import { DialogoReembolso } from "@/features/academico/dialogo-reembolso";
 import { PagoEnLinea } from "@/features/matricula/pago-en-linea-cliente";
@@ -35,7 +35,12 @@ export default async function EstudiantePagosPage({ searchParams }: PageProps<"/
   const pagado = inscripciones.filter((i) => i.pago?.estado === "APROBADO").reduce((a, i) => a + i.pago!.monto, 0);
   const pendiente = inscripciones.filter((i) => i.pago?.estado === "PENDIENTE" && !reservaVencida(i)).reduce((a, i) => a + i.pago!.monto, 0);
   const reembolsables = inscripciones
-    .filter((i) => i.pago?.estado === "APROBADO" && !(reembolsos ?? []).some((r) => r.pago_id === i.pago!.id && r.estado !== "RECHAZADO"))
+    .filter(
+      (i) =>
+        i.pago?.estado === "APROBADO" &&
+        dentroDePlazoReembolso(i.curso.primera_sesion) &&
+        !(reembolsos ?? []).some((r) => r.pago_id === i.pago!.id && r.estado !== "RECHAZADO"),
+    )
     .map((i) => ({ id: i.pago!.id, etiqueta: `${i.curso.titulo} · ${formatearSoles(i.pago!.monto)}` }));
   const recien = typeof nueva === "string" ? inscripciones.find((i) => i.codigo === nueva) : undefined;
   // Pagos directos por Yape / Plin que el estudiante debe registrar (o que están en validación); el recién creado va primero.

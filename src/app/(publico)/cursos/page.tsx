@@ -5,7 +5,7 @@ import { EstadoVacio } from "@/components/comunes";
 import { buttonVariants } from "@/components/ui/button";
 import { listarCategorias, listarCursosPublicados, type OrdenCatalogo } from "@/features/catalogo/consultas";
 import { CursoCard } from "@/features/catalogo/curso-card";
-import { FiltrosCatalogo, PRECIO_TOPE } from "@/features/catalogo/filtros-catalogo";
+import { DURACION_TOPE, FiltrosCatalogo, PRECIO_TOPE } from "@/features/catalogo/filtros-catalogo";
 import { ETIQUETA_MODALIDAD, ETIQUETA_NIVEL } from "@/lib/formato";
 import type { Modalidad, Nivel } from "@/types/dominio";
 
@@ -21,13 +21,17 @@ export default async function CatalogoPage({ searchParams }: PageProps<"/cursos"
   const categorias = lista(sp.categoria);
   const niveles = lista(sp.nivel).filter((n): n is Nivel => n in ETIQUETA_NIVEL);
   const modalidades = lista(sp.modalidad).filter((m): m is Modalidad => m in ETIQUETA_MODALIDAD);
+  const precioMinNum = Number(lista(sp.precioMin)[0]);
+  const precioMin = Number.isFinite(precioMinNum) && precioMinNum > 0 ? precioMinNum : undefined;
   const precio = Number(lista(sp.precio)[0]);
   const precioMax = Number.isFinite(precio) && precio > 0 && precio < PRECIO_TOPE ? precio : undefined;
+  const duracionNum = Number(lista(sp.duracion)[0]);
+  const duracionMax = Number.isFinite(duracionNum) && duracionNum > 0 && duracionNum < DURACION_TOPE ? duracionNum : undefined;
   const ordenParam = lista(sp.orden)[0] as OrdenCatalogo;
   const orden = ORDENES.includes(ordenParam) ? ordenParam : "relevancia";
 
   const [cursos, todas, todosLosCursos] = await Promise.all([
-    listarCursosPublicados({ q, categorias, niveles, modalidades, precioMax, orden }),
+    listarCursosPublicados({ q, categorias, niveles, modalidades, precioMin, precioMax, duracionMax, orden }),
     listarCategorias(),
     listarCursosPublicados(),
   ]);
@@ -49,7 +53,9 @@ export default async function CatalogoPage({ searchParams }: PageProps<"/cursos"
     ...categorias.map((c) => ({ k: "categoria", v: c, t: todas.find((x) => x.slug === c)?.nombre ?? c })),
     ...niveles.map((n) => ({ k: "nivel", v: n, t: ETIQUETA_NIVEL[n] })),
     ...modalidades.map((m) => ({ k: "modalidad", v: m, t: ETIQUETA_MODALIDAD[m] })),
+    ...(precioMin ? [{ k: "precioMin", v: String(precioMin), t: `Desde S/ ${precioMin}` }] : []),
     ...(precioMax ? [{ k: "precio", v: String(precioMax), t: `Hasta S/ ${precioMax}` }] : []),
+    ...(duracionMax ? [{ k: "duracion", v: String(duracionMax), t: `Hasta ${duracionMax} h` }] : []),
   ];
 
   return (
@@ -73,7 +79,16 @@ export default async function CatalogoPage({ searchParams }: PageProps<"/cursos"
 
       <div className="mx-auto max-w-7xl px-4 pb-20 sm:px-6 lg:px-8">
         <FiltrosCatalogo
-          valores={{ q, categorias, niveles, modalidades, precioMax: precioMax ?? PRECIO_TOPE, orden }}
+          valores={{
+            q,
+            categorias,
+            niveles,
+            modalidades,
+            precioMin: precioMin ?? 0,
+            precioMax: precioMax ?? PRECIO_TOPE,
+            duracionMax: duracionMax ?? DURACION_TOPE,
+            orden,
+          }}
           categorias={todas}
           conteoCategorias={conteo}
         >

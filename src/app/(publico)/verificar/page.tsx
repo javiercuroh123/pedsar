@@ -7,7 +7,28 @@ import { verificarCertificado } from "@/features/certificacion/consultas";
 import { VistaCertificado } from "@/features/certificacion/vista-certificado";
 import { formatearFecha } from "@/lib/formato";
 
-export const metadata: Metadata = { title: "Verificar certificado" };
+export async function generateMetadata({ searchParams }: PageProps<"/verificar">): Promise<Metadata> {
+  const codigo = (await searchParams).codigo;
+  const buscado = typeof codigo === "string" && codigo.trim() ? codigo.trim().toUpperCase() : null;
+  const certificado = buscado ? await verificarCertificado(buscado) : null;
+  if (!certificado) {
+    return {
+      title: "Verificar certificado",
+      description: "Comprueba la autenticidad de un certificado digital emitido por PEDSAR E.I.R.L.",
+    };
+  }
+  const titulo = `Certificado de ${certificado.estudiante} · ${certificado.curso}`;
+  const descripcion = `Certificado verificable (${certificado.codigo_unico}) emitido por PEDSAR E.I.R.L. por completar el curso «${certificado.curso}» (${certificado.duracion_horas} h).`;
+  return {
+    title: titulo,
+    description: descripcion,
+    openGraph: {
+      title: titulo,
+      description: descripcion,
+      type: "article",
+    },
+  };
+}
 
 // HU-11 · Verificación pública de certificados (Figura 15)
 export default async function VerificarPage({ searchParams }: PageProps<"/verificar">) {

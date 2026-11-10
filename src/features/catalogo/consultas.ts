@@ -42,7 +42,9 @@ export interface FiltrosCatalogo {
   categorias?: string[];
   niveles?: Nivel[];
   modalidades?: Modalidad[];
+  precioMin?: number;
   precioMax?: number;
+  duracionMax?: number;
   orden?: OrdenCatalogo;
   destacados?: boolean;
   limite?: number;
@@ -80,6 +82,18 @@ export async function calificaciones(ids: string[]) {
   return mapa;
 }
 
+/** RNF-02 · Cupos disponibles de varios cursos con una sola consulta por lotes. */
+async function cuposDisponibles(ids: string[]) {
+  const mapa = new Map<string, number>();
+  if (!ids.length) return mapa;
+  const supabase = await createClient();
+  const { data } = await supabase.rpc("cupos_disponibles", { p_cursos: ids });
+  for (const c of (data ?? []) as { curso_id: string; cupo_disponible: number }[]) {
+    mapa.set(c.curso_id, Number(c.cupo_disponible));
+  }
+  return mapa;
+}
+
 function proximaSesion(sesiones: FilaSesion[] | null) {
   const hoy = hoyISO();
   return (
@@ -104,7 +118,9 @@ export async function listarCursosPublicados(filtros: FiltrosCatalogo = {}): Pro
   if (filtros.categorias?.length) consulta = consulta.in("categoria.slug", filtros.categorias);
   if (filtros.niveles?.length) consulta = consulta.in("nivel", filtros.niveles);
   if (filtros.modalidades?.length) consulta = consulta.in("modalidad", filtros.modalidades);
+  if (filtros.precioMin !== undefined) consulta = consulta.gte("precio", filtros.precioMin);
   if (filtros.precioMax !== undefined) consulta = consulta.lte("precio", filtros.precioMax);
+  if (filtros.duracionMax !== undefined) consulta = consulta.lte("duracion_horas", filtros.duracionMax);
   if (filtros.destacados) consulta = consulta.eq("destacado", true);
 
   const { data, error } = await consulta;
@@ -114,13 +130,13 @@ export async function listarCursosPublicados(filtros: FiltrosCatalogo = {}): Pro
   const filas = (data ?? []) as any[];
   const [instructores, cupos, notas, horarios] = await Promise.all([
     nombresInstructores(filas.map((f) => f.instructor_id)),
-    Promise.all(filas.map((f) => supabase.rpc("cupo_disponible", { p_curso: f.id }))),
+    cuposDisponibles(filas.map((f) => f.id)),
     calificaciones(filas.map((f) => f.id)),
     supabase.rpc("horarios_publicos", { p_cursos: filas.map((f) => f.id) }),
   ]);
   if (horarios.error) throw new Error(`Horarios: ${horarios.error.message}`);
 
-  let cursos: CursoResumen[] = filas.map((f, i) => ({
+  let cursos: CursoResumen[] = filas.map((f) => ({
     id: f.id,
     slug: f.slug,
     titulo: f.titulo,
@@ -134,7 +150,7 @@ export async function listarCursosPublicados(filtros: FiltrosCatalogo = {}): Pro
     destacado: f.destacado,
     categoria: f.categoria ?? null,
     instructor: instructores.get(f.instructor_id) ?? null,
-    cupo_disponible: (cupos[i].data as number | null) ?? f.cupo_maximo,
+    cupo_disponible: cupos.get(f.id) ?? f.cupo_maximo,
     proxima_sesion: proximaSesion((horarios.data ?? []).filter((s) => s.curso_id === f.id)),
     calificacion: notas.get(f.id) ?? null,
   }));
@@ -207,4 +223,31 @@ export async function listarCategorias() {
   const supabase = await createClient();
   const { data } = await supabase.from("categorias").select("id, nombre, slug, descripcion").order("nombre");
   return (data ?? []) as { id: number; nombre: string; slug: string; descripcion: string | null }[];
+}
+
+/**
+ * HU-25 · Recomendaciones de cursos para el estudiante según el historial de
+ * categorías de sus matrículas previas, priorizando afinidad, destacados y calificación.
+ */
+export async function recomendarCursos(
+  inscripciones: { estado: string; curso: { id: string; categoria: { slug: string } | null } }[],
+  limite = 3,
+): Promise<CursoResumen[]> {
+  const todos = await listarCursosPublicados();
+  const inscritosIds = new Set(inscripciones.filter((i) => i.estado !== "CANCELADA").map((i) => i.curso.id));
+  const categoriasAfinidad = new Set(
+    inscripciones
+      .filter((i) => i.estado !== "CANCELADA" && i.curso.categoria?.slug)
+      .map((i) => i.curso.categoria!.slug),
+  );
+
+  const puntaje = (c: CursoResumen) =>
+    (c.categoria && categoriasAfinidad.has(c.categoria.slug) ? 2 : 0) +
+    (c.destacado ? 1 : 0) +
+    ((c.calificacion?.promedio ?? 0) >= 4 ? 0.5 : 0);
+
+  return todos
+    .filter((c) => !inscritosIds.has(c.id) && c.cupo_disponible > 0)
+    .sort((a, b) => puntaje(b) - puntaje(a))
+    .slice(0, limite);
 }

@@ -2,9 +2,11 @@
 
 import { z } from "zod";
 import { redirect } from "next/navigation";
+import { VERSION_POLITICA_PRIVACIDAD } from "@/config/empresa";
 import { INICIO_POR_ROL } from "@/config/navegacion";
 import { publicEnv } from "@/lib/env";
 import { registrarActividad } from "@/lib/auditoria";
+import { getUsuarioActual } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import type { Rol } from "@/types/dominio";
 import {
@@ -52,7 +54,12 @@ export async function registrarse(_: EstadoFormulario, formData: FormData): Prom
     email: datos.data.correo,
     password: datos.data.contrasena,
     options: {
-      data: { nombres: datos.data.nombres, apellidos: datos.data.apellidos },
+      data: {
+        nombres: datos.data.nombres,
+        apellidos: datos.data.apellidos,
+        privacidad_version: VERSION_POLITICA_PRIVACIDAD,
+        privacidad_aceptada_en: new Date().toISOString(),
+      },
       emailRedirectTo: `${publicEnv.NEXT_PUBLIC_SITE_URL}/auth/confirm`,
     },
   });
@@ -86,6 +93,8 @@ export async function actualizarContrasena(_: EstadoFormulario, formData: FormDa
 
 // HU-14 · Cierre de sesión
 export async function cerrarSesion() {
+  const usuario = await getUsuarioActual();
+  if (usuario) await registrarActividad(usuario.id, "CIERRE_SESION");
   const supabase = await createClient();
   await supabase.auth.signOut();
   redirect("/login");

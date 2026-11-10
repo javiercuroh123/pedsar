@@ -89,12 +89,38 @@ describe("solicitud de reembolso (HU-31)", () => {
     await expect(solicitar()).resolves.toEqual({ ok: false, mensaje: "RLS" });
   });
 
-  it("registra la solicitud por el monto pagado", async () => {
+  it("registra la solicitud por el monto pagado y exige al menos 7 días de anticipación (HU-50)", async () => {
+    vi.useFakeTimers({ now: new Date("2026-10-03T15:00:00Z") });
     conSesion("estudiante");
-    responder({ pagos: { data: { id: UUID.pago, monto: 180, estado: "APROBADO" } } });
+    responder({
+      pagos: {
+        data: {
+          id: UUID.pago,
+          monto: 180,
+          estado: "APROBADO",
+          inscripcion: { curso: { sesiones: [{ fecha: "2026-10-08" }] } },
+        },
+      },
+    });
+    await expect(solicitar()).resolves.toEqual({
+      ok: false,
+      mensaje: "Las solicitudes de reembolso se atienden hasta 7 días antes del inicio del curso",
+    });
+
+    responder({
+      pagos: {
+        data: {
+          id: UUID.pago,
+          monto: 180,
+          estado: "APROBADO",
+          inscripcion: { curso: { sesiones: [{ fecha: "2026-10-10" }] } },
+        },
+      },
+    });
     await expect(solicitar()).resolves.toEqual({ ok: true, mensaje: "Solicitud enviada. Te responderemos por correo." });
     expect(entorno.servidor.de("reembolsos", "insert")[0].valores).toEqual({ pago_id: UUID.pago, motivo: "No podré asistir por viaje de trabajo", monto: 180 });
     expect(entorno.admin.de("registro_actividad")[0].valores).toMatchObject({ accion: "SOLICITAR_REEMBOLSO" });
+    vi.useRealTimers();
   });
 });
 

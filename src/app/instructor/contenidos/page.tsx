@@ -7,6 +7,8 @@ import { eliminarContenido, eliminarModulo } from "@/features/academico/acciones
 import { listarModulosConContenidos } from "@/features/academico/consultas";
 import { elegirCurso, listarCursosDelInstructor } from "@/features/academico/consultas-instructor";
 import { DialogoContenido, DialogoModulo } from "@/features/academico/formularios-instructor";
+import { listarTemasCurso } from "@/features/comunidad/consultas-foro";
+import { SeccionForo } from "@/features/comunidad/seccion-foro";
 import { requireRol } from "@/lib/auth";
 import type { TipoContenido } from "@/types/dominio";
 
@@ -24,7 +26,12 @@ export default async function InstructorContenidosPage({ searchParams }: PagePro
   const { curso: param } = await searchParams;
   const cursos = await listarCursosDelInstructor(usuario);
   const curso = elegirCurso(cursos, param);
-  const modulos = curso ? await listarModulosConContenidos(curso.id) : [];
+  const [modulos, temasForo] = curso
+    ? await Promise.all([
+        listarModulosConContenidos(curso.id),
+        listarTemasCurso(curso.id, usuario.id, true),
+      ])
+    : [[], []];
 
   return (
     <div className="space-y-6">
@@ -107,6 +114,10 @@ export default async function InstructorContenidosPage({ searchParams }: PagePro
             </section>
           ))}
         </div>
+      )}
+
+      {curso && (
+        <SeccionForo cursoId={curso.id} contenidoActual={null} temas={temasForo} />
       )}
     </div>
   );

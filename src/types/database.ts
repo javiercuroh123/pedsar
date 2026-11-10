@@ -509,6 +509,103 @@ export type Database = {
           },
         ]
       }
+      foro_respuestas: {
+        Row: {
+          autor_id: string
+          creado_en: string
+          id: number
+          tema_id: number
+          texto: string
+        }
+        Insert: {
+          autor_id: string
+          creado_en?: string
+          id?: never
+          tema_id: number
+          texto: string
+        }
+        Update: {
+          autor_id?: string
+          creado_en?: string
+          id?: never
+          tema_id?: number
+          texto?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "foro_respuestas_autor_id_fkey"
+            columns: ["autor_id"]
+            isOneToOne: false
+            referencedRelation: "perfiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "foro_respuestas_tema_id_fkey"
+            columns: ["tema_id"]
+            isOneToOne: false
+            referencedRelation: "foro_temas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      foro_temas: {
+        Row: {
+          actualizado_en: string
+          autor_id: string
+          contenido_id: number | null
+          creado_en: string
+          cuerpo: string
+          curso_id: string
+          id: number
+          resuelto: boolean
+          titulo: string
+        }
+        Insert: {
+          actualizado_en?: string
+          autor_id: string
+          contenido_id?: number | null
+          creado_en?: string
+          cuerpo: string
+          curso_id: string
+          id?: never
+          resuelto?: boolean
+          titulo: string
+        }
+        Update: {
+          actualizado_en?: string
+          autor_id?: string
+          contenido_id?: number | null
+          creado_en?: string
+          cuerpo?: string
+          curso_id?: string
+          id?: never
+          resuelto?: boolean
+          titulo?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "foro_temas_autor_id_fkey"
+            columns: ["autor_id"]
+            isOneToOne: false
+            referencedRelation: "perfiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "foro_temas_contenido_id_fkey"
+            columns: ["contenido_id"]
+            isOneToOne: false
+            referencedRelation: "contenidos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "foro_temas_curso_id_fkey"
+            columns: ["curso_id"]
+            isOneToOne: false
+            referencedRelation: "cursos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       inscripciones: {
         Row: {
           codigo: string
@@ -792,6 +889,8 @@ export type Database = {
           fecha_registro: string
           id: string
           nombres: string
+          privacidad_aceptada_en: string | null
+          privacidad_version: string | null
           rol: Database["public"]["Enums"]["rol_usuario"]
           telefono: string | null
         }
@@ -806,6 +905,8 @@ export type Database = {
           fecha_registro?: string
           id: string
           nombres?: string
+          privacidad_aceptada_en?: string | null
+          privacidad_version?: string | null
           rol?: Database["public"]["Enums"]["rol_usuario"]
           telefono?: string | null
         }
@@ -820,6 +921,8 @@ export type Database = {
           fecha_registro?: string
           id?: string
           nombres?: string
+          privacidad_aceptada_en?: string | null
+          privacidad_version?: string | null
           rol?: Database["public"]["Enums"]["rol_usuario"]
           telefono?: string | null
         }
@@ -1098,6 +1201,13 @@ export type Database = {
         }[]
       }
       cupo_disponible: { Args: { p_curso: string }; Returns: number }
+      cupos_disponibles: {
+        Args: { p_cursos: string[] }
+        Returns: {
+          cupo_disponible: number
+          curso_id: string
+        }[]
+      }
       es_admin: { Args: never; Returns: boolean }
       finalizar_reembolso: { Args: { p_reembolso: number; p_actor: string }; Returns: boolean }
       instructores_publicos: {

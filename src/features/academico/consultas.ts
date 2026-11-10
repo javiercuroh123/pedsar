@@ -20,6 +20,8 @@ export interface InscripcionEstudiante {
     modalidad: Modalidad;
     duracion_horas: number;
     categoria: { nombre: string; slug: string } | null;
+    /** Fecha de la primera sesión programada (AAAA-MM-DD), o null si aún no tiene sesiones. */
+    primera_sesion?: string | null;
   };
   pago: {
     id: string;
@@ -93,7 +95,7 @@ export async function listarMisInscripciones(estudianteId: string): Promise<Insc
     .from("inscripciones")
     .select(
       `id, codigo, estado, fecha_inscripcion, vence_en,
-       curso:cursos(id, slug, titulo, modalidad, duracion_horas, categoria:categorias(nombre, slug)),
+       curso:cursos(id, slug, titulo, modalidad, duracion_horas, categoria:categorias(nombre, slug), sesiones(fecha)),
        pagos(id, monto, metodo, medio, estado, fecha_pago, numero_operacion, reportado_en, observacion, comprobantes(id, tipo, serie, numero)),
        certificados(codigo_unico, fecha_emision, estudiante_nombre, curso_titulo, duracion_horas, instructor_nombre, nota_final)`,
     )
@@ -108,7 +110,8 @@ export async function listarMisInscripciones(estudianteId: string): Promise<Insc
   );
 
   return filas.map((f) => {
-    const curso = uno<InscripcionEstudiante["curso"]>(f.curso)!;
+    const curso = uno<InscripcionEstudiante["curso"] & { sesiones?: { fecha: string }[] }>(f.curso)!;
+    const fechasSesion = (curso.sesiones ?? []).map((s) => s.fecha).sort();
     const pago = uno<Record<string, unknown>>(f.pagos);
     return {
       id: f.id,
@@ -116,7 +119,7 @@ export async function listarMisInscripciones(estudianteId: string): Promise<Insc
       estado: f.estado,
       fecha_inscripcion: f.fecha_inscripcion,
       vence_en: f.vence_en,
-      curso: { ...curso, categoria: uno(curso.categoria) },
+      curso: { ...curso, categoria: uno(curso.categoria), primera_sesion: fechasSesion[0] ?? null },
       pago: pago
         ? {
             id: pago.id as string,

@@ -6,6 +6,7 @@ import { BotonAccion } from "@/components/boton-accion";
 import { resolverPago } from "@/features/administracion/acciones";
 import { GraficoBarras } from "@/features/administracion/grafico-barras";
 import { GraficoDona } from "@/features/administracion/grafico-dona";
+import { mesDe } from "@/features/administracion/reportes";
 import { uno } from "@/features/academico/consultas";
 import { cursosMejorEvaluados } from "@/features/comunidad/consultas-resenas";
 import { Estrellas, formatearPromedio } from "@/features/comunidad/estrellas";
@@ -25,15 +26,16 @@ export default async function AdminPage() {
   await requireRol("administrador");
   const supabase = await createClient();
   const hoy = hoyISO();
-  const inicioMes = `${hoy.slice(0, 7)}-01`;
-  const hace12 = new Date(`${hoy.slice(0, 7)}-15T12:00:00Z`);
+  const mesActual = hoy.slice(0, 7);
+  const inicioMes = `${mesActual}-01T00:00:00-05:00`;
+  const hace12 = new Date(`${mesActual}-15T12:00:00Z`);
   hace12.setUTCMonth(hace12.getUTCMonth() - 11);
-  const desde = `${hace12.toISOString().slice(0, 7)}-01`;
+  const desde = `${hace12.toISOString().slice(0, 7)}-01T00:00:00-05:00`;
 
   const [usuarios, usuariosMes, inscripciones, pagos, certificados, cursos, pendientes, mejorEvaluados] = await Promise.all([
     supabase.from("perfiles").select("id", { head: true, count: "exact" }),
     supabase.from("perfiles").select("id", { head: true, count: "exact" }).gte("fecha_registro", inicioMes),
-    supabase.from("inscripciones").select("id, curso_id, estado, fecha_inscripcion").gte("fecha_inscripcion", desde),
+    supabase.from("inscripciones").select("id, curso_id, estado, fecha_inscripcion").neq("estado", "CANCELADA").gte("fecha_inscripcion", desde),
     supabase.from("pagos").select("monto, fecha_pago").eq("estado", "APROBADO"),
     supabase.from("certificados").select("id", { head: true, count: "exact" }),
     supabase.from("cursos").select("id, titulo, modalidad, cupo_maximo, estado"),
@@ -51,15 +53,15 @@ export default async function AdminPage() {
   const listaCursos = (cursos.data ?? []) as { id: string; titulo: string; modalidad: Modalidad; cupo_maximo: number; estado: string }[];
 
   const ingresos = filasPagos.reduce((a, p) => a + Number(p.monto), 0);
-  const ingresosMes = filasPagos.filter((p) => (p.fecha_pago ?? "") >= inicioMes).reduce((a, p) => a + Number(p.monto), 0);
-  const insMes = filasIns.filter((i) => i.fecha_inscripcion >= inicioMes).length;
+  const ingresosMes = filasPagos.filter((p) => p.fecha_pago && mesDe(p.fecha_pago) === mesActual).reduce((a, p) => a + Number(p.monto), 0);
+  const insMes = filasIns.filter((i) => mesDe(i.fecha_inscripcion) === mesActual).length;
 
-  // Serie mensual de matrículas (últimos 12 meses).
+  // Serie mensual de matrículas (últimos 12 meses, en hora de Perú).
   const meses = Array.from({ length: 12 }, (_, i) => {
     const d = new Date(hace12);
     d.setUTCMonth(d.getUTCMonth() + i);
     const clave = d.toISOString().slice(0, 7);
-    return { clave, etiqueta: MES.format(d).replace(".", ""), valor: filasIns.filter((x) => x.fecha_inscripcion.slice(0, 7) === clave).length };
+    return { clave, etiqueta: MES.format(d).replace(".", ""), valor: filasIns.filter((x) => mesDe(x.fecha_inscripcion) === clave).length };
   });
 
   const publicados = listaCursos.filter((c) => c.estado === "PUBLICADO");
