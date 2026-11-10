@@ -7,7 +7,7 @@ import { toast } from "sonner";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { NOTA_MINIMA } from "@/config/academico";
 import { cn } from "@/lib/utils";
-import { enviarEvaluacion, type ResultadoEvaluacion } from "./acciones-estudiante";
+import { iniciarEvaluacion, enviarEvaluacion, type ResultadoEvaluacion } from "./acciones-estudiante";
 
 export interface PreguntaPublica {
   id: number;
@@ -22,24 +22,22 @@ export function RendirEvaluacion({
   evaluacionId,
   titulo,
   curso,
-  preguntas,
   tiempoMin,
-  intento,
   intentosPermitidos,
 }: {
   evaluacionId: number;
   titulo: string;
   curso: string;
-  preguntas: PreguntaPublica[];
   tiempoMin: number | null;
-  intento: number;
   intentosPermitidos: number;
 }) {
   const [i, setI] = useState(0);
+  const [preguntas, setPreguntas] = useState<PreguntaPublica[]>([]);
+  const [sesion, setSesion] = useState<{ intento: number; finLocal: number | null } | null>(null);
   const [resp, setResp] = useState<Record<string, string>>({});
-  const [restante, setRestante] = useState(tiempoMin ? tiempoMin * 60 : null);
+  const [restante, setRestante] = useState<number | null>(null);
   const [resultado, setResultado] = useState<ResultadoEvaluacion | null>(null);
-  const [enviando, iniciar] = useTransition();
+  const [enviando, iniciarTransicion] = useTransition();
   const enviado = useRef(false);
   // El envío automático por tiempo necesita las respuestas más recientes.
   const respRef = useRef(resp);
@@ -48,30 +46,67 @@ export function RendirEvaluacion({
   }, [resp]);
 
   const enviar = useCallback(() => {
-    if (enviado.current) return;
+    if (enviado.current || !sesion) return;
     enviado.current = true;
-    iniciar(async () => {
-      const r = await enviarEvaluacion(evaluacionId, respRef.current);
+    iniciarTransicion(async () => {
+      let r: ResultadoEvaluacion;
+      try {
+        r = await enviarEvaluacion(evaluacionId, respRef.current, sesion.intento);
+      } catch {
+        enviado.current = false;
+        toast.error("No se pudo conectar. Puedes volver a enviar el mismo intento.");
+        return;
+      }
       if (!r.ok) {
         enviado.current = false;
         toast.error(r.mensaje ?? "No se pudo enviar la evaluación");
         return;
       }
       setResultado(r);
+      try { sessionStorage.removeItem(`evaluacion:${evaluacionId}:${sesion.intento}`); } catch { /* almacenamiento deshabilitado */ }
       window.scrollTo({ top: 0 });
     });
-  }, [evaluacionId]);
+  }, [evaluacionId, sesion]);
+
+  const iniciar = () => iniciarTransicion(async () => {
+    try {
+      const r = await iniciarEvaluacion(evaluacionId);
+      if (!r.ok) { toast.error(r.mensaje); return; }
+      const segundos = r.sesion.vence_en ? Math.max(0, (Date.parse(r.sesion.vence_en) - Date.parse(r.sesion.servidor_en)) / 1000) : null;
+      setSesion({ intento: r.sesion.numero_intento, finLocal: segundos === null ? null : Date.now() + segundos * 1000 });
+      setRestante(segundos === null ? null : Math.ceil(segundos));
+      setPreguntas(r.preguntas);
+      try {
+        const guardadas = JSON.parse(sessionStorage.getItem(`evaluacion:${evaluacionId}:${r.sesion.numero_intento}`) ?? "{}");
+        if (guardadas && typeof guardadas === "object") setResp(guardadas);
+      } catch { /* El plazo lo conserva el servidor aunque el navegador no guarde respuestas. */ }
+    } catch { toast.error("No se pudo iniciar. Inténtalo de nuevo."); }
+  });
 
   useEffect(() => {
-    if (restante === null || resultado) return;
+    if (!sesion || resultado) return;
+    try { sessionStorage.setItem(`evaluacion:${evaluacionId}:${sesion.intento}`, JSON.stringify(resp)); } catch { /* almacenamiento deshabilitado */ }
+  }, [resp, sesion, resultado, evaluacionId]);
+
+  useEffect(() => {
+    if (restante === null || resultado || !sesion) return;
     if (restante <= 0) {
       toast.info("Se acabó el tiempo. Enviamos tus respuestas.");
       enviar();
       return;
     }
-    const t = setTimeout(() => setRestante((s) => (s ?? 1) - 1), 1000);
+    const t = setTimeout(() => setRestante(Math.max(0, Math.ceil(((sesion.finLocal ?? Date.now()) - Date.now()) / 1000))), 1000);
     return () => clearTimeout(t);
-  }, [restante, resultado, enviar]);
+  }, [restante, resultado, enviar, sesion]);
+
+  if (!sesion) return (
+    <div className="mx-auto max-w-xl space-y-4 rounded-2xl border bg-card p-8">
+      <h1 className="text-2xl font-bold">{titulo}</h1>
+      <p>{curso}</p>
+      <p className="text-sm text-muted-foreground">{tiempoMin ? `Dispones de ${tiempoMin} minutos. El plazo continúa aunque cierres o recargues la página.` : "Esta evaluación no tiene límite de tiempo."}</p>
+      <Button onClick={iniciar} disabled={enviando}>Iniciar o continuar evaluación</Button>
+    </div>
+  );
 
   if (resultado) {
     const pct = resultado.total ? (resultado.puntaje! / resultado.total) * 100 : 0;
@@ -95,7 +130,7 @@ export function RendirEvaluacion({
             {resultado.aprobado ? "¡Evaluación aprobada!" : "Evaluación no aprobada"}
           </h1>
           <p className="mt-2 text-sm text-muted-foreground">
-            Respondiste correctamente {resultado.correctas} de {resultado.preguntas} preguntas. Nota mínima aprobatoria: {NOTA_MINIMA}/20.
+            {resultado.mensaje} Respondiste correctamente {resultado.correctas} de {resultado.preguntas} preguntas. Nota mínima aprobatoria: {NOTA_MINIMA}/20.
             {resultado.intentosRestantes ? ` Te quedan ${resultado.intentosRestantes} intento(s).` : ""}
           </p>
           <div className="mt-8 flex justify-center gap-2">
@@ -131,7 +166,7 @@ export function RendirEvaluacion({
           <p className="text-sm text-muted-foreground">{curso}</p>
           <h1 className="mt-1 text-2xl font-bold tracking-tight">{titulo}</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            {preguntas.length} preguntas · Intento {intento} de {intentosPermitidos}
+            {preguntas.length} preguntas · Intento {sesion.intento} de {intentosPermitidos}
           </p>
         </div>
         {restante !== null && (

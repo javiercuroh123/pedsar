@@ -196,10 +196,14 @@ Varias funciones (pagos, evaluaciones, notificaciones, auditoría) requieren `SU
 
 ## Pruebas (Definición de Terminado)
 
+Las correcciones de integridad y seguridad del 10/11/2026 requieren desplegar el código
+junto con su migración. Consulta [cambios, comprobaciones y pasos de aplicación](docs/correcciones-criticas-2026-11-10.md).
+
 ```bash
 npm test                  # pruebas unitarias (Vitest)
 npm run test:cobertura    # con informe de cobertura en coverage/ (mínimo exigido: 70 %)
 npm run test:db           # pruebas de la BD con pgTAP (requiere `npm run db:start`)
+node scripts/probar-concurrencia.mjs # último cupo/cupón con dos conexiones a Supabase local
 ```
 
 - **Unitarias** (`tests/unidad`): reglas de aprobación y plazos, acciones de servidor

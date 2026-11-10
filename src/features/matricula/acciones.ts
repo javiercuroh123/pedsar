@@ -47,8 +47,13 @@ async function buscarCupon(codigo: string) {
     .maybeSingle();
   if (!cupon || !cupon.activo || cupon.fecha_vigencia < hoyISO()) return null;
   if (cupon.usos_maximos) {
-    const { count } = await admin.from("pagos").select("id", { head: true, count: "exact" }).eq("cupon_id", cupon.id);
-    if ((count ?? 0) >= cupon.usos_maximos) return null;
+    const [pagados, reservados] = await Promise.all([
+      admin.from("pagos").select("id", { head: true, count: "exact" }).eq("cupon_id", cupon.id).eq("estado", "APROBADO"),
+      admin.from("pagos").select("id, inscripcion:inscripciones!inner(estado, vence_en)", { head: true, count: "exact" })
+        .eq("cupon_id", cupon.id).eq("estado", "PENDIENTE").eq("inscripcion.estado", "PENDIENTE")
+        .or(`vence_en.is.null,vence_en.gt.${new Date().toISOString()}`, { referencedTable: "inscripcion" }),
+    ]);
+    if (pagados.error || reservados.error || (pagados.count ?? 0) + (reservados.count ?? 0) >= cupon.usos_maximos) return null;
   }
   return { id: cupon.id as number, porcentaje: Number(cupon.porcentaje_descuento) };
 }
@@ -89,29 +94,25 @@ export async function inscribirse(formData: FormData) {
       .eq("id", estudiante.id);
   }
 
-  const { data: inscripcion, error } = await supabase
-    .from("inscripciones")
-    .insert({ estudiante_id: estudiante.id, curso_id: datos.cursoId })
-    .select("id, codigo, vence_en")
-    .single();
-
-  if (error) {
-    const mensaje =
-      error.code === "23505" ? "Ya estás inscrito en este curso" : error.code === "P0001" ? "El curso ya no tiene cupos disponibles" : error.message;
-    redirect(`/estudiante/cursos?error=${encodeURIComponent(mensaje)}`);
-  }
-
   const cupon = datos.cupon ? await buscarCupon(datos.cupon) : null;
+  if (datos.cupon && !cupon) redirect(`/estudiante/cursos?error=${encodeURIComponent("El cupón ya no está disponible. Revisa el importe antes de inscribirte.")}`);
   const monto = Math.round(Number(curso.precio) * (1 - (cupon?.porcentaje ?? 0) / 100) * 100) / 100;
 
   // Los pagos solo los escribe el servidor (sin política de inserción para estudiantes).
   const datosFacturacion =
     datos.comprobante === "FACTURA" ? { tipo: "FACTURA", ruc: datos.ruc ?? null, razon_social: datos.razonSocial ?? null } : { tipo: "BOLETA" };
-  const { data: pago } = await createAdminClient()
-    .from("pagos")
-    .insert({ inscripcion_id: inscripcion.id, cupon_id: cupon?.id ?? null, monto, metodo: datos.metodo, datos_facturacion: datosFacturacion })
-    .select("id")
+  const { data: matricula, error } = await createAdminClient()
+    .rpc("registrar_matricula", { p_estudiante: estudiante.id, p_curso: datos.cursoId, p_metodo: datos.metodo,
+      p_cupon: datos.cupon || "", p_monto: monto, p_facturacion: datosFacturacion })
     .single();
+  if (error || !matricula) {
+    const mensaje = error?.code === "23505" ? "Ya estás inscrito en este curso"
+      : error?.code === "P0001" ? "El curso ya no tiene cupos disponibles"
+      : error?.code === "22023" ? error.message : "No se pudo registrar la matrícula y su pago. Inténtalo de nuevo.";
+    redirect(`/estudiante/cursos?error=${encodeURIComponent(mensaje)}`);
+  }
+  const inscripcion = { id: matricula.inscripcion_id, codigo: matricula.codigo, vence_en: matricula.vence_en };
+  const pago = { id: matricula.pago_id };
 
   await registrarActividad(estudiante.id, "INSCRIPCION_CREADA", {
     inscripcion: inscripcion.id,

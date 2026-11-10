@@ -89,6 +89,13 @@ export function PagoManual({
     return r;
   }, {});
 
+  if (!celular || !titular) return (
+    <section className="rounded-2xl border bg-card p-5 text-sm">
+      <p className="font-semibold">Pago directo temporalmente no disponible · {curso.titulo}</p>
+      <p className="mt-2 text-muted-foreground">PEDSAR está confirmando sus datos de cobro. Si ya realizaste un pago, contacta a la administración indicando tu inscripción {codigo}.</p>
+    </section>
+  );
+
   return (
     <section aria-labelledby={`pago-${pago.id}`} className="animar-escala overflow-hidden rounded-2xl border bg-card shadow-xs">
       <div className="flex flex-wrap items-start justify-between gap-3 border-b p-5">

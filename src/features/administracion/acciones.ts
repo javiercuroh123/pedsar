@@ -316,11 +316,13 @@ export async function resolverReembolso(formData: FormData): Promise<EstadoFormu
     const { data } = await db.from("reembolsos").update({ estado: a }).eq("id", id).eq("estado", desde).select("id").maybeSingle();
     return Boolean(data);
   };
-  const cerrar = async (estadoFinal: "APROBADO" | "PROCESADO") => {
-    if (estadoFinal === "PROCESADO") await db.from("reembolsos").update({ estado: "PROCESADO" }).eq("id", id);
-    await db.from("pagos").update({ estado: "REEMBOLSADO" }).eq("id", pago.id);
-    await db.from("inscripciones").update({ estado: "CANCELADA" }).eq("id", pago.inscripcion_id);
+  const cerrar = async (mensaje: string): Promise<EstadoFormulario> => {
+    const { error } = await db.rpc("finalizar_reembolso", { p_reembolso: id, p_actor: usuario.id });
+    if (error) return { ok: false, mensaje: "No se pudo registrar el cierre. Si el dinero ya fue devuelto, usa «Marcar como devuelto» para registrar la entrega, sin repetir la transferencia." };
+    if (decision === "manual") await registrarActividad(usuario.id, "REEMBOLSO_MANUAL", { reembolso: id });
     revalidatePath("/admin", "layout");
+    revalidatePath("/estudiante", "layout");
+    return { ok: true, mensaje };
   };
   const enPasarela = pago.metodo === "CULQI" && Boolean(pago.referencia_pasarela?.startsWith("chr_"));
   /** Devuelve en Culqi; null si salió bien o el motivo del fallo. */
@@ -349,27 +351,24 @@ export async function resolverReembolso(formData: FormData): Promise<EstadoFormu
     if (estudiante) await notificar(estudiante, "Tu solicitud de reembolso fue aprobada.", "/estudiante/pagos");
     await registrarActividad(usuario.id, "APROBAR_REEMBOLSO", { reembolso: id });
     if (!enPasarela) {
-      await cerrar("APROBADO");
+      // Aprobar autoriza la devolución; el dinero sigue pendiente de entrega.
+      revalidatePath("/admin", "layout");
       return { ok: true, mensaje: "Reembolso aprobado: devuelve el dinero al estudiante." };
     }
     const motivo = await devolverEnCulqi();
     if (motivo !== null) return fallo(motivo);
-    await cerrar("PROCESADO");
-    return { ok: true, mensaje: "Reembolso procesado en Culqi" };
+    return cerrar("Reembolso procesado en Culqi");
   }
 
   // reintentar / manual: solo para un reembolso aprobado cuyo pago aún no se devolvió.
-  if (r.estado !== "APROBADO" || pago.estado !== "APROBADO") return yaAtendida;
+  if (r.estado !== "APROBADO" || (pago.estado !== "APROBADO" && !(decision === "manual" && pago.estado === "REEMBOLSADO"))) return yaAtendida;
   if (decision === "manual") {
-    await registrarActividad(usuario.id, "REEMBOLSO_MANUAL", { reembolso: id });
-    await cerrar("PROCESADO");
-    return { ok: true, mensaje: "Reembolso marcado como devuelto" };
+    return cerrar("Reembolso marcado como devuelto");
   }
   if (!enPasarela) return { ok: false, mensaje: "Este pago se devuelve a mano" };
   const motivo = await devolverEnCulqi();
   if (motivo !== null) return fallo(motivo);
-  await cerrar("PROCESADO");
-  return { ok: true, mensaje: "Reembolso procesado en Culqi" };
+  return cerrar("Reembolso procesado en Culqi");
 }
 
 const MENSAJE_CONCILIACION: Record<ResultadoConciliacion, [boolean, string]> = {

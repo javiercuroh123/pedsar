@@ -30,6 +30,13 @@ const ACTUALIZADO = { data: { id: UUID.pago } };
 const auditadas = () => entorno.admin.de("registro_actividad").map((c) => c.valores as { accion: string; usuario_id: string | null });
 
 describe("confirmarPago: único punto de confirmación de un pago", () => {
+  it.each(["P0001", "23505"])("si la BD impide confirmar una reserva tardía (%s), solicita devolución sin anunciar matrícula", async (code) => {
+    responder({}, { "pagos.select": pago(), "pagos.update": ACTUALIZADO, "inscripciones.update": { error: { code, message: "Sin lugar" } }, perfiles: { data: [{ id: UUID.admin }] } });
+    await expect(confirmarPago(UUID.pago, { referencia: "chr_1", actor: null })).resolves.toBe("SIN_CUPO");
+    expect(auditadas()).toContainEqual(expect.objectContaining({ accion: "PAGO_SIN_CUPO" }));
+    expect(programarCorreo).not.toHaveBeenCalled();
+  });
+
   it("aprueba el pago, confirma la matrícula, avisa y envía el correo con el comprobante", async () => {
     responder({}, { "pagos.select": pago(), "pagos.update": ACTUALIZADO, comprobantes: COMPROBANTE });
     const respuesta = { id: "chr_1" };

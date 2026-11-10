@@ -71,10 +71,10 @@ describe("pasarelas de pago intercambiables", () => {
     expect((await import("@/lib/pagos")).pasarelaActiva()).toBe(true);
   });
 
-  it("el pago directo por Yape / Plin está habilitado salvo que se apague", async () => {
+  it("el pago directo queda deshabilitado sin un destino de cobro confirmado", async () => {
     vi.resetModules();
-    expect((await import("@/lib/pagos")).pagoManualHabilitado()).toBe(true);
-    vi.stubEnv("PAGO_MANUAL_HABILITADO", "false");
+    expect((await import("@/lib/pagos")).pagoManualHabilitado()).toBe(false);
+    vi.stubEnv("PAGO_MANUAL_HABILITADO", "true");
     vi.resetModules();
     expect((await import("@/lib/pagos")).pagoManualHabilitado()).toBe(false);
   });

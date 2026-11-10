@@ -59,8 +59,11 @@ select pruebas.como('a0000000-0000-4000-8000-000000000003');
 select results_eq($$select correo from public.perfiles$$, array['ana@pedsar.test'], 'El estudiante solo ve su propio perfil');
 select is_empty($$select 1 from public.inscripciones$$, 'El estudiante no ve inscripciones ajenas');
 select is_empty($$select 1 from public.pagos$$, 'El estudiante no ve pagos ajenos');
-select lives_ok($$insert into public.inscripciones (estudiante_id, curso_id) values ('a0000000-0000-4000-8000-000000000003', 'c0000000-0000-4000-8000-000000000001')$$,
-  'El estudiante se inscribe a sí mismo');
+select throws_ok($$insert into public.inscripciones (estudiante_id, curso_id) values ('a0000000-0000-4000-8000-000000000003', 'c0000000-0000-4000-8000-000000000001')$$,
+  '42501', null, 'El estudiante no crea matrículas sin pago por la API');
+reset role;
+insert into public.inscripciones(estudiante_id,curso_id) values ('a0000000-0000-4000-8000-000000000003','c0000000-0000-4000-8000-000000000001');
+select pruebas.como('a0000000-0000-4000-8000-000000000003');
 select throws_ok($$insert into public.inscripciones (estudiante_id, curso_id) values ('a0000000-0000-4000-8000-000000000004', 'c0000000-0000-4000-8000-000000000002')$$,
   '42501', null, 'No puede inscribir a otro estudiante');
 select throws_ok($$insert into public.inscripciones (estudiante_id, curso_id, estado) values ('a0000000-0000-4000-8000-000000000003', 'c0000000-0000-4000-8000-000000000002', 'CONFIRMADA')$$,

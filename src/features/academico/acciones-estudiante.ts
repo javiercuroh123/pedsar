@@ -9,39 +9,21 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import type { EstadoFormulario } from "@/features/usuarios/esquemas";
 
-const completarSchema = z.object({ inscripcionId: z.uuid(), contenidoId: z.coerce.number().int(), cursoId: z.uuid() });
+const completarSchema = z.object({ inscripcionId: z.uuid(), contenidoId: z.coerce.number().int().positive() });
 
-/** Recalcula la tabla `progreso` de una inscripción (la usan reportes y el portal del instructor). */
-async function actualizarProgreso(inscripcionId: string, cursoId: string) {
-  const admin = createAdminClient();
-  const [{ data: modulos }, { count }] = await Promise.all([
-    admin.from("modulos").select("contenidos(id)").eq("curso_id", cursoId),
-    admin.from("contenidos_completados").select("contenido_id", { head: true, count: "exact" }).eq("inscripcion_id", inscripcionId),
-  ]);
-  const total = (modulos ?? []).reduce((a: number, m: { contenidos: unknown[] }) => a + (m.contenidos?.length ?? 0), 0);
-  const hechas = Math.min(count ?? 0, total);
-  await admin.from("progreso").upsert({
-    inscripcion_id: inscripcionId,
-    lecciones_completadas: hechas,
-    total_lecciones: total,
-    porcentaje: total ? Math.round((hechas / total) * 10000) / 100 : 0,
-    actualizado_en: new Date().toISOString(),
-  });
-}
-
-// HU-28 · Marcar lección como completada
+// El curso se deduce de la matrícula; RLS comprueba la pertenencia del contenido
+// y un trigger recalcula el progreso dentro de la misma transacción.
 export async function marcarCompletado(formData: FormData) {
   const estudiante = await requireRol("estudiante");
-  const { inscripcionId, contenidoId, cursoId } = completarSchema.parse(Object.fromEntries(formData));
+  const { inscripcionId, contenidoId } = completarSchema.parse(Object.fromEntries(formData));
   const supabase = await createClient();
-
-  // RLS: solo puede marcar en sus propias inscripciones.
+  const { data: propia, error: errorLectura } = await supabase.from("inscripciones").select("id, curso_id")
+    .eq("id", inscripcionId).eq("estudiante_id", estudiante.id).eq("estado", "CONFIRMADA").maybeSingle();
+  if (errorLectura || !propia) throw new Error("No tienes una matrícula confirmada para esta lección");
   const { error } = await supabase.from("contenidos_completados").insert({ inscripcion_id: inscripcionId, contenido_id: contenidoId });
-  if (error && error.code !== "23505") throw new Error(error.message);
-
-  const { data: propia } = await supabase.from("inscripciones").select("id").eq("id", inscripcionId).eq("estudiante_id", estudiante.id).maybeSingle();
-  if (propia) await actualizarProgreso(inscripcionId, cursoId);
-  revalidatePath(`/estudiante/cursos/${cursoId}`);
+  if (error && error.code !== "23505") throw new Error("No se pudo completar la lección de este curso");
+  revalidatePath(`/estudiante/cursos/${propia.curso_id}`);
+  revalidatePath("/estudiante", "layout");
 }
 
 export interface ResultadoEvaluacion {
@@ -55,76 +37,34 @@ export interface ResultadoEvaluacion {
   intentosRestantes?: number;
 }
 
-const respuestasSchema = z.record(z.string(), z.string());
-
-/**
- * HU-09 · Rendir evaluación con calificación automática.
- * Las respuestas correctas nunca llegan al navegador: se califican aquí con el
- * cliente admin después de verificar la inscripción y los intentos disponibles.
- */
-export async function enviarEvaluacion(evaluacionId: number, respuestas: Record<string, string>): Promise<ResultadoEvaluacion> {
+export async function iniciarEvaluacion(evaluacionId: number) {
   const estudiante = await requireRol("estudiante");
-  const resp = respuestasSchema.parse(respuestas);
-  const admin = createAdminClient();
+  z.number().int().positive().parse(evaluacionId);
+  const db = createAdminClient();
+  const { data: sesion, error } = await db.rpc("iniciar_evaluacion", { p_estudiante: estudiante.id, p_evaluacion: evaluacionId }).single();
+  if (error || !sesion) return { ok: false as const, mensaje: error?.message ?? "No se pudo iniciar la evaluación" };
+  // Las preguntas se entregan DESPUÉS de iniciar el plazo; nunca sus respuestas.
+  const { data: preguntas, error: errorPreguntas } = await db.from("preguntas")
+    .select("id, enunciado, opciones, puntaje").eq("evaluacion_id", evaluacionId).order("id");
+  if (errorPreguntas || !preguntas?.length) return { ok: false as const, mensaje: "No se pudieron cargar las preguntas. Vuelve a intentarlo." };
+  return { ok: true as const, sesion, preguntas: preguntas.map((p) => ({ ...p, opciones: p.opciones as string[], puntaje: Number(p.puntaje) })) };
+}
 
-  const { data: evaluacion } = await admin
-    .from("evaluaciones")
-    .select("id, curso_id, puntaje_total, intentos_permitidos, preguntas(id, respuesta_correcta, puntaje)")
-    .eq("id", evaluacionId)
-    .single();
-  if (!evaluacion) return { ok: false, mensaje: "Evaluación no encontrada" };
-
-  const { data: inscripcion } = await admin
-    .from("inscripciones")
-    .select("id")
-    .eq("curso_id", evaluacion.curso_id)
-    .eq("estudiante_id", estudiante.id)
-    .eq("estado", "CONFIRMADA")
-    .maybeSingle();
-  if (!inscripcion) return { ok: false, mensaje: "No estás inscrito en este curso" };
-
-  const { count } = await admin
-    .from("intentos_evaluacion")
-    .select("id", { head: true, count: "exact" })
-    .eq("inscripcion_id", inscripcion.id)
-    .eq("evaluacion_id", evaluacionId);
-  const usados = count ?? 0;
-  if (usados >= evaluacion.intentos_permitidos) return { ok: false, mensaje: "Ya usaste todos tus intentos" };
-
-  const preguntas = (evaluacion.preguntas ?? []) as { id: number; respuesta_correcta: string; puntaje: number }[];
-  const sumaPuntajes = preguntas.reduce((a, p) => a + Number(p.puntaje), 0) || 1;
-  const total = Number(evaluacion.puntaje_total);
-  let correctas = 0;
-  let bruto = 0;
-  preguntas.forEach((p) => {
-    if (resp[String(p.id)] === p.respuesta_correcta) {
-      correctas++;
-      bruto += Number(p.puntaje);
-    }
-  });
-  // Escala el puntaje de las preguntas al puntaje total de la evaluación (p. ej. 20).
-  const puntaje = Math.round((bruto / sumaPuntajes) * total * 100) / 100;
-
-  const { error } = await admin.from("intentos_evaluacion").insert({
-    inscripcion_id: inscripcion.id,
-    evaluacion_id: evaluacionId,
-    numero_intento: usados + 1,
-    respuestas: resp,
-    puntaje_obtenido: puntaje,
-  });
-  if (error) return { ok: false, mensaje: "No se pudo registrar el intento. Inténtalo de nuevo." };
-
-  await registrarActividad(estudiante.id, "RENDIR_EVALUACION", { evaluacion: evaluacionId, puntaje, intento: usados + 1 });
+export async function enviarEvaluacion(evaluacionId: number, respuestas: Record<string, string>, intento: number): Promise<ResultadoEvaluacion> {
+  const estudiante = await requireRol("estudiante");
+  z.number().int().positive().parse(evaluacionId);
+  z.number().int().positive().parse(intento);
+  const resp = z.record(z.string().max(30), z.string().max(10000)).parse(respuestas);
+  const { data: resultado, error } = await createAdminClient().rpc("entregar_evaluacion", {
+    p_estudiante: estudiante.id, p_evaluacion: evaluacionId, p_intento: intento, p_respuestas: resp,
+  }).single();
+  if (error || !resultado) return { ok: false, mensaje: error?.message ?? "No se pudo registrar el intento. Inténtalo de nuevo." };
+  await registrarActividad(estudiante.id, "RENDIR_EVALUACION", { evaluacion: evaluacionId, puntaje: resultado.puntaje, intento });
   revalidatePath("/estudiante", "layout");
-
-  return {
-    ok: true,
-    puntaje,
-    total,
-    correctas,
-    preguntas: preguntas.length,
-    aprobado: aprobado(puntaje, total),
-    intentosRestantes: evaluacion.intentos_permitidos - usados - 1,
+  return { ok: true, puntaje: Number(resultado.puntaje), total: Number(resultado.total), correctas: resultado.correctas,
+    preguntas: resultado.preguntas, aprobado: aprobado(Number(resultado.puntaje), Number(resultado.total)),
+    intentosRestantes: resultado.intentos_restantes,
+    ...(resultado.fuera_de_plazo ? { mensaje: "El plazo venció. Este intento se registró sin respuestas válidas." } : {}),
   };
 }
 

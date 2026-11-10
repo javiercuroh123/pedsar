@@ -138,6 +138,7 @@ describe("catálogo público (HU-05 · HU-06 · HU-33)", () => {
       "rpc:instructores_publicos": { data: [{ id: "ins-1", nombres: "Luis", apellidos: "Ramos" }] },
       "rpc:cupo_disponible": (c) => ({ data: (c.valores as { p_curso: string }).p_curso === "excel" ? 4 : null }),
       "rpc:calificacion_cursos": { data: [{ curso_id: "excel", promedio: 4.5, cantidad: 2 }] },
+      "rpc:horarios_publicos": { data: [{ curso_id: "excel", fecha: "2026-10-05", hora_inicio: "09:00" }] },
     });
     const [excel, sst] = await listarCursosPublicados({ categorias: ["ofimatica"], niveles: ["BASICO"], modalidades: ["VIRTUAL"], precioMax: 200, destacados: true });
     // HU-24 · Una sola consulta de calificaciones para todo el catálogo.
@@ -156,7 +157,7 @@ describe("catálogo público (HU-05 · HU-06 · HU-33)", () => {
 
   it("busca sin tildes por título, descripción, instructor o categoría, y ordena", async () => {
     const cursos = { data: [curso("a", { titulo: "Gestión pública", precio: "300" }), curso("b", { titulo: "Excel", precio: "100", sesiones: [{ fecha: "2999-01-01", hora_inicio: "08:00" }] }), curso("c", { titulo: "Power BI", precio: "200" })] };
-    const conCatalogo = () => responder({ cursos, "rpc:instructores_publicos": { data: [{ id: "ins-1", nombres: "Luis", apellidos: "Ramos" }] } });
+    const conCatalogo = () => responder({ cursos, "rpc:horarios_publicos": { data: [{ curso_id: "b", fecha: "2999-01-01", hora_inicio: "08:00" }] }, "rpc:instructores_publicos": { data: [{ id: "ins-1", nombres: "Luis", apellidos: "Ramos" }] } });
 
     conCatalogo();
     expect((await listarCursosPublicados({ q: "GESTION" })).map((c) => c.slug)).toEqual(["a"]);
@@ -181,6 +182,7 @@ describe("catálogo público (HU-05 · HU-06 · HU-33)", () => {
       "rpc:instructores_publicos": { data: { nombres: "Luis", apellidos: "Ramos", especialidad: "Excel", avatar_url: null } },
       "rpc:calificacion_cursos": { data: [{ curso_id: "excel", promedio: 4, cantidad: 1 }] },
       "rpc:resenas_publicas": { data: [{ estrellas: 4, texto: "Muy práctico", autor: "Ana Q.", fecha: "2026-10-02T15:00:00Z" }] },
+      "rpc:horarios_publicos": { data: [{ id: 2, curso_id: "excel", fecha: "2026-10-09", hora_inicio: "19:00" }, { id: 1, curso_id: "excel", fecha: "2026-10-02", hora_inicio: "19:00" }] },
     });
     const detalle = await obtenerCursoPorSlug("excel");
     expect(detalle).toMatchObject({ calificacion: { promedio: 4, cantidad: 1 }, resenas: [{ estrellas: 4, texto: "Muy práctico", autor: "Ana Q.", fecha: "2026-10-02T15:00:00Z" }] });

@@ -13,7 +13,7 @@ export const EMPRESA = {
    * TODO: reemplazar por el celular y el titular reales de la cuenta Yape / Plin de la empresa.
    */
   pagoDirecto: {
-    celular: "956 000 000",
-    titular: "PEDSAR E.I.R.L.",
+    celular: "",
+    titular: "",
   },
 };

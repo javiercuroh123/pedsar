@@ -435,6 +435,45 @@ export type Database = {
           },
         ]
       }
+      evaluaciones_en_curso: {
+        Row: {
+          evaluacion_id: number
+          iniciado_en: string
+          inscripcion_id: string
+          numero_intento: number
+          vence_en: string | null
+        }
+        Insert: {
+          evaluacion_id: number
+          iniciado_en?: string
+          inscripcion_id: string
+          numero_intento: number
+          vence_en?: string | null
+        }
+        Update: {
+          evaluacion_id?: number
+          iniciado_en?: string
+          inscripcion_id?: string
+          numero_intento?: number
+          vence_en?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "evaluaciones_en_curso_evaluacion_id_fkey"
+            columns: ["evaluacion_id"]
+            isOneToOne: false
+            referencedRelation: "evaluaciones"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "evaluaciones_en_curso_inscripcion_id_fkey"
+            columns: ["inscripcion_id"]
+            isOneToOne: false
+            referencedRelation: "inscripciones"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       evaluaciones: {
         Row: {
           curso_id: string
@@ -1060,6 +1099,7 @@ export type Database = {
       }
       cupo_disponible: { Args: { p_curso: string }; Returns: number }
       es_admin: { Args: never; Returns: boolean }
+      finalizar_reembolso: { Args: { p_reembolso: number; p_actor: string }; Returns: boolean }
       instructores_publicos: {
         Args: { p_ids: string[] }
         Returns: {
@@ -1079,6 +1119,22 @@ export type Database = {
           fecha: string
           texto: string
         }[]
+      }
+      registrar_matricula: {
+        Args: { p_estudiante: string; p_curso: string; p_metodo: Database["public"]["Enums"]["metodo_pago"]; p_cupon: string; p_monto: number; p_facturacion: Json }
+        Returns: { inscripcion_id: string; codigo: string; vence_en: string | null; pago_id: string; monto: number; cupon_id: number | null }[]
+      }
+      horarios_publicos: {
+        Args: { p_cursos: string[] }
+        Returns: { id: number; curso_id: string; fecha: string; hora_inicio: string; duracion_minutos: number; modalidad: Database["public"]["Enums"]["modalidad_curso"] }[]
+      }
+      iniciar_evaluacion: {
+        Args: { p_estudiante: string; p_evaluacion: number }
+        Returns: { numero_intento: number; vence_en: string | null; servidor_en: string }[]
+      }
+      entregar_evaluacion: {
+        Args: { p_estudiante: string; p_evaluacion: number; p_intento: number; p_respuestas: Json }
+        Returns: { puntaje: number; total: number; correctas: number; preguntas: number; intentos_restantes: number; fuera_de_plazo: boolean }[]
       }
       resultado_academico: {
         Args: { p_inscripciones: string[] }

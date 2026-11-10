@@ -1,4 +1,3 @@
-import { revalidatePath } from "next/cache";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { requireRol } from "@/lib/auth";
 import { inscribirse, registrarPagoManual, validarCupon } from "@/features/matricula/acciones";
@@ -19,6 +18,15 @@ vi.mock("@/features/matricula/confirmar-pago", () => ({ confirmarPago: vi.fn(asy
 const CUPON_VIGENTE = { id: 7, porcentaje_descuento: "20.00", fecha_vigencia: "2999-12-31", usos_maximos: null, activo: true };
 
 describe("cupones de descuento (HU-32)", () => {
+  it("cuenta solo pagos aprobados y reservas pendientes vigentes", async () => {
+    conSesion("estudiante");
+    responder({}, { cupones: { data: { ...CUPON_VIGENTE, usos_maximos: 10 } }, "pagos.select": [{ count: 7 }, { count: 2 }] });
+    await expect(validarCupon("PROMO20")).resolves.toMatchObject({ ok: true });
+    expect(entorno.admin.de("pagos")[0].filtros).toContainEqual(["eq", "estado", "APROBADO"]);
+    expect(entorno.admin.de("pagos")[1].filtros).toContainEqual(["eq", "inscripcion.estado", "PENDIENTE"]);
+    expect(entorno.admin.de("pagos")[1].filtros).toContainEqual(["or", expect.stringContaining("vence_en.gt."), { referencedTable: "inscripcion" }]);
+  });
+
   it("solo los estudiantes validan cupones", async () => {
     conSesion("instructor");
     await expect(validarCupon("PROMO")).rejects.toBeInstanceOf(Redireccion);
@@ -51,101 +59,48 @@ describe("cupones de descuento (HU-32)", () => {
   });
 });
 
-describe("inscripción (HU-07 · HU-12 · HU-17)", () => {
+describe("matrícula y pago atómicos", () => {
   const datos = (extra: Record<string, string> = {}) => formulario({ cursoId: UUID.curso, metodo: "YAPE", ...extra });
-  const conCurso = (inscripcion: { data?: unknown; error?: { code: string; message: string } }, admin = {}) =>
-    responder(
-      { cursos: { data: { id: UUID.curso, titulo: "Excel avanzado", precio: "180.00", slug: "excel-avanzado" } }, "inscripciones.insert": inscripcion },
-      admin,
-    );
-  const inscripcionCreada = { data: { id: UUID.inscripcion, codigo: "MAT-AB12CD34", vence_en: "2026-10-03T15:00:00Z" } };
-
-  it("solo acepta el pago en línea (Culqi) o el directo por Yape o Plin", async () => {
+  const curso = { data: { id: UUID.curso, titulo: "Excel avanzado", precio: 180, slug: "excel-avanzado" } };
+  const matricula = { data: { inscripcion_id: UUID.inscripcion, codigo: "MAT-AB12CD34", vence_en: "2026-11-12T15:00:00Z", pago_id: UUID.pago, monto: 180, cupon_id: null } };
+  it("crea ambos registros mediante una sola transacción y después notifica", async () => {
     conSesion("estudiante");
-    await expect(inscribirse(datos({ metodo: "TARJETA" }))).rejects.toThrow();
-  });
-
-  it("con pago en línea guarda los datos de facturación, avisa por correo y lleva a pagar", async () => {
-    conSesion("estudiante", { nombres: "Ana" });
-    conCurso(inscripcionCreada);
-    await expect(inscribirse(datos({ metodo: "CULQI", comprobante: "FACTURA", ruc: "20605615521", razonSocial: "Empresa SAC" }))).rejects.toEqual(
-      new Redireccion("/estudiante/pagos?pagar=MAT-AB12CD34"),
-    );
-    expect(entorno.admin.de("pagos", "insert")[0].valores).toEqual({
-      inscripcion_id: UUID.inscripcion,
-      cupon_id: null,
-      monto: 180,
-      metodo: "CULQI",
-      datos_facturacion: { tipo: "FACTURA", ruc: "20605615521", razon_social: "Empresa SAC" },
-    });
+    responder({ cursos: curso }, { "rpc:registrar_matricula": matricula });
+    await expect(inscribirse(datos({ metodo: "CULQI", comprobante: "FACTURA", ruc: "20605615521", razonSocial: "Empresa SAC" }))).rejects.toEqual(new Redireccion("/estudiante/pagos?pagar=MAT-AB12CD34"));
+    expect(entorno.admin.de("rpc:registrar_matricula")[0].valores).toEqual({ p_estudiante: UUID.estudiante, p_curso: UUID.curso, p_metodo: "CULQI", p_cupon: "", p_monto: 180, p_facturacion: { tipo: "FACTURA", ruc: "20605615521", razon_social: "Empresa SAC" } });
+    expect(entorno.servidor.de("inscripciones", "insert")).toHaveLength(0);
+    expect(entorno.admin.de("pagos", "insert")).toHaveLength(0);
     await ejecutarTareas();
-    expect(console.info).toHaveBeenCalledWith(expect.stringMatching(/estudiante@pedsar\.test: Completa el pago .*Excel avanzado/));
+    expect(console.info).toHaveBeenCalledWith(expect.stringContaining("Completa el pago"));
   });
-
-  it.each([
-    ["CULQI", "pasarela", "El pago en línea aún no está disponible"],
-    ["YAPE", "manual", "El pago directo por Yape o Plin no está disponible"],
-  ] as const)("no acepta %s si ese medio está apagado", async (metodo, apagado, mensaje) => {
-    disponibilidad[apagado] = false;
+  it.each([["P0001", "El curso ya no tiene cupos disponibles"], ["23505", "Ya estás inscrito en este curso"], ["22023", "El precio cambió"], ["XX000", "No se pudo registrar la matrícula y su pago. Inténtalo de nuevo."]])("no envía confirmación si falla la transacción: %s", async (code, mensaje) => {
     conSesion("estudiante");
-    conCurso(inscripcionCreada);
-    await expect(inscribirse(datos({ metodo }))).rejects.toEqual(new Redireccion(`/estudiante/cursos?error=${encodeURIComponent(mensaje)}`));
-    expect(entorno.servidor.de("inscripciones")).toHaveLength(0);
+    responder({ cursos: curso }, { "rpc:registrar_matricula": { error: { code, message: "El precio cambió" } } });
+    await expect(inscribirse(datos())).rejects.toEqual(new Redireccion(`/estudiante/cursos?error=${encodeURIComponent(mensaje)}`));
+    expect(entorno.tareas).toHaveLength(0);
+    expect(entorno.admin.de("registro_actividad")).toHaveLength(0);
   });
-
-  it("si el curso no existe, vuelve al catálogo", async () => {
+  it("un cupón invalidado no se transforma silenciosamente en precio completo", async () => {
+    conSesion("estudiante");
+    responder({ cursos: curso });
+    await expect(inscribirse(datos({ cupon: "PROMO20" }))).rejects.toMatchObject({ destino: expect.stringContaining("error=") });
+    expect(entorno.admin.de("rpc:registrar_matricula")).toHaveLength(0);
+  });
+  it("transmite el descuento a validar en la BD y confirma las becas sin cobro", async () => {
+    conSesion("estudiante");
+    responder({ cursos: curso }, { cupones: { data: { ...CUPON_VIGENTE, porcentaje_descuento: 100 } }, "rpc:registrar_matricula": matricula });
+    await expect(inscribirse(datos({ cupon: "BECA" }))).rejects.toEqual(new Redireccion("/estudiante/cursos"));
+    expect(entorno.admin.de("rpc:registrar_matricula")[0].valores).toMatchObject({ p_monto: 0, p_cupon: "BECA" });
+    expect(confirmarPago).toHaveBeenCalledWith(UUID.pago, { actor: UUID.estudiante });
+  });
+  it.each([["CULQI", "pasarela"], ["YAPE", "manual"]] as const)("rechaza %s si está deshabilitado", async (metodo, clave) => {
+    conSesion("estudiante"); disponibilidad[clave] = false;
+    await expect(inscribirse(datos({ metodo }))).rejects.toMatchObject({ destino: expect.stringContaining("error=") });
+    expect(entorno.admin.consultas).toHaveLength(0);
+  });
+  it("vuelve al catálogo si no existe el curso", async () => {
     conSesion("estudiante");
     await expect(inscribirse(datos())).rejects.toEqual(new Redireccion("/cursos"));
-  });
-
-  it.each([
-    ["23505", "Ya estás inscrito en este curso"],
-    ["P0001", "El curso ya no tiene cupos disponibles"],
-    ["42501", "permiso denegado"],
-  ])("traduce el error %s de la BD", async (code, mensaje) => {
-    conSesion("estudiante");
-    conCurso({ error: { code, message: "permiso denegado" } });
-    await expect(inscribirse(datos())).rejects.toEqual(new Redireccion(`/estudiante/cursos?error=${encodeURIComponent(mensaje)}`));
-    expect(entorno.admin.de("pagos")).toHaveLength(0);
-  });
-
-  it("crea la inscripción y su pago con el descuento, audita y envía las instrucciones de pago", async () => {
-    conSesion("estudiante", { nombres: "Ana" });
-    conCurso(inscripcionCreada, { cupones: { data: CUPON_VIGENTE } });
-    await expect(inscribirse(datos({ cupon: "promo20", telefono: "987654321", documento: "45678912" }))).rejects.toEqual(
-      new Redireccion("/estudiante/pagos?inscripcion=MAT-AB12CD34"),
-    );
-
-    expect(entorno.servidor.de("perfiles", "update")[0].valores).toEqual({ telefono: "987654321", documento: "45678912" });
-    // El estudiante solo inserta su inscripción; el pago lo escribe el servidor.
-    expect(entorno.servidor.de("inscripciones", "insert")[0].valores).toEqual({ estudiante_id: UUID.estudiante, curso_id: UUID.curso });
-    expect(entorno.admin.de("pagos", "insert")[0].valores).toEqual({ inscripcion_id: UUID.inscripcion, cupon_id: 7, monto: 144, metodo: "YAPE", datos_facturacion: { tipo: "BOLETA" } });
-    expect(entorno.admin.de("registro_actividad")[0].valores).toMatchObject({
-      accion: "INSCRIPCION_CREADA",
-      detalle: { inscripcion: UUID.inscripcion, metodo: "YAPE", monto: 144, cupon: "PROMO20", comprobante: "BOLETA" },
-    });
-    expect(revalidatePath).toHaveBeenCalledWith("/estudiante", "layout");
-
-    await ejecutarTareas();
-    expect(console.info).toHaveBeenCalledWith(expect.stringMatching(/estudiante@pedsar\.test: .*Excel avanzado/));
-  });
-
-  it("con un cupón del 100 % no hay nada que cobrar: confirma la matrícula de inmediato", async () => {
-    conSesion("estudiante");
-    conCurso(inscripcionCreada, { cupones: { data: { ...CUPON_VIGENTE, porcentaje_descuento: "100.00" } }, "pagos.insert": { data: { id: UUID.pago } } });
-    await expect(inscribirse(datos({ metodo: "CULQI", cupon: "BECA100" }))).rejects.toEqual(new Redireccion("/estudiante/cursos"));
-    expect(entorno.admin.de("pagos", "insert")[0].valores).toMatchObject({ monto: 0, metodo: "CULQI" });
-    expect(confirmarPago).toHaveBeenCalledWith(UUID.pago, { actor: UUID.estudiante });
-    expect(entorno.tareas).toHaveLength(0);
-  });
-
-  it("sin cupón cobra el precio completo y guarda los datos de la factura", async () => {
-    conSesion("estudiante");
-    conCurso({ data: { ...inscripcionCreada.data, vence_en: null } });
-    await expect(inscribirse(datos({ metodo: "PLIN", comprobante: "FACTURA", ruc: "20605615521", razonSocial: "Empresa SAC" }))).rejects.toBeInstanceOf(Redireccion);
-    expect(entorno.servidor.de("perfiles")).toHaveLength(0);
-    expect(entorno.admin.de("pagos", "insert")[0].valores).toMatchObject({ cupon_id: null, monto: 180, metodo: "PLIN", datos_facturacion: { tipo: "FACTURA", ruc: "20605615521", razon_social: "Empresa SAC" } });
-    expect(entorno.admin.de("registro_actividad")[0].valores).toMatchObject({ detalle: { ruc: "20605615521", razon_social: "Empresa SAC", cupon: null } });
   });
 });
 

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { enviarEvaluacion, marcarCompletado, solicitarReembolso } from "@/features/academico/acciones-estudiante";
+import { iniciarEvaluacion, enviarEvaluacion, marcarCompletado, solicitarReembolso } from "@/features/academico/acciones-estudiante";
 import {
   crearContenido,
   crearEvaluacion,
@@ -17,100 +17,61 @@ import { conSesion, entorno, formulario, Redireccion, responder, UUID } from "..
 
 vi.mock("@/lib/auth", () => import("../../apoyo/auth-falso"));
 
-describe("aula virtual del estudiante (HU-28)", () => {
-  const marcar = () => marcarCompletado(formulario({ inscripcionId: UUID.inscripcion, contenidoId: "12", cursoId: UUID.curso }));
-
-  it("marca la lección y recalcula el progreso de su inscripción", async () => {
+describe("progreso protegido", () => {
+  const marcar = () => marcarCompletado(formulario({ inscripcionId: UUID.inscripcion, contenidoId: "12", cursoId: UUID.otra }));
+  it("deduce el curso de la matrícula confirmada e ignora el curso adulterado", async () => {
     conSesion("estudiante");
-    responder(
-      { "inscripciones.select": { data: { id: UUID.inscripcion } } },
-      { modulos: { data: [{ contenidos: [{ id: 1 }, { id: 2 }] }, { contenidos: [{ id: 3 }] }, { contenidos: null }] }, contenidos_completados: { count: 2 } },
-    );
+    responder({ "inscripciones.select": { data: { id: UUID.inscripcion, curso_id: UUID.curso } } });
     await marcar();
+    expect(entorno.servidor.de("inscripciones")[0].filtros).toContainEqual(["eq", "estado", "CONFIRMADA"]);
     expect(entorno.servidor.de("contenidos_completados", "insert")[0].valores).toEqual({ inscripcion_id: UUID.inscripcion, contenido_id: 12 });
-    expect(entorno.servidor.de("inscripciones")[0].filtros).toContainEqual(["eq", "estudiante_id", UUID.estudiante]);
-    expect(entorno.admin.de("progreso", "upsert")[0].valores).toMatchObject({ inscripcion_id: UUID.inscripcion, lecciones_completadas: 2, total_lecciones: 3, porcentaje: 66.67 });
+    expect(entorno.admin.consultas).toHaveLength(0);
   });
-
-  it("marcarla dos veces no es un error; sin inscripción propia no toca el progreso", async () => {
+  it("no escribe si no hay matrícula propia confirmada", async () => {
     conSesion("estudiante");
-    responder({ "contenidos_completados.insert": { error: { code: "23505", message: "dup" } } }, { modulos: { data: [] } });
-    await marcar();
-    expect(entorno.admin.de("progreso")).toHaveLength(0);
-
-    responder({ "contenidos_completados.insert": { error: { code: "42501", message: "RLS" } } });
-    await expect(marcar()).rejects.toThrow("RLS");
+    await expect(marcar()).rejects.toThrow("matrícula confirmada");
+    expect(entorno.servidor.de("contenidos_completados")).toHaveLength(0);
   });
-
-  it("un curso sin contenidos queda en 0 %", async () => {
+  it("tolera una repetición pero propaga el rechazo de contenido ajeno", async () => {
     conSesion("estudiante");
-    responder({ "inscripciones.select": { data: { id: UUID.inscripcion } } }, { modulos: { data: null }, contenidos_completados: { count: null } });
+    responder({ inscripciones: { data: { id: UUID.inscripcion, curso_id: UUID.curso } }, "contenidos_completados.insert": [{ error: { code: "23505", message: "dup" } }, { error: { code: "42501", message: "RLS" } }] });
     await marcar();
-    expect(entorno.admin.de("progreso")[0].valores).toMatchObject({ total_lecciones: 0, porcentaje: 0 });
+    await expect(marcar()).rejects.toThrow("No se pudo completar");
   });
 });
 
-describe("evaluaciones con calificación automática (HU-09)", () => {
-  const evaluacion = (extra = {}) => ({
-    data: {
-      id: 5,
-      curso_id: UUID.curso,
-      puntaje_total: "20",
-      intentos_permitidos: 2,
-      preguntas: [
-        { id: 1, respuesta_correcta: "París", puntaje: "1" },
-        { id: 2, respuesta_correcta: "4", puntaje: "1" },
-        { id: 3, respuesta_correcta: "Lima", puntaje: "2" },
-      ],
-      ...extra,
-    },
-  });
-
-  it("califica en el servidor escalando al puntaje total y registra el intento", async () => {
+describe("intentos de evaluación controlados en servidor", () => {
+  it("inicia el plazo antes de devolver preguntas y nunca selecciona la respuesta correcta", async () => {
     conSesion("estudiante");
-    responder({}, { evaluaciones: evaluacion(), "inscripciones.select": { data: { id: UUID.inscripcion } }, "intentos_evaluacion.select": { count: 0 } });
-    const respuestas = { 1: "París", 2: "5", 3: "Lima" };
-    await expect(enviarEvaluacion(5, respuestas)).resolves.toEqual({ ok: true, puntaje: 15, total: 20, correctas: 2, preguntas: 3, aprobado: true, intentosRestantes: 1 });
-    expect(entorno.admin.de("inscripciones")[0].filtros).toEqual([
-      ["eq", "curso_id", UUID.curso],
-      ["eq", "estudiante_id", UUID.estudiante],
-      ["eq", "estado", "CONFIRMADA"],
-    ]);
-    expect(entorno.admin.de("intentos_evaluacion", "insert")[0].valores).toEqual({
-      inscripcion_id: UUID.inscripcion,
-      evaluacion_id: 5,
-      numero_intento: 1,
-      respuestas: { 1: "París", 2: "5", 3: "Lima" },
-      puntaje_obtenido: 15,
-    });
+    responder({}, { "rpc:iniciar_evaluacion": { data: { numero_intento: 1, vence_en: "2026-11-10T16:00:00Z", servidor_en: "2026-11-10T15:00:00Z" } }, preguntas: { data: [{ id: 1, enunciado: "Capital", opciones: ["Lima", "Cusco"], puntaje: 20 }] } });
+    await expect(iniciarEvaluacion(5)).resolves.toMatchObject({ ok: true, sesion: { numero_intento: 1 } });
+    expect(entorno.admin.consultas[0].tabla).toBe("rpc:iniciar_evaluacion");
+    expect(entorno.admin.de("preguntas")[0].columnas).not.toContain("respuesta_correcta");
   });
-
-  it("desaprueba por debajo de 13/20", async () => {
+  it("no revela preguntas si la BD rechaza el inicio", async () => {
     conSesion("estudiante");
-    responder({}, { evaluaciones: evaluacion(), "inscripciones.select": { data: { id: UUID.inscripcion } }, "intentos_evaluacion.select": { count: 1 } });
-    await expect(enviarEvaluacion(5, { 1: "París", 2: "4" })).resolves.toMatchObject({ puntaje: 10, aprobado: false, intentosRestantes: 0 });
-    expect(entorno.admin.de("intentos_evaluacion", "insert")[0].valores).toMatchObject({ numero_intento: 2 });
+    responder({}, { "rpc:iniciar_evaluacion": { error: { message: "Ya usaste todos tus intentos" } } });
+    await expect(iniciarEvaluacion(5)).resolves.toMatchObject({ ok: false });
+    expect(entorno.admin.de("preguntas")).toHaveLength(0);
   });
-
-  it.each([
-    ["no existe", { evaluaciones: { data: null } }, "Evaluación no encontrada"],
-    ["no está inscrito o no está confirmado", { evaluaciones: evaluacion(), "inscripciones.select": { data: null } }, "No estás inscrito en este curso"],
-    ["agotó sus intentos", { evaluaciones: evaluacion(), "inscripciones.select": { data: { id: "i" } }, "intentos_evaluacion.select": { count: 2 } }, "Ya usaste todos tus intentos"],
-    [
-      "falla el registro",
-      { evaluaciones: evaluacion(), "inscripciones.select": { data: { id: "i" } }, "intentos_evaluacion.insert": { error: { message: "x" } } },
-      "No se pudo registrar el intento. Inténtalo de nuevo.",
-    ],
-  ])("no califica si la evaluación %s", async (_, admin, mensaje) => {
+  it("entrega respuestas e identidad autenticada a la operación atómica", async () => {
     conSesion("estudiante");
-    responder({}, admin);
-    await expect(enviarEvaluacion(5, {})).resolves.toEqual({ ok: false, mensaje });
+    responder({}, { "rpc:entregar_evaluacion": { data: { puntaje: 15, total: 20, correctas: 2, preguntas: 3, intentos_restantes: 1, fuera_de_plazo: false } } });
+    await expect(enviarEvaluacion(5, { 1: "Lima" }, 1)).resolves.toEqual({ ok: true, puntaje: 15, total: 20, correctas: 2, preguntas: 3, aprobado: true, intentosRestantes: 1 });
+    expect(entorno.admin.de("rpc:entregar_evaluacion")[0].valores).toEqual({ p_estudiante: UUID.estudiante, p_evaluacion: 5, p_intento: 1, p_respuestas: { 1: "Lima" } });
+    expect(entorno.admin.de("intentos_evaluacion", "insert")).toHaveLength(0);
   });
-
-  it("una evaluación sin preguntas no divide entre cero", async () => {
+  it("informa el intento vencido sin afirmar que aprobó", async () => {
     conSesion("estudiante");
-    responder({}, { evaluaciones: evaluacion({ preguntas: null }), "inscripciones.select": { data: { id: "i" } } });
-    await expect(enviarEvaluacion(5, {})).resolves.toMatchObject({ ok: true, puntaje: 0, preguntas: 0 });
+    responder({}, { "rpc:entregar_evaluacion": { data: { puntaje: 0, total: 20, correctas: 0, preguntas: 3, intentos_restantes: 0, fuera_de_plazo: true } } });
+    await expect(enviarEvaluacion(5, { 1: "Lima" }, 1)).resolves.toMatchObject({ ok: true, aprobado: false, mensaje: expect.stringContaining("plazo venció") });
+  });
+  it("no registra éxito cuando falla la transacción", async () => {
+    conSesion("estudiante");
+    responder({}, { "rpc:entregar_evaluacion": { error: { message: "Inicia la evaluación antes de entregar" } } });
+    await expect(enviarEvaluacion(5, {}, 1)).resolves.toMatchObject({ ok: false });
+    expect(entorno.admin.de("registro_actividad")).toHaveLength(0);
+    await expect(enviarEvaluacion(5, {}, 0)).rejects.toThrow();
   });
 });
 

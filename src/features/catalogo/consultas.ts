@@ -49,7 +49,7 @@ export interface FiltrosCatalogo {
 }
 
 const CAMPOS_RESUMEN =
-  "id, slug, titulo, descripcion, imagen_url, nivel, modalidad, precio, duracion_horas, cupo_maximo, destacado, instructor_id, sesiones(fecha, hora_inicio)";
+  "id, slug, titulo, descripcion, imagen_url, nivel, modalidad, precio, duracion_horas, cupo_maximo, destacado, instructor_id";
 
 const normalizar = (s: string) =>
   s
@@ -112,11 +112,13 @@ export async function listarCursosPublicados(filtros: FiltrosCatalogo = {}): Pro
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const filas = (data ?? []) as any[];
-  const [instructores, cupos, notas] = await Promise.all([
+  const [instructores, cupos, notas, horarios] = await Promise.all([
     nombresInstructores(filas.map((f) => f.instructor_id)),
     Promise.all(filas.map((f) => supabase.rpc("cupo_disponible", { p_curso: f.id }))),
     calificaciones(filas.map((f) => f.id)),
+    supabase.rpc("horarios_publicos", { p_cursos: filas.map((f) => f.id) }),
   ]);
+  if (horarios.error) throw new Error(`Horarios: ${horarios.error.message}`);
 
   let cursos: CursoResumen[] = filas.map((f, i) => ({
     id: f.id,
@@ -133,7 +135,7 @@ export async function listarCursosPublicados(filtros: FiltrosCatalogo = {}): Pro
     categoria: f.categoria ?? null,
     instructor: instructores.get(f.instructor_id) ?? null,
     cupo_disponible: (cupos[i].data as number | null) ?? f.cupo_maximo,
-    proxima_sesion: proximaSesion(f.sesiones),
+    proxima_sesion: proximaSesion((horarios.data ?? []).filter((s) => s.curso_id === f.id)),
     calificacion: notas.get(f.id) ?? null,
   }));
 
@@ -161,8 +163,7 @@ export async function obtenerCursoPorSlug(slug: string) {
     .select(
       `id, slug, titulo, descripcion, imagen_url, nivel, modalidad, precio, cupo_maximo, duracion_horas, destacado, instructor_id,
        categoria:categorias(nombre, slug),
-       modulos(id, titulo, orden),
-       sesiones(id, fecha, hora_inicio, duracion_minutos, modalidad)`,
+       modulos(id, titulo, orden)`,
     )
     .eq("slug", slug)
     .eq("estado", "PUBLICADO")
@@ -170,14 +171,16 @@ export async function obtenerCursoPorSlug(slug: string) {
   if (error) throw new Error(`Curso: ${error.message}`);
   if (!data) return null;
 
-  const [{ data: cupo }, { data: instructor }, notas, { data: resenas }] = await Promise.all([
+  const [{ data: cupo }, { data: instructor }, notas, { data: resenas }, horarios] = await Promise.all([
     supabase.rpc("cupo_disponible", { p_curso: data.id }),
     data.instructor_id
       ? supabase.rpc("instructores_publicos", { p_ids: [data.instructor_id] }).maybeSingle()
       : Promise.resolve({ data: null }),
     calificaciones([data.id]),
     supabase.rpc("resenas_publicas", { p_curso: data.id, p_limite: 6 }),
+    supabase.rpc("horarios_publicos", { p_cursos: [data.id] }),
   ]);
+  if (horarios.error) throw new Error(`Horarios: ${horarios.error.message}`);
 
   return {
     ...data,
@@ -192,7 +195,7 @@ export async function obtenerCursoPorSlug(slug: string) {
     instructor: instructor as { nombres: string; apellidos: string; especialidad: string | null; avatar_url: string | null } | null,
     modulos: [...((data.modulos ?? []) as { id: number; titulo: string; orden: number }[])].sort((a, b) => a.orden - b.orden),
     sesiones: [
-      ...((data.sesiones ?? []) as { id: number; fecha: string; hora_inicio: string; duracion_minutos: number; modalidad: Modalidad }[]),
+      ...(horarios.data ?? []),
     ].sort((a, b) => (a.fecha + a.hora_inicio).localeCompare(b.fecha + b.hora_inicio)),
   };
 }

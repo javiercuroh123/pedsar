@@ -205,14 +205,14 @@ describe("reembolsos (HU-31 · HU-50)", () => {
   const TOMADA = { data: { id: 9 } };
   const avisosAdmin = () => entorno.admin.de("notificaciones").flatMap((c) => [c.valores].flat()) as { usuario_id: string; mensaje: string }[];
 
-  it("aprobar un pago directo por Yape lo marca reembolsado y cancela la matrícula (la devolución es manual)", async () => {
+  it("aprobar un pago directo mantiene el dinero pendiente hasta confirmar la devolución", async () => {
     conSesion("administrador");
     responder({}, { "reembolsos.select": reembolso(), "reembolsos.update": TOMADA });
     await expect(resolverReembolso(formulario({ id: "9", decision: "aprobar" }))).resolves.toMatchObject({ ok: true });
     expect(entorno.admin.de("reembolsos", "update")[0]).toMatchObject({ valores: { estado: "APROBADO" }, filtros: expect.arrayContaining([["eq", "id", 9], ["eq", "estado", "SOLICITADO"]]) });
     expect(pasarela.reembolsar).not.toHaveBeenCalled();
-    expect(entorno.admin.de("pagos", "update")[0].valores).toEqual({ estado: "REEMBOLSADO" });
-    expect(entorno.admin.de("inscripciones", "update")[0].valores).toEqual({ estado: "CANCELADA" });
+    expect(entorno.admin.de("pagos", "update")).toHaveLength(0);
+    expect(entorno.admin.de("inscripciones", "update")).toHaveLength(0);
     expect(entorno.admin.de("notificaciones")[0].valores).toMatchObject({ mensaje: "Tu solicitud de reembolso fue aprobada." });
     expect(auditadas()).toEqual(["APROBAR_REEMBOLSO"]);
   });
@@ -223,9 +223,7 @@ describe("reembolsos (HU-31 · HU-50)", () => {
     pasarela.reembolsar.mockResolvedValueOnce({ aprobado: true, referencia: "ref_1", mensaje: "ok", respuesta: {} });
     await expect(resolverReembolso(formulario({ id: "9", decision: "aprobar" }))).resolves.toMatchObject({ ok: true });
     expect(pasarela.reembolsar).toHaveBeenCalledWith("chr_1", 144, "No puedo asistir");
-    expect(entorno.admin.de("reembolsos", "update")[1].valores).toEqual({ estado: "PROCESADO" });
-    expect(entorno.admin.de("pagos", "update")[0].valores).toEqual({ estado: "REEMBOLSADO" });
-    expect(entorno.admin.de("inscripciones", "update")[0].valores).toEqual({ estado: "CANCELADA" });
+    expect(entorno.admin.de("rpc:finalizar_reembolso")[0].valores).toEqual({ p_reembolso: 9, p_actor: UUID.admin });
   });
 
   it.each([
@@ -256,8 +254,7 @@ describe("reembolsos (HU-31 · HU-50)", () => {
     responder({}, { "reembolsos.select": reembolso("APROBADO", CULQI), "reembolsos.update": TOMADA });
     pasarela.reembolsar.mockResolvedValueOnce({ aprobado: true, referencia: "ref_2", mensaje: "ok", respuesta: {} });
     await expect(resolverReembolso(formulario({ id: "9", decision: "reintentar" }))).resolves.toMatchObject({ ok: true });
-    expect(entorno.admin.de("reembolsos", "update")[0].valores).toEqual({ estado: "PROCESADO" });
-    expect(entorno.admin.de("pagos", "update")[0].valores).toEqual({ estado: "REEMBOLSADO" });
+    expect(entorno.admin.de("rpc:finalizar_reembolso")[0].valores).toEqual({ p_reembolso: 9, p_actor: UUID.admin });
   });
 
   it("o marcarse como devuelto a mano (por ejemplo desde CulqiPanel)", async () => {
@@ -265,10 +262,24 @@ describe("reembolsos (HU-31 · HU-50)", () => {
     responder({}, { "reembolsos.select": reembolso("APROBADO", CULQI), "reembolsos.update": TOMADA });
     await expect(resolverReembolso(formulario({ id: "9", decision: "manual" }))).resolves.toMatchObject({ ok: true });
     expect(pasarela.reembolsar).not.toHaveBeenCalled();
-    expect(entorno.admin.de("reembolsos", "update")[0].valores).toEqual({ estado: "PROCESADO" });
-    expect(entorno.admin.de("pagos", "update")[0].valores).toEqual({ estado: "REEMBOLSADO" });
-    expect(entorno.admin.de("inscripciones", "update")[0].valores).toEqual({ estado: "CANCELADA" });
+    expect(entorno.admin.de("rpc:finalizar_reembolso")[0].valores).toEqual({ p_reembolso: 9, p_actor: UUID.admin });
+    expect(entorno.admin.de("inscripciones", "update")).toHaveLength(0);
     expect(auditadas()).toEqual(["REEMBOLSO_MANUAL"]);
+  });
+
+  it("permite confirmar entregas de solicitudes que quedaron atascadas en el flujo anterior", async () => {
+    conSesion("administrador");
+    responder({}, { "reembolsos.select": reembolso("APROBADO", { estado: "REEMBOLSADO" }) });
+    await expect(resolverReembolso(formulario({ id: "9", decision: "manual" }))).resolves.toMatchObject({ ok: true });
+    expect(entorno.admin.de("rpc:finalizar_reembolso")).toHaveLength(1);
+    expect(pasarela.reembolsar).not.toHaveBeenCalled();
+  });
+
+  it("no informa una devolución registrada si falla el cierre en la BD", async () => {
+    conSesion("administrador");
+    responder({}, { "reembolsos.select": reembolso("APROBADO"), "rpc:finalizar_reembolso": { error: { message: "fallo" } } });
+    await expect(resolverReembolso(formulario({ id: "9", decision: "manual" }))).resolves.toMatchObject({ ok: false, mensaje: expect.stringContaining("sin repetir la transferencia") });
+    expect(auditadas()).not.toContain("REEMBOLSO_MANUAL");
   });
 
   it("reintentar o marcar a mano solo valen para reembolsos aprobados", async () => {

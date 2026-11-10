@@ -4,7 +4,7 @@ import { notFound } from "next/navigation";
 import { ClipboardXIcon } from "lucide-react";
 import { EstadoVacio } from "@/components/comunes";
 import { buttonVariants } from "@/components/ui/button";
-import { RendirEvaluacion, type PreguntaPublica } from "@/features/academico/rendir-evaluacion";
+import { RendirEvaluacion } from "@/features/academico/rendir-evaluacion";
 import { requireRol } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
 
@@ -20,7 +20,7 @@ export default async function EstudianteEvaluacionPage({ params }: PageProps<"/e
   const admin = createAdminClient();
   const { data: evaluacion } = await admin
     .from("evaluaciones")
-    .select("id, titulo, curso_id, intentos_permitidos, tiempo_limite_min, curso:cursos(titulo), preguntas(id, enunciado, opciones, puntaje)")
+    .select("id, titulo, curso_id, intentos_permitidos, tiempo_limite_min, curso:cursos(titulo), preguntas(id)")
     .eq("id", id)
     .maybeSingle();
   if (!evaluacion) notFound();
@@ -41,9 +41,7 @@ export default async function EstudianteEvaluacionPage({ params }: PageProps<"/e
     .eq("evaluacion_id", id);
   const usados = count ?? 0;
 
-  const preguntas: PreguntaPublica[] = ((evaluacion.preguntas ?? []) as { id: number; enunciado: string; opciones: unknown; puntaje: number }[])
-    .sort((a, b) => a.id - b.id)
-    .map((p) => ({ id: p.id, enunciado: p.enunciado, opciones: Array.isArray(p.opciones) ? (p.opciones as string[]) : [], puntaje: Number(p.puntaje) }));
+  const preguntas = evaluacion.preguntas ?? [];
   const curso = (Array.isArray(evaluacion.curso) ? evaluacion.curso[0] : evaluacion.curso) as { titulo: string } | null;
 
   if (usados >= evaluacion.intentos_permitidos || !preguntas.length) {
@@ -65,9 +63,7 @@ export default async function EstudianteEvaluacionPage({ params }: PageProps<"/e
       evaluacionId={evaluacion.id}
       titulo={evaluacion.titulo}
       curso={curso?.titulo ?? ""}
-      preguntas={preguntas}
       tiempoMin={evaluacion.tiempo_limite_min}
-      intento={usados + 1}
       intentosPermitidos={evaluacion.intentos_permitidos}
     />
   );

@@ -1,4 +1,5 @@
 import "server-only";
+import { EMPRESA } from "@/config/empresa";
 import { publicEnv } from "@/lib/env";
 import { serverEnv } from "@/lib/env.server";
 import { culqi } from "./culqi";
@@ -27,7 +28,7 @@ export function pasarelaActiva(): boolean {
 
 /** Pago directo por Yape / Plin validado por el administrador (contingencia de la Tabla 12). */
 export function pagoManualHabilitado(): boolean {
-  return serverEnv.PAGO_MANUAL_HABILITADO;
+  return serverEnv.PAGO_MANUAL_HABILITADO && /^9\d{8}$/.test(EMPRESA.pagoDirecto.celular.replace(/\s/g, "")) && EMPRESA.pagoDirecto.titular.trim().length >= 3;
 }
 
 export { ErrorPasarela } from "./tipos";

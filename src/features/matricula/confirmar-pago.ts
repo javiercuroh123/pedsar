@@ -93,17 +93,23 @@ export async function confirmarPago(pagoId: string, datos: DatosConfirmacion): P
     });
   }
 
-  if (ins.estado === "CANCELADA" && !(await hayLugarPara(ins))) {
+  const avisarSinCupo = async (): Promise<ResultadoConfirmacion> => {
     // Pago que llegó con la reserva ya vencida y sin lugar: hay que devolver el dinero.
     await registrarActividad(datos.actor, "PAGO_SIN_CUPO", { pago: pagoId, inscripcion: ins.codigo });
     await notificarAdministradores(`Pago aprobado sin cupo · ${curso} · ${ins.codigo}: hay que reembolsar al estudiante`, "/admin/inscripciones");
     await notificarUsuario(ins.estudiante_id, `Recibimos tu pago de ${curso}, pero tu reserva ya había vencido y no quedan cupos. Te contactaremos para devolverte el dinero.`, "/estudiante/pagos");
     revalidar();
     return "SIN_CUPO";
+  };
+  if (ins.estado === "CANCELADA" && !(await hayLugarPara(ins))) {
+    return avisarSinCupo();
   }
 
   const { error: errorInscripcion } = await db.from("inscripciones").update({ estado: "CONFIRMADA", vence_en: null }).eq("id", ins.id);
   if (errorInscripcion) {
+    // El trigger decide bajo bloqueo, incluso si la reserva venció entre la
+    // consulta anterior y la confirmación o alguien tomó el último cupo.
+    if (errorInscripcion.code === "P0001" || errorInscripcion.code === "23505") return avisarSinCupo();
     await notificarAdministradores(`Pago aprobado de ${ins.codigo}, pero no se pudo confirmar la matrícula: ${errorInscripcion.message}`, "/admin/inscripciones");
     throw new Error(`No se pudo confirmar la matrícula: ${errorInscripcion.message}`);
   }

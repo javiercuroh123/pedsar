@@ -268,13 +268,13 @@ export default async function AdminInscripcionesPage({ searchParams }: PageProps
                           <BotonAccion accion={resolverReembolso} campos={{ id: r.id, decision: "rechazar" }} variant="outline" size="sm">
                             Rechazar
                           </BotonAccion>{" "}
-                          <BotonAccion accion={resolverReembolso} campos={{ id: r.id, decision: "aprobar" }} confirmar="¿Aprobar el reembolso? La inscripción se cancelará." size="sm">
+                          <BotonAccion accion={resolverReembolso} campos={{ id: r.id, decision: "aprobar" }} confirmar="¿Aprobar el reembolso? Si la devolución es manual, deberás confirmar cuando hayas entregado el dinero." size="sm">
                             Aprobar
                           </BotonAccion>
                         </>
-                      ) : r.estado === "APROBADO" && pagoReembolso?.estado === "APROBADO" ? (
+                      ) : r.estado === "APROBADO" && (pagoReembolso?.estado === "APROBADO" || pagoReembolso?.estado === "REEMBOLSADO") ? (
                         <>
-                          {pagoReembolso.metodo === "CULQI" && pagoReembolso.referencia_pasarela?.startsWith("chr_") && (
+                          {pagoReembolso.estado === "APROBADO" && pagoReembolso.metodo === "CULQI" && pagoReembolso.referencia_pasarela?.startsWith("chr_") && (
                             <>
                               <BotonAccion accion={resolverReembolso} campos={{ id: r.id, decision: "reintentar" }} variant="outline" size="sm">
                                 Reintentar en Culqi

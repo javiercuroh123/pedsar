@@ -16,6 +16,9 @@ const eslintConfig = defineConfig([
     "coverage/**",
     // Worktrees de Claude Code: copias del repo con su propio .next (git ya las excluye).
     ".claude/**",
+    // Artefactos auxiliares y temporales, ajenos a la aplicación.
+    ".superpowers/**",
+    "tmp/**",
   ]),
 ]);
 
