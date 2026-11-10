@@ -133,7 +133,7 @@ describe("portal del instructor", () => {
 
   it("agrega módulos y contenidos al final; RLS impide editar cursos ajenos", async () => {
     conSesion("instructor");
-    responder({ "modulos.select": { count: 2 }, "modulos.insert": [{}, { error: { message: "RLS" } }], "contenidos.select": { count: null }, "contenidos.insert": [{}, { error: { message: "x" } }] });
+    responder({ "modulos.select": { count: 2 }, "modulos.insert": [{}, { error: { message: "RLS" } }], "contenidos.select": { count: null }, "contenidos.insert": [{}, { error: { message: "x" } }, {}] });
     await expect(crearModulo({}, formulario({ cursoId: UUID.curso, titulo: "Tablas dinámicas" }))).resolves.toEqual({ ok: true, mensaje: "Módulo agregado" });
     expect(entorno.servidor.de("modulos", "insert")[0].valores).toEqual({ curso_id: UUID.curso, titulo: "Tablas dinámicas", orden: 3 });
     await expect(crearModulo({}, formulario({ cursoId: UUID.curso, titulo: "Ajeno" }))).resolves.toEqual({ ok: false, mensaje: "No tienes permiso para editar este curso" });
@@ -143,6 +143,17 @@ describe("portal del instructor", () => {
     await expect(crearContenido({}, formulario(contenido))).resolves.toEqual({ ok: true, mensaje: "Contenido publicado en el aula" });
     expect(entorno.servidor.de("contenidos", "insert")[0].valores).toEqual({ modulo_id: 3, titulo: "Guía de fórmulas", tipo: "PDF", url_archivo: `${UUID.curso}/guia.pdf`, orden: 1 });
     await expect(crearContenido({}, formulario(contenido))).resolves.toEqual({ ok: false, mensaje: "No se pudo guardar el contenido" });
+    await expect(
+      crearContenido(
+        {},
+        formulario({
+          ...contenido,
+          tipo: "ENLACE",
+          url: "https://www.youtube.com/watch?si=8MTpdzWWGm0vw98Y&v=pS6YhES2VCY&feature=youtu.be",
+        }),
+      ),
+    ).resolves.toEqual({ ok: true, mensaje: "Contenido publicado en el aula" });
+    expect(entorno.servidor.de("contenidos", "insert")[2].valores).toMatchObject({ tipo: "VIDEO" });
     await expect(crearContenido({}, formulario({ ...contenido, tipo: "ENLACE", url: "javascript:alert(1)" }))).resolves.toEqual({ ok: false, mensaje: "La URL debe empezar con https://" });
     await expect(crearContenido({}, formulario({ ...contenido, url: "" }))).resolves.toEqual({ ok: false, mensaje: "Adjunta un archivo o escribe la URL" });
 

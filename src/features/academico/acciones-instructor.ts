@@ -46,18 +46,24 @@ const contenidoSchema = z.object({
   url: z.string().trim().min(1, "Adjunta un archivo o escribe la URL").max(1000),
 });
 
+const esUrlVideoEmbebible = (url: string) =>
+  /(?:youtube(?:-nocookie)?\.com\/(?:watch\?(?:.*&)?v=|embed\/|shorts\/|live\/)|youtu\.be\/)[\w-]{11}|(?:player\.)?vimeo\.com\/(?:video\/)?\d+/.test(
+    url,
+  );
+
 export async function crearContenido(_: EstadoFormulario, formData: FormData): Promise<EstadoFormulario> {
   const usuario = await staff();
   const d = contenidoSchema.safeParse(Object.fromEntries(formData));
   if (!d.success) return fallo(d.error);
   if (d.data.tipo === "ENLACE" && !/^https?:\/\//.test(d.data.url)) return { ok: false, mensaje: "La URL debe empezar con https://" };
+  const tipoFinal = d.data.tipo === "ENLACE" && esUrlVideoEmbebible(d.data.url) ? "VIDEO" : d.data.tipo;
   const supabase = await createClient();
   const { count } = await supabase.from("contenidos").select("id", { head: true, count: "exact" }).eq("modulo_id", d.data.moduloId);
   const { error } = await supabase
     .from("contenidos")
-    .insert({ modulo_id: d.data.moduloId, titulo: d.data.titulo, tipo: d.data.tipo, url_archivo: d.data.url, orden: (count ?? 0) + 1 });
+    .insert({ modulo_id: d.data.moduloId, titulo: d.data.titulo, tipo: tipoFinal, url_archivo: d.data.url, orden: (count ?? 0) + 1 });
   if (error) return { ok: false, mensaje: "No se pudo guardar el contenido" };
-  await registrarActividad(usuario.id, "SUBIR_CONTENIDO", { modulo: d.data.moduloId, titulo: d.data.titulo, tipo: d.data.tipo });
+  await registrarActividad(usuario.id, "SUBIR_CONTENIDO", { modulo: d.data.moduloId, titulo: d.data.titulo, tipo: tipoFinal });
   revalidatePath("/instructor/contenidos");
   return { ok: true, mensaje: "Contenido publicado en el aula" };
 }

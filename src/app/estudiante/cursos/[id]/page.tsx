@@ -32,11 +32,13 @@ export const metadata: Metadata = { title: "Aula virtual" };
 
 const ICONO: Record<TipoContenido, typeof FileTextIcon> = { VIDEO: CirclePlayIcon, PDF: FileTextIcon, ENLACE: LinkIcon };
 
-/** Convierte enlaces de YouTube / Vimeo a su versión embebible. */
+/** Convierte enlaces de YouTube / Vimeo a su versión embebible, sin importar el orden de los parámetros. */
 function urlEmbebida(url: string) {
-  const yt = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([\w-]{11})/);
+  const yt = url.match(
+    /(?:youtube(?:-nocookie)?\.com\/(?:watch\?(?:.*&)?v=|embed\/|shorts\/|live\/)|youtu\.be\/)([\w-]{11})/,
+  );
   if (yt) return `https://www.youtube-nocookie.com/embed/${yt[1]}`;
-  const vimeo = url.match(/vimeo\.com\/(\d+)/);
+  const vimeo = url.match(/(?:player\.)?vimeo\.com\/(?:video\/)?(\d+)/);
   if (vimeo) return `https://player.vimeo.com/video/${vimeo[1]}`;
   return null;
 }
@@ -86,7 +88,8 @@ export default async function AulaPage({ params, searchParams }: PageProps<"/est
   const anterior = todos[indice - 1];
   const siguiente = todos[indice + 1];
   const url = actual ? await resolverUrl(actual) : null;
-  const embebida = actual?.tipo === "VIDEO" && url ? urlEmbebida(url) : null;
+  const embebida = url && actual?.tipo !== "PDF" ? urlEmbebida(url) : null;
+  const esVideo = actual?.tipo === "VIDEO" || Boolean(embebida);
 
   return (
     <div className="space-y-4">
@@ -110,7 +113,7 @@ export default async function AulaPage({ params, searchParams }: PageProps<"/est
         <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_340px]">
           <div className="min-w-0">
             <div className="relative aspect-video overflow-hidden rounded-2xl bg-zinc-950 text-white shadow-xl">
-              {actual.tipo === "VIDEO" && embebida ? (
+              {embebida ? (
                 <iframe
                   src={embebida}
                   title={actual.titulo}
@@ -175,7 +178,7 @@ export default async function AulaPage({ params, searchParams }: PageProps<"/est
               </div>
             </div>
 
-            {url && actual.tipo !== "ENLACE" && (
+            {url && (actual.tipo !== "ENLACE" || esVideo) && (
               <div className="mt-6 flex items-center gap-3 rounded-2xl border bg-card p-4">
                 <span className="grid size-10 place-items-center rounded-xl bg-red-50 text-red-600 dark:bg-red-500/10 dark:text-red-300">
                   {actual.tipo === "PDF" ? <FileTextIcon className="size-5" /> : <CirclePlayIcon className="size-5" />}
@@ -217,7 +220,7 @@ export default async function AulaPage({ params, searchParams }: PageProps<"/est
                   </summary>
                   <ul className="pb-2">
                     {m.contenidos.map((ct, ci) => {
-                      const Icono = ICONO[ct.tipo];
+                      const Icono = ct.tipo === "ENLACE" && urlEmbebida(ct.url_archivo) ? CirclePlayIcon : ICONO[ct.tipo];
                       const hecho = hechos.has(ct.id);
                       const esActual = ct.id === actual.id;
                       return (
