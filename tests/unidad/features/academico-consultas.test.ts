@@ -72,6 +72,23 @@ describe("mis cursos y progreso del estudiante (HU-10 · HU-28)", () => {
     await expect(listarMisInscripciones(UUID.estudiante)).rejects.toThrow("Inscripciones: RLS");
   });
 
+  it("omite las inscripciones cuyo curso la RLS no deja leer en vez de romper el panel", async () => {
+    // Caso real del 2026-11-17: al despublicar el curso, la inscripción confirmada llegó con curso = null.
+    responder({
+      inscripciones: {
+        data: [
+          { id: "i1", codigo: "MAT-1", estado: "CONFIRMADA", fecha_inscripcion: "2026-09-01T10:00:00Z", vence_en: null, curso: null, pagos: [], certificados: [] },
+          { id: "i2", codigo: "MAT-2", estado: "CONFIRMADA", fecha_inscripcion: "2026-09-02T10:00:00Z", vence_en: null, curso: { id: "c2", titulo: "Word", categoria: null }, pagos: [], certificados: [] },
+        ],
+      },
+      modulos: { data: [{ curso_id: "c2", contenidos: [{}] }] },
+      contenidos_completados: { data: [] },
+    });
+    const lista = await listarMisInscripciones(UUID.estudiante);
+    expect(lista.map((i) => i.id)).toEqual(["i2"]);
+    expect(entorno.servidor.de("contenidos_completados")[0].filtros).toEqual([["in", "inscripcion_id", ["i2"]]]);
+  });
+
   it("lista sesiones próximas, evaluaciones con su mejor intento y el aula ordenada", async () => {
     await expect(listarSesionesProximas([], "2026-10-01")).resolves.toEqual([]);
     await expect(listarEvaluacionesEstudiante([])).resolves.toEqual([]);

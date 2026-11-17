@@ -104,8 +104,10 @@ export async function listarMisInscripciones(estudianteId: string): Promise<Insc
     .order("fecha_inscripcion", { ascending: false });
   if (error) throw new Error(`Inscripciones: ${error.message}`);
 
+  // Si la RLS oculta el curso (p. ej. despublicado), la inscripción llega con curso = null:
+  // se omite para que una sola fila no tumbe todo el panel del estudiante.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const filas = (data ?? []) as any[];
+  const filas = ((data ?? []) as any[]).filter((f) => uno(f.curso));
   const progreso = await calcularProgreso(
     filas.filter((f) => f.estado === "CONFIRMADA").map((f) => ({ inscripcionId: f.id, cursoId: uno<{ id: string }>(f.curso)!.id })),
   );

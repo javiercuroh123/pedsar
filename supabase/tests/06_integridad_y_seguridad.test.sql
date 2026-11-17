@@ -136,6 +136,15 @@ insert into public.certificados(inscripcion_id,codigo_unico)
  select id,'PED-2026-PREREQ01' from public.inscripciones where estudiante_id='a6000000-0000-4000-8000-000000000002' and curso_id='c6000000-0000-4000-8000-000000000002';
 select is(public.cumple_prerrequisito('a6000000-0000-4000-8000-000000000002','c6000000-0000-4000-8000-000000000005'),true,'Cumple prerrequisito cuando posee certificado del curso previo');
 select lives_ok($$select * from public.registrar_matricula('a6000000-0000-4000-8000-000000000002','c6000000-0000-4000-8000-000000000005','YAPE','',150,'{}')$$,'Permite inscribirse tras cumplir el prerrequisito');
+-- cumple_prerrequisito es security definer: solo para estudiantes con sesión y el servidor.
+select set_config('request.jwt.claims','{"role":"anon"}',true);
+set local role anon;
+select throws_ok($$select public.cumple_prerrequisito('a6000000-0000-4000-8000-000000000002','c6000000-0000-4000-8000-000000000005')$$,'42501',null,'El visitante no puede consultar prerrequisitos de un estudiante');
+reset role;
+select set_config('request.jwt.claims','{"sub":"a6000000-0000-4000-8000-000000000002","role":"authenticated"}',true);
+set local role authenticated;
+select is(public.cumple_prerrequisito('a6000000-0000-4000-8000-000000000002','c6000000-0000-4000-8000-000000000005'),true,'El estudiante con sesión sí consulta su prerrequisito');
+reset role;
 
 -- HU-21 · RF-11 · Recordatorios programados y preferencia de canal.
 insert into public.evaluaciones(id,curso_id,titulo,fecha_limite) overriding system value values

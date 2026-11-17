@@ -51,185 +51,55 @@ end $$;
 
 grant execute on function public.cumple_prerrequisito(uuid, uuid) to authenticated, service_role;
 
--- Actualiza registrar_matricula para verificar prerrequisito en la misma transacción
-create or replace function public.registrar_matricula(
-  p_estudiante  uuid,
-  p_curso       uuid,
-  p_metodo      public.metodo_pago,
-  p_cupon       text default '',
-  p_monto       numeric default null,
-  p_facturacion jsonb default '{}'::jsonb
-)
-returns table (
-  inscripcion_id uuid,
-  codigo         text,
-  vence_en       timestamptz,
-  pago_id        uuid,
-  monto          numeric(10, 2),
-  cupon_id       bigint
-)
-language plpgsql security definer set search_path = '' as $$
-declare
-  v_curso    record;
-  v_cupon    record;
-  v_usados   int;
-  v_monto    numeric(10, 2);
-  v_vence    timestamptz := now() + interval '48 hours';
-  v_ins      record;
-  v_pago_id  uuid;
+-- Actualiza registrar_matricula para verificar el prerrequisito en la misma
+-- transacción. Conserva íntegro el cuerpo de 20261110155700 (security invoker,
+-- validación del medio de pago, cupón como fila tipada y códigos de error que
+-- espera la aplicación); solo se añade la comprobación del prerrequisito.
+create or replace function public.registrar_matricula(p_estudiante uuid, p_curso uuid, p_metodo public.metodo_pago,
+  p_cupon text, p_monto numeric, p_facturacion jsonb)
+returns table(inscripcion_id uuid, codigo text, vence_en timestamptz, pago_id uuid, monto numeric, cupon_id bigint)
+language plpgsql security invoker set search_path = '' as $$
+declare c public.cursos; cp public.cupones; i public.inscripciones; p public.pagos; importe numeric; usados int;
 begin
-  if not exists (
-    select 1 from public.perfiles
-    where id = p_estudiante and rol = 'estudiante' and estado
-  ) then
-    raise exception 'Estudiante no válido' using errcode = '42501';
+  if not exists(select 1 from public.perfiles where id = p_estudiante and estado and rol = 'estudiante') then
+    raise exception 'Estudiante no habilitado' using errcode = '42501';
   end if;
-
-  select c.id, c.precio into v_curso
-  from public.cursos c
-  where c.id = p_curso and c.estado = 'PUBLICADO'
-  for share;
-
-  if v_curso.id is null then
-    raise exception 'Curso no disponible' using errcode = 'P0002';
-  end if;
-
+  if p_metodo not in ('CULQI', 'YAPE', 'PLIN') then raise exception 'Medio no disponible'; end if;
+  select * into c from public.cursos where id = p_curso and estado = 'PUBLICADO' for no key update;
+  if not found then raise exception 'Curso no disponible' using errcode = '22023'; end if;
   if not public.cumple_prerrequisito(p_estudiante, p_curso) then
-    raise exception 'Debes completar primero el curso prerrequisito antes de inscribirte'
-      using errcode = '22023';
+    raise exception 'Debes completar primero el curso prerrequisito antes de inscribirte' using errcode = '22023';
   end if;
-
-  v_monto := v_curso.precio;
-
-  if coalesce(trim(p_cupon), '') <> '' then
-    select * into v_cupon
-    from public.cupones
-    where upper(codigo) = upper(trim(p_cupon))
-    for update;
-
-    if v_cupon.id is null or not v_cupon.activo or v_cupon.fecha_vigencia < (now() at time zone 'America/Lima')::date then
-      raise exception 'Cupón no válido o vencido' using errcode = '22023';
+  if nullif(trim(p_cupon), '') is not null then
+    select cu.* into cp from public.cupones cu where cu.codigo = upper(trim(p_cupon)) for update;
+    if not found or not cp.activo or cp.fecha_vigencia < (now() at time zone 'America/Lima')::date then
+      raise exception 'El cupón ya no está disponible. Revisa el importe antes de inscribirte.' using errcode = '22023';
     end if;
-
-    if v_cupon.usos_maximos is not null then
-      select count(*)::int into v_usados
-      from public.pagos p
-      join public.inscripciones i on i.id = p.inscripcion_id
-      where p.cupon_id = v_cupon.id
-        and (
-          p.estado = 'APROBADO'
-          or (i.estado = 'PENDIENTE' and (i.vence_en is null or i.vence_en > now()))
-        );
-
-      if v_usados >= v_cupon.usos_maximos then
-        raise exception 'Este cupón ya alcanzó su límite de usos' using errcode = '22023';
-      end if;
+    select count(*) into usados from public.pagos pa join public.inscripciones ins on ins.id = pa.inscripcion_id
+      where pa.cupon_id = cp.id and (pa.estado = 'APROBADO' or (pa.estado = 'PENDIENTE' and ins.estado = 'PENDIENTE' and (ins.vence_en is null or ins.vence_en > now())));
+    if cp.usos_maximos is not null and usados >= cp.usos_maximos then
+      raise exception 'El cupón agotó sus usos. Revisa el importe antes de inscribirte.' using errcode = '22023';
     end if;
-
-    v_monto := round(v_curso.precio * (1 - v_cupon.porcentaje_descuento / 100.0), 2);
   end if;
-
-  if p_monto is not null and round(p_monto, 2) <> v_monto then
-    raise exception 'El importe de la inscripción cambió; verifica el monto antes de continuar'
-      using errcode = '22023';
+  importe = round(c.precio * (1 - coalesce(cp.porcentaje_descuento, 0) / 100), 2);
+  if p_monto is null or importe <> p_monto then
+    raise exception 'El precio cambió. Revisa el importe antes de inscribirte.' using errcode = '22023';
   end if;
-
-  insert into public.inscripciones (estudiante_id, curso_id, estado, vence_en)
-  values (p_estudiante, p_curso, 'PENDIENTE', v_vence)
-  returning id, public.inscripciones.codigo, public.inscripciones.vence_en into v_ins;
-
-  insert into public.pagos (inscripcion_id, cupon_id, monto, metodo, estado, datos_facturacion)
-  values (v_ins.id, v_cupon.id, v_monto, p_metodo, 'PENDIENTE', coalesce(p_facturacion, '{}'::jsonb))
-  returning id into v_pago_id;
-
-  return query select v_ins.id, v_ins.codigo, v_ins.vence_en, v_pago_id, v_monto, v_cupon.id;
+  insert into public.inscripciones(estudiante_id, curso_id) values(p_estudiante, p_curso) returning * into i;
+  insert into public.pagos(inscripcion_id, monto, metodo, cupon_id, datos_facturacion)
+    values(i.id, importe, p_metodo, cp.id, p_facturacion) returning * into p;
+  return query select i.id, i.codigo, i.vence_en, p.id, importe, cp.id;
 end $$;
+revoke all on function public.registrar_matricula(uuid,uuid,public.metodo_pago,text,numeric,jsonb) from public, anon, authenticated;
+grant execute on function public.registrar_matricula(uuid,uuid,public.metodo_pago,text,numeric,jsonb) to service_role;
 
 -- ---------------------------------------------------------------------
--- 2. HU-11 · RF-08 — Permitir que resultado_academico también funcione
---    con service_role para la emisión automática de certificados
+-- 2. HU-11 · RF-08 — resultado_academico NO se redefine aquí.
+--    La versión security invoker de 20261001155751 ya sirve para la emisión
+--    automática: service_role omite la RLS. Una versión security definer
+--    que acepte current_user = 'postgres' deja leer notas ajenas, porque
+--    dentro de la función current_user siempre es su dueño.
 -- ---------------------------------------------------------------------
-create or replace function public.resultado_academico(p_inscripciones uuid[])
-returns table (
-  inscripcion_id uuid,
-  evaluaciones   int,
-  rendidas       int,
-  nota_final     numeric(5, 2),
-  sesiones       int,
-  presentes      int,
-  asistencia     numeric(5, 1),
-  contenidos     int,
-  completados    int,
-  progreso       numeric(5, 1)
-)
-language sql stable security definer set search_path = '' as $$
-  with autorizadas as (
-    select i.id, i.curso_id
-    from public.inscripciones i
-    where i.id = any (p_inscripciones)
-      and (
-        i.estudiante_id = auth.uid()
-        or privado.es_instructor_de(i.curso_id)
-        or public.es_admin()
-        or coalesce(auth.role(), '') = 'service_role'
-        or current_user in ('postgres', 'service_role')
-      )
-  ),
-  mejor_intento as (
-    select a.id as inscripcion_id,
-           e.id as evaluacion_id,
-           max(ie.puntaje_obtenido * 20.0 / nullif(e.puntaje_total, 0)) as nota_20
-    from autorizadas a
-    join public.evaluaciones e on e.curso_id = a.curso_id
-    left join public.intentos_evaluacion ie
-           on ie.inscripcion_id = a.id and ie.evaluacion_id = e.id
-    group by a.id, e.id
-  ),
-  notas as (
-    select m.inscripcion_id,
-           count(m.evaluacion_id)::int as evaluaciones,
-           count(m.nota_20)::int       as rendidas,
-           round(avg(coalesce(m.nota_20, 0)), 2) as nota_final
-    from mejor_intento m
-    group by m.inscripcion_id
-  ),
-  asist as (
-    select a.id as inscripcion_id,
-           count(s.id)::int as sesiones,
-           count(asist.id) filter (where asist.estado in ('PRESENTE', 'TARDANZA'))::int as presentes
-    from autorizadas a
-    left join public.sesiones s     on s.curso_id = a.curso_id
-    left join public.asistencias asist on asist.inscripcion_id = a.id and asist.sesion_id = s.id
-    group by a.id
-  ),
-  avance as (
-    select a.id as inscripcion_id,
-           count(c.id)::int  as contenidos,
-           count(cc.contenido_id)::int as completados
-    from autorizadas a
-    left join public.modulos m    on m.curso_id = a.curso_id
-    left join public.contenidos c on c.modulo_id = m.id
-    left join public.contenidos_completados cc
-           on cc.inscripcion_id = a.id and cc.contenido_id = c.id
-    group by a.id
-  )
-  select a.id,
-         coalesce(n.evaluaciones, 0),
-         coalesce(n.rendidas, 0),
-         n.nota_final,
-         coalesce(s.sesiones, 0),
-         coalesce(s.presentes, 0),
-         round(s.presentes * 100.0 / nullif(s.sesiones, 0), 1),
-         coalesce(v.contenidos, 0),
-         coalesce(v.completados, 0),
-         round(v.completados * 100.0 / nullif(v.contenidos, 0), 1)
-  from autorizadas a
-  left join notas  n on n.inscripcion_id = a.id
-  left join asist  s on s.inscripcion_id = a.id
-  left join avance v on v.inscripcion_id = a.id
-$$;
-
-grant execute on function public.resultado_academico(uuid[]) to authenticated, service_role;
 
 -- ---------------------------------------------------------------------
 -- 3. HU-15 · HU-18 · HU-21 · HU-41 · RF-11 — Perfil (fecha de nacimiento),

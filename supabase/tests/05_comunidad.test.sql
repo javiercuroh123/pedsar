@@ -115,7 +115,10 @@ select pruebas.como('a0000000-0000-4000-8000-000000000002');
 select throws_ok($$insert into public.resenas (inscripcion_id, estrellas) values ('e0000000-0000-4000-8000-000000000002', 5)$$,
   '42501', null, 'No se califica un curso que aún no se completa');
 reset role;
-insert into public.progreso (inscripcion_id, porcentaje, lecciones_completadas, total_lecciones) values ('e0000000-0000-4000-8000-000000000002', 100, 8, 8);
+-- trg_progreso_inscripcion (20261110170000) ya crea la fila al confirmar la matrícula.
+insert into public.progreso (inscripcion_id, porcentaje, lecciones_completadas, total_lecciones) values ('e0000000-0000-4000-8000-000000000002', 100, 8, 8)
+  on conflict (inscripcion_id) do update set porcentaje = excluded.porcentaje,
+    lecciones_completadas = excluded.lecciones_completadas, total_lecciones = excluded.total_lecciones;
 select pruebas.como('a0000000-0000-4000-8000-000000000002');
 select lives_ok($$insert into public.resenas (inscripcion_id, estrellas, texto) values ('e0000000-0000-4000-8000-000000000002', 4, 'Muy práctico')$$,
   'Con el 100 % de avance se puede calificar');
