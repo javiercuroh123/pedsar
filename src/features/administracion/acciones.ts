@@ -54,6 +54,8 @@ const cursoSchema = z.object({
   id: z.preprocess(vacioANull, z.uuid().nullable()),
   titulo: z.string().trim().min(3, "Escribe el título").max(160),
   descripcion: z.string().trim().max(2000).optional(),
+  requisitosPrevios: z.string().trim().max(500).optional(),
+  prerrequisitoCursoId: z.preprocess(vacioANull, z.uuid().nullable().optional()),
   categoriaId: z.preprocess(vacioANull, z.coerce.number().int().nullable()),
   instructorId: z.preprocess(vacioANull, z.uuid().nullable()),
   nivel: z.enum(["BASICO", "INTERMEDIO", "AVANZADO"]),
@@ -72,6 +74,9 @@ export async function guardarCurso(_: EstadoFormulario, formData: FormData): Pro
   const d = cursoSchema.safeParse(Object.fromEntries(formData));
   if (!d.success) return fallo(d.error);
   const c = d.data;
+  if (c.id && c.prerrequisitoCursoId && c.prerrequisitoCursoId === c.id) {
+    return { ok: false, mensaje: "Un curso no puede ser prerrequisito de sí mismo" };
+  }
   const supabase = await createClient();
   const publicarEn = c.publicarEn ? new Date(`${c.publicarEn}:00-05:00`).toISOString() : null;
   const programadoFuturo = publicarEn !== null && new Date(publicarEn).getTime() > Date.now();
@@ -79,6 +84,8 @@ export async function guardarCurso(_: EstadoFormulario, formData: FormData): Pro
   const fila = {
     titulo: c.titulo,
     descripcion: c.descripcion || null,
+    requisitos_previos: c.requisitosPrevios || null,
+    prerrequisito_curso_id: c.prerrequisitoCursoId ?? null,
     categoria_id: c.categoriaId,
     instructor_id: c.instructorId,
     nivel: c.nivel,
@@ -157,14 +164,25 @@ const categoriaSchema = z.object({
   id: z.preprocess(vacioANull, z.coerce.number().int().nullable()),
   nombre: z.string().trim().min(3, "Escribe el nombre").max(80),
   descripcion: z.string().trim().max(300).optional(),
+  padreId: z.preprocess(vacioANull, z.coerce.number().int().nullable().optional()),
+  imagenUrl: z.preprocess(vacioANull, z.url("La imagen debe ser una URL").nullable().optional()),
 });
 
 export async function guardarCategoria(_: EstadoFormulario, formData: FormData): Promise<EstadoFormulario> {
   const usuario = await admin();
   const d = categoriaSchema.safeParse(Object.fromEntries(formData));
   if (!d.success) return fallo(d.error);
+  if (d.data.id && d.data.padreId && d.data.id === d.data.padreId) {
+    return { ok: false, mensaje: "Una categoría no puede ser subcategoría de sí misma" };
+  }
   const supabase = await createClient();
-  const fila = { nombre: d.data.nombre, slug: slugDe(d.data.nombre), descripcion: d.data.descripcion || null };
+  const fila = {
+    nombre: d.data.nombre,
+    slug: slugDe(d.data.nombre),
+    descripcion: d.data.descripcion || null,
+    ...(d.data.padreId !== undefined && { padre_id: d.data.padreId }),
+    ...(d.data.imagenUrl !== undefined && { imagen_url: d.data.imagenUrl }),
+  };
   const { error } = d.data.id
     ? await supabase.from("categorias").update(fila).eq("id", d.data.id)
     : await supabase.from("categorias").insert(fila);
@@ -172,6 +190,15 @@ export async function guardarCategoria(_: EstadoFormulario, formData: FormData):
   await registrarActividad(usuario.id, "GUARDAR_CATEGORIA", { nombre: d.data.nombre });
   revalidatePath("/", "layout");
   return { ok: true, mensaje: "Categoría guardada" };
+}
+
+export async function alternarCategoria(formData: FormData) {
+  await admin();
+  const id = z.coerce.number().int().parse(formData.get("id"));
+  const activa = formData.get("activa") === "true";
+  const supabase = await createClient();
+  await supabase.from("categorias").update({ activa }).eq("id", id);
+  revalidatePath("/", "layout");
 }
 
 export async function eliminarCategoria(formData: FormData) {

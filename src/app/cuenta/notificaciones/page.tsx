@@ -3,18 +3,30 @@ import Link from "next/link";
 import { BellIcon, BellOffIcon, CheckCheckIcon } from "lucide-react";
 import { BotonAccion } from "@/components/boton-accion";
 import { EncabezadoPagina, EstadoVacio, Pildora } from "@/components/comunes";
-import { marcarTodasLeidas } from "@/features/notificaciones/acciones";
+import { actualizarCanalNotificacion, marcarTodasLeidas } from "@/features/notificaciones/acciones";
 import { listarNotificaciones } from "@/features/notificaciones/consultas";
 import { requireUsuario } from "@/lib/auth";
 import { formatearFechaHora } from "@/lib/formato";
+import { createClient } from "@/lib/supabase/server";
 import { cn } from "@/lib/utils";
 
 export const metadata: Metadata = { title: "Notificaciones" };
 
-// HU-51 · HU-21 · HU-64 · Notificaciones y recordatorios
+const CANALES = [
+  { v: "AMBOS", t: "Correo e in-app", d: "Recibe avisos en la campana y por correo electrónico." },
+  { v: "IN_APP", t: "Solo en la plataforma", d: "Muestra recordatorios únicamente en la campana." },
+  { v: "CORREO", t: "Solo por correo", d: "Envía recordatorios de sesiones y evaluaciones a tu correo." },
+] as const;
+
+// HU-51 · HU-21 · HU-41 · HU-64 · Notificaciones y recordatorios
 export default async function CuentaNotificacionesPage() {
   const usuario = await requireUsuario();
-  const notificaciones = await listarNotificaciones(usuario.id, 100);
+  const supabase = await createClient();
+  const [notificaciones, { data: perfil }] = await Promise.all([
+    listarNotificaciones(usuario.id, 100),
+    supabase.from("perfiles").select("canal_notificacion").eq("id", usuario.id).maybeSingle(),
+  ]);
+  const canalActual = perfil?.canal_notificacion ?? "AMBOS";
   const noLeidas = notificaciones.filter((n) => !n.leida).length;
 
   return (
@@ -26,6 +38,27 @@ export default async function CuentaNotificacionesPage() {
           </BotonAccion>
         )}
       </EncabezadoPagina>
+
+      <section className="rounded-2xl border bg-card p-5 shadow-xs">
+        <h2 className="text-sm font-semibold">Canal preferido para recordatorios</h2>
+        <p className="mt-1 text-xs text-muted-foreground">
+          Elige cómo recibir recordatorios automáticos (1 h antes de tus sesiones y 24 h antes del cierre de evaluaciones).
+        </p>
+        <div className="mt-3 flex flex-wrap gap-2">
+          {CANALES.map((c) => (
+            <BotonAccion
+              key={c.v}
+              accion={actualizarCanalNotificacion}
+              campos={{ canal: c.v }}
+              variant={canalActual === c.v ? "default" : "outline"}
+              size="sm"
+              title={c.d}
+            >
+              {c.t}
+            </BotonAccion>
+          ))}
+        </div>
+      </section>
       {notificaciones.length ? (
         <ul className="divide-y overflow-hidden rounded-2xl border bg-card shadow-xs">
           {notificaciones.map((n) => (

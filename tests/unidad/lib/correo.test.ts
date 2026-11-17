@@ -6,6 +6,8 @@ import {
   correoInscripcionRegistrada,
   correoPagoObservado,
   correoPagoRechazado,
+  correoRecordatorioEvaluacion,
+  correoRecordatorioSesion,
 } from "@/lib/email/plantillas";
 import { ejecutarTareas, entorno } from "../../apoyo/entorno";
 
@@ -46,10 +48,18 @@ describe("plantillas de correo (HU-21)", () => {
 
   it("cada evento tiene su asunto y su enlace", () => {
     const datos = { nombre: "Ana", curso: "Excel", codigo: "MAT-1", url: "https://pedsar.test/x" };
-    const correos = [correoConfirmacionMatricula(datos), correoPagoRechazado(datos), correoCertificadoEmitido({ ...datos, codigo: "PED-2026-ABCDEFGH" })];
-    expect(new Set(correos.map((c) => c.asunto)).size).toBe(3);
+    const correos = [
+      correoConfirmacionMatricula(datos),
+      correoPagoRechazado(datos),
+      correoCertificadoEmitido({ ...datos, codigo: "PED-2026-ABCDEFGH" }),
+      correoRecordatorioSesion({ nombre: "Ana", curso: "Excel", fecha: "10 oct.", hora: "19:00", modalidad: "Virtual", url: "https://pedsar.test/x" }),
+      correoRecordatorioEvaluacion({ nombre: "Ana", curso: "Excel", evaluacion: "Examen Final", venceEn: "11 oct., 12:00", url: "https://pedsar.test/x" }),
+    ];
+    expect(new Set(correos.map((c) => c.asunto)).size).toBe(5);
     correos.forEach((c) => expect(c.html).toContain('href="https://pedsar.test/x"'));
     expect(correos[2].html).toContain("PED-2026-ABCDEFGH");
+    expect(correos[3].html).toContain("19:00");
+    expect(correos[4].html).toContain("Examen Final");
   });
 });
 

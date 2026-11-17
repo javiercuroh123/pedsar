@@ -100,6 +100,10 @@ export function LoginForm({ next }: { next?: string }) {
           </Link>
         }
       />
+      <Label className="items-center gap-2 font-normal text-muted-foreground">
+        <input type="checkbox" name="recordar" defaultChecked className="size-4" />
+        <span>Recordar sesión en este dispositivo</span>
+      </Label>
       <Mensaje estado={estado} />
       <Button type="submit" className={botonPrincipal} disabled={pendiente}>
         {pendiente ? "Ingresando…" : "Iniciar sesión"}

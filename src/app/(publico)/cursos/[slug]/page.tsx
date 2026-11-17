@@ -131,6 +131,22 @@ export default async function CursoPage({ params }: PageProps<"/cursos/[slug]">)
 
       <div className="mx-auto grid max-w-7xl gap-10 px-4 py-10 sm:px-6 lg:grid-cols-[minmax(0,1fr)_360px] lg:px-8">
         <div className="min-w-0 space-y-12">
+          {(curso.prerrequisito || curso.requisitos_previos) && (
+            <section className="rounded-2xl border bg-card p-6 shadow-xs">
+              <h2 className="text-lg font-bold tracking-tight">Requisitos previos</h2>
+              {curso.prerrequisito && (
+                <p className="mt-2 text-sm text-muted-foreground">
+                  Para inscribirte en este curso debes haber completado primero{" "}
+                  <Link href={`/cursos/${curso.prerrequisito.slug}`} className="font-semibold text-primary underline underline-offset-4">
+                    {curso.prerrequisito.titulo}
+                  </Link>
+                  .
+                </p>
+              )}
+              {curso.requisitos_previos && <p className="mt-2 text-sm text-muted-foreground">{curso.requisitos_previos}</p>}
+            </section>
+          )}
+
           <section>
             <h2 className="text-xl font-bold tracking-tight">Temario</h2>
             <p className="mt-1 text-sm text-muted-foreground">{curso.modulos.length} módulos organizados por semanas</p>

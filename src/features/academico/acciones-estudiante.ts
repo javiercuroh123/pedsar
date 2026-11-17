@@ -5,6 +5,7 @@ import { z } from "zod";
 import { aprobado } from "@/config/academico";
 import { DIAS_ANTICIPACION_REEMBOLSO, dentroDePlazoReembolso } from "@/config/matricula";
 import { uno } from "@/features/academico/consultas";
+import { emitirCertificadoTrasEvaluacion } from "@/features/certificacion/emision-automatica";
 import { registrarActividad } from "@/lib/auditoria";
 import { requireRol } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -61,10 +62,14 @@ export async function enviarEvaluacion(evaluacionId: number, respuestas: Record<
     p_estudiante: estudiante.id, p_evaluacion: evaluacionId, p_intento: intento, p_respuestas: resp,
   }).single();
   if (error || !resultado) return { ok: false, mensaje: error?.message ?? "No se pudo registrar el intento. Inténtalo de nuevo." };
+  const esAprobado = aprobado(Number(resultado.puntaje), Number(resultado.total));
   await registrarActividad(estudiante.id, "RENDIR_EVALUACION", { evaluacion: evaluacionId, puntaje: resultado.puntaje, intento });
+  if (esAprobado && !resultado.fuera_de_plazo) {
+    await emitirCertificadoTrasEvaluacion(estudiante.id, evaluacionId);
+  }
   revalidatePath("/estudiante", "layout");
   return { ok: true, puntaje: Number(resultado.puntaje), total: Number(resultado.total), correctas: resultado.correctas,
-    preguntas: resultado.preguntas, aprobado: aprobado(Number(resultado.puntaje), Number(resultado.total)),
+    preguntas: resultado.preguntas, aprobado: esAprobado,
     intentosRestantes: resultado.intentos_restantes,
     ...(resultado.fuera_de_plazo ? { mensaje: "El plazo venció. Este intento se registró sin respuestas válidas." } : {}),
   };

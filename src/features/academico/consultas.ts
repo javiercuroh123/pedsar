@@ -19,6 +19,7 @@ export interface InscripcionEstudiante {
     titulo: string;
     modalidad: Modalidad;
     duracion_horas: number;
+    instructor_id?: string | null;
     categoria: { nombre: string; slug: string } | null;
     /** Fecha de la primera sesión programada (AAAA-MM-DD), o null si aún no tiene sesiones. */
     primera_sesion?: string | null;
@@ -95,7 +96,7 @@ export async function listarMisInscripciones(estudianteId: string): Promise<Insc
     .from("inscripciones")
     .select(
       `id, codigo, estado, fecha_inscripcion, vence_en,
-       curso:cursos(id, slug, titulo, modalidad, duracion_horas, categoria:categorias(nombre, slug), sesiones(fecha)),
+       curso:cursos(id, slug, titulo, modalidad, duracion_horas, instructor_id, categoria:categorias(nombre, slug), sesiones(fecha)),
        pagos(id, monto, metodo, medio, estado, fecha_pago, numero_operacion, reportado_en, observacion, comprobantes(id, tipo, serie, numero)),
        certificados(codigo_unico, fecha_emision, estudiante_nombre, curso_titulo, duracion_horas, instructor_nombre, nota_final)`,
     )

@@ -6,7 +6,7 @@ import { SelectorUrl } from "@/components/selector-url";
 import { eliminarContenido, eliminarModulo } from "@/features/academico/acciones-instructor";
 import { listarModulosConContenidos } from "@/features/academico/consultas";
 import { elegirCurso, listarCursosDelInstructor } from "@/features/academico/consultas-instructor";
-import { DialogoContenido, DialogoModulo } from "@/features/academico/formularios-instructor";
+import { DialogoContenido, DialogoEditarContenido, DialogoEditarModulo, DialogoModulo } from "@/features/academico/formularios-instructor";
 import { listarTemasCurso } from "@/features/comunidad/consultas-foro";
 import { SeccionForo } from "@/features/comunidad/seccion-foro";
 import { requireRol } from "@/lib/auth";
@@ -67,10 +67,12 @@ export default async function InstructorContenidosPage({ searchParams }: PagePro
                 </span>
                 <h2 className="flex-1 text-sm font-semibold">{m.titulo}</h2>
                 <span className="text-xs text-muted-foreground">{m.contenidos.length} elementos</span>
+                <DialogoEditarModulo modulo={m} />
                 <BotonAccion
                   accion={eliminarModulo}
                   campos={{ id: m.id }}
-                  confirmar={`¿Eliminar el módulo "${m.titulo}" y todos sus contenidos?`}
+                  tituloConfirmar="Eliminar módulo completo"
+                  confirmar={`¿Eliminar el módulo "${m.titulo}" y todos sus contenidos? Esta acción no se puede deshacer.`}
                   variant="ghost"
                   size="icon-sm"
                   className="text-red-600 dark:text-red-400"
@@ -93,10 +95,12 @@ export default async function InstructorContenidosPage({ searchParams }: PagePro
                           <p className="truncate text-xs text-muted-foreground">{c.url_archivo}</p>
                         </div>
                         <Pildora className="hidden sm:inline-flex">{t.etiqueta}</Pildora>
+                        <DialogoEditarContenido contenido={c} />
                         <BotonAccion
                           accion={eliminarContenido}
                           campos={{ id: c.id }}
-                          confirmar={`¿Eliminar "${c.titulo}"?`}
+                          tituloConfirmar="Eliminar material del módulo"
+                          confirmar={`¿Eliminar "${c.titulo}"? Este material dejará de estar disponible para los estudiantes en el aula virtual.`}
                           variant="ghost"
                           size="icon-sm"
                           className="text-red-600 dark:text-red-400"

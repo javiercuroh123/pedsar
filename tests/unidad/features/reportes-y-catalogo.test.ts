@@ -255,13 +255,14 @@ describe("catálogo público (HU-05 · HU-06 · HU-33)", () => {
     await expect(listarCategorias()).resolves.toEqual([]);
   });
 
-  it("recomienda cursos por afinidad de categoría, destacados y cupo disponible (HU-25)", async () => {
+  it("recomienda cursos por afinidad de categoría o mismo instructor, destacados y cupo disponible (HU-25)", async () => {
     responder({
       cursos: {
         data: [
-          curso("inscrito", { categoria: { nombre: "Ofimática", slug: "ofimatica" } }),
-          curso("afin", { categoria: { nombre: "Ofimática", slug: "ofimatica" }, destacado: false }),
-          curso("destacado-otro", { categoria: { nombre: "Gestión", slug: "gestion" }, destacado: true }),
+          curso("inscrito", { categoria: { nombre: "Ofimática", slug: "ofimatica" }, instructor_id: "ins-1" }),
+          curso("afin", { categoria: { nombre: "Ofimática", slug: "ofimatica" }, instructor_id: "ins-2", destacado: false }),
+          curso("mismo-instructor", { categoria: { nombre: "Diseño", slug: "diseno" }, instructor_id: "ins-1", destacado: false }),
+          curso("destacado-otro", { categoria: { nombre: "Gestión", slug: "gestion" }, instructor_id: "ins-3", destacado: true }),
           curso("sin-cupo", { categoria: { nombre: "Ofimática", slug: "ofimatica" }, cupo_maximo: 0 }),
         ],
       },
@@ -270,8 +271,12 @@ describe("catálogo público (HU-05 · HU-06 · HU-33)", () => {
       "rpc:horarios_publicos": { data: [] },
     });
     const recomendados = await recomendarCursos([
-      { estado: "CONFIRMADA", curso: { id: "inscrito", categoria: { slug: "ofimatica" } } },
+      {
+        estado: "CONFIRMADA",
+        curso: { id: "inscrito", instructor_id: "ins-1", categoria: { slug: "ofimatica" } },
+        progreso: { porcentaje: 100 },
+      },
     ]);
-    expect(recomendados.map((c) => c.id)).toEqual(["afin", "destacado-otro"]);
+    expect(recomendados.map((c) => c.id)).toEqual(["afin", "mismo-instructor", "destacado-otro"]);
   });
 });

@@ -168,3 +168,63 @@ export function correoCertificadoEmitido(p: { nombre: string; curso: string; cod
       ${boton("Verificar certificado", p.url)}`),
   };
 }
+
+// ---------- Recordatorios automáticos (HU-21 · RF-11) ----------
+
+/** Recordatorio 1 hora antes del inicio de una sesión programada. */
+export function correoRecordatorioSesion(p: {
+  nombre: string;
+  curso: string;
+  fecha: string;
+  hora: string;
+  modalidad: string;
+  url: string;
+}) {
+  return {
+    asunto: `Recordatorio: tu sesión de ${p.curso} inicia pronto`,
+    html: marco(`
+      ${saludo(p.nombre)}
+      <p style="margin:0">Te recordamos que tu sesión de <strong>${escapar(p.curso)}</strong> comienza en aproximadamente una hora.</p>
+      ${datos([
+        ["Fecha", escapar(p.fecha)],
+        ["Hora de inicio", escapar(p.hora)],
+        ["Modalidad", escapar(p.modalidad)],
+      ])}
+      ${boton("Ver mis horarios", p.url)}`),
+  };
+}
+
+/** Recordatorio 24 horas antes del vencimiento de una evaluación pendiente. */
+export function correoRecordatorioEvaluacion(p: {
+  nombre: string;
+  curso: string;
+  evaluacion: string;
+  venceEn: string;
+  url: string;
+}) {
+  return {
+    asunto: `Recordatorio: evaluación pendiente en ${p.curso}`,
+    html: marco(`
+      ${saludo(p.nombre)}
+      <p style="margin:0">Tienes pendiente rendir la evaluación <strong>${escapar(p.evaluacion)}</strong> del curso <strong>${escapar(p.curso)}</strong>.</p>
+      ${datos([["Cierre de la evaluación", escapar(p.venceEn)]])}
+      ${boton("Rendir evaluación", p.url)}`),
+  };
+}
+
+/** HU-21 · Aviso de actividad académica del curso (nueva evaluación o nueva sesión programada). */
+export function correoAvisoCurso(p: {
+  nombre: string;
+  curso: string;
+  mensaje: string;
+  url: string;
+}) {
+  return {
+    asunto: `Novedad en tu curso: ${p.curso}`,
+    html: marco(`
+      ${saludo(p.nombre)}
+      <p style="margin:0">Hay una actualización en tu curso <strong>${escapar(p.curso)}</strong>:</p>
+      ${aviso(escapar(p.mensaje))}
+      ${boton("Ir a mi portal", p.url)}`),
+  };
+}

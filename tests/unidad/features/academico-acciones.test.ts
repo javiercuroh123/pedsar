@@ -5,6 +5,8 @@ import {
   crearEvaluacion,
   crearModulo,
   crearSesion,
+  editarContenido,
+  editarModulo,
   eliminarContenido,
   eliminarEvaluacion,
   eliminarModulo,
@@ -167,6 +169,47 @@ describe("portal del instructor", () => {
       ["eq", "id", 4],
       ["eq", "id", 5],
     ]);
+  });
+
+  it("edita y reordena módulos y contenidos existentes (HU-08)", async () => {
+    conSesion("instructor");
+    responder({
+      "modulos.update": [{}, { error: { message: "RLS" } }],
+      "contenidos.update": [{}, {}, { error: { message: "RLS" } }],
+    });
+    await expect(editarModulo({}, formulario({ id: "3", titulo: "Tablas dinámicas avanzadas", orden: "2" }))).resolves.toEqual({
+      ok: true,
+      mensaje: "Módulo actualizado",
+    });
+    expect(entorno.servidor.de("modulos", "update")[0]).toMatchObject({
+      valores: { titulo: "Tablas dinámicas avanzadas", orden: 2 },
+      filtros: [["eq", "id", 3]],
+    });
+    await expect(editarModulo({}, formulario({ id: "3", titulo: "Ajeno" }))).resolves.toEqual({
+      ok: false,
+      mensaje: "No tienes permiso para editar este módulo",
+    });
+    await expect(editarModulo({}, formulario({ id: "3", titulo: "a" }))).resolves.toEqual({
+      ok: false,
+      mensaje: "Escribe el título del módulo",
+    });
+
+    await expect(
+      editarContenido({}, formulario({ id: "8", titulo: "Video actualizado", tipo: "ENLACE", url: "https://drive.google.com/file/d/1zpWC5ulEDYyFWytVpexpqrW4B713/view?usp=sharing", orden: "1" })),
+    ).resolves.toEqual({ ok: true, mensaje: "Contenido actualizado" });
+    expect(entorno.servidor.de("contenidos", "update")[0]).toMatchObject({
+      valores: { titulo: "Video actualizado", tipo: "VIDEO", url_archivo: "https://drive.google.com/file/d/1zpWC5ulEDYyFWytVpexpqrW4B713/view?usp=sharing", orden: 1 },
+      filtros: [["eq", "id", 8]],
+    });
+    await expect(
+      editarContenido({}, formulario({ id: "8", titulo: "Guía PDF", tipo: "PDF", url: `${UUID.curso}/guia-v2.pdf` })),
+    ).resolves.toEqual({ ok: true, mensaje: "Contenido actualizado" });
+    await expect(
+      editarContenido({}, formulario({ id: "8", titulo: "Guía PDF", tipo: "PDF", url: `${UUID.curso}/guia-v2.pdf` })),
+    ).resolves.toEqual({ ok: false, mensaje: "No se pudo actualizar el contenido" });
+    await expect(
+      editarContenido({}, formulario({ id: "8", titulo: "Enlace malo", tipo: "ENLACE", url: "ftp://archivo" })),
+    ).resolves.toEqual({ ok: false, mensaje: "La URL debe empezar con https://" });
   });
 
   it("programa sesiones (HU-16)", async () => {

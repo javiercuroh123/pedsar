@@ -7,6 +7,7 @@ import {
   ChevronRightIcon,
   CircleCheckIcon,
   CirclePlayIcon,
+  DownloadIcon,
   ExternalLinkIcon,
   FileTextIcon,
   FolderOpenIcon,
@@ -32,7 +33,7 @@ export const metadata: Metadata = { title: "Aula virtual" };
 
 const ICONO: Record<TipoContenido, typeof FileTextIcon> = { VIDEO: CirclePlayIcon, PDF: FileTextIcon, ENLACE: LinkIcon };
 
-/** Convierte enlaces de YouTube / Vimeo a su versión embebible, sin importar el orden de los parámetros. */
+/** Convierte enlaces de YouTube, Vimeo o Google Drive a su versión embebible (/embed o /preview). */
 function urlEmbebida(url: string) {
   const yt = url.match(
     /(?:youtube(?:-nocookie)?\.com\/(?:watch\?(?:.*&)?v=|embed\/|shorts\/|live\/)|youtu\.be\/)([\w-]{11})/,
@@ -40,6 +41,8 @@ function urlEmbebida(url: string) {
   if (yt) return `https://www.youtube-nocookie.com/embed/${yt[1]}`;
   const vimeo = url.match(/(?:player\.)?vimeo\.com\/(?:video\/)?(\d+)/);
   if (vimeo) return `https://player.vimeo.com/video/${vimeo[1]}`;
+  const drive = url.match(/drive\.google\.com\/(?:file\/d\/|open\?(?:.*&)?id=|uc\?(?:.*&)?id=)([\w-]{10,})/);
+  if (drive) return `https://drive.google.com/file/d/${drive[1]}/preview`;
   return null;
 }
 
@@ -88,7 +91,7 @@ export default async function AulaPage({ params, searchParams }: PageProps<"/est
   const anterior = todos[indice - 1];
   const siguiente = todos[indice + 1];
   const url = actual ? await resolverUrl(actual) : null;
-  const embebida = url && actual?.tipo !== "PDF" ? urlEmbebida(url) : null;
+  const embebida = url ? urlEmbebida(url) : null;
   const esVideo = actual?.tipo === "VIDEO" || Boolean(embebida);
 
   return (
@@ -185,8 +188,16 @@ export default async function AulaPage({ params, searchParams }: PageProps<"/est
                 </span>
                 <div className="flex-1">
                   <p className="text-sm font-medium">{actual.titulo}</p>
-                  <p className="text-xs text-muted-foreground">{actual.tipo === "PDF" ? "Documento PDF" : "Video"}</p>
+                  <p className="text-xs text-muted-foreground">{actual.tipo === "PDF" ? "Material descargable" : "Video"}</p>
                 </div>
+                <a
+                  href={`/estudiante/contenidos/${actual.id}/descargar`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className={buttonVariants({ variant: "ghost", size: "sm" })}
+                >
+                  <DownloadIcon /> Descargar
+                </a>
                 <a href={url} target="_blank" rel="noreferrer" className={buttonVariants({ variant: "ghost", size: "sm" })}>
                   <ExternalLinkIcon /> Abrir
                 </a>

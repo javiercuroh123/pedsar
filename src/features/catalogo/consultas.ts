@@ -16,6 +16,7 @@ export interface CursoResumen {
   cupo_maximo: number;
   destacado: boolean;
   categoria: { nombre: string; slug: string } | null;
+  instructor_id?: string | null;
   instructor: string | null;
   cupo_disponible: number;
   proxima_sesion: { fecha: string; hora_inicio: string } | null;
@@ -149,6 +150,7 @@ export async function listarCursosPublicados(filtros: FiltrosCatalogo = {}): Pro
     cupo_maximo: f.cupo_maximo,
     destacado: f.destacado,
     categoria: f.categoria ?? null,
+    instructor_id: f.instructor_id ?? null,
     instructor: instructores.get(f.instructor_id) ?? null,
     cupo_disponible: cupos.get(f.id) ?? f.cupo_maximo,
     proxima_sesion: proximaSesion((horarios.data ?? []).filter((s) => s.curso_id === f.id)),
@@ -177,8 +179,9 @@ export async function obtenerCursoPorSlug(slug: string) {
   const { data, error } = await supabase
     .from("cursos")
     .select(
-      `id, slug, titulo, descripcion, imagen_url, nivel, modalidad, precio, cupo_maximo, duracion_horas, destacado, instructor_id,
+      `id, slug, titulo, descripcion, requisitos_previos, prerrequisito_curso_id, imagen_url, nivel, modalidad, precio, cupo_maximo, duracion_horas, destacado, instructor_id,
        categoria:categorias(nombre, slug),
+       prerrequisito:cursos!prerrequisito_curso_id(id, slug, titulo),
        modulos(id, titulo, orden)`,
     )
     .eq("slug", slug)
@@ -198,8 +201,18 @@ export async function obtenerCursoPorSlug(slug: string) {
   ]);
   if (horarios.error) throw new Error(`Horarios: ${horarios.error.message}`);
 
+  const prerreqRaw = (data as Record<string, unknown>).prerrequisito;
+  const prerrequisito = (Array.isArray(prerreqRaw) ? (prerreqRaw[0] ?? null) : (prerreqRaw ?? null)) as {
+    id: string;
+    slug: string;
+    titulo: string;
+  } | null;
+
   return {
     ...data,
+    requisitos_previos: data.requisitos_previos ?? null,
+    prerrequisito_curso_id: data.prerrequisito_curso_id ?? null,
+    prerrequisito,
     nivel: data.nivel as Nivel,
     modalidad: data.modalidad as Modalidad,
     // PostgREST devuelve un objeto en relaciones muchos-a-uno, aunque el tipo inferido sea un arreglo.
@@ -227,22 +240,37 @@ export async function listarCategorias() {
 
 /**
  * HU-25 · Recomendaciones de cursos para el estudiante según el historial de
- * categorías de sus matrículas previas, priorizando afinidad, destacados y calificación.
+ * categorías e instructores de sus matrículas previas y cursos completados,
+ * priorizando afinidad, destacados y calificación.
  */
 export async function recomendarCursos(
-  inscripciones: { estado: string; curso: { id: string; categoria: { slug: string } | null } }[],
+  inscripciones: {
+    estado: string;
+    curso: { id: string; instructor_id?: string | null; categoria: { slug: string } | null };
+    certificado?: unknown;
+    progreso?: { porcentaje: number };
+  }[],
   limite = 3,
 ): Promise<CursoResumen[]> {
   const todos = await listarCursosPublicados();
-  const inscritosIds = new Set(inscripciones.filter((i) => i.estado !== "CANCELADA").map((i) => i.curso.id));
+  const activas = inscripciones.filter((i) => i.estado !== "CANCELADA");
+  const inscritosIds = new Set(activas.map((i) => i.curso.id));
   const categoriasAfinidad = new Set(
-    inscripciones
-      .filter((i) => i.estado !== "CANCELADA" && i.curso.categoria?.slug)
+    activas.filter((i) => i.curso.categoria?.slug).map((i) => i.curso.categoria!.slug),
+  );
+  const categoriasCompletadas = new Set(
+    activas
+      .filter((i) => i.curso.categoria?.slug && (Boolean(i.certificado) || (i.progreso?.porcentaje ?? 0) >= 100))
       .map((i) => i.curso.categoria!.slug),
+  );
+  const instructoresAfinidad = new Set(
+    activas.filter((i) => i.curso.instructor_id).map((i) => i.curso.instructor_id!),
   );
 
   const puntaje = (c: CursoResumen) =>
     (c.categoria && categoriasAfinidad.has(c.categoria.slug) ? 2 : 0) +
+    (c.categoria && categoriasCompletadas.has(c.categoria.slug) ? 0.5 : 0) +
+    (c.instructor_id && instructoresAfinidad.has(c.instructor_id) ? 1.5 : 0) +
     (c.destacado ? 1 : 0) +
     ((c.calificacion?.promedio ?? 0) >= 4 ? 0.5 : 0);
 

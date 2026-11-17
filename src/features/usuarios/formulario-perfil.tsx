@@ -17,6 +17,7 @@ interface Props {
   apellidos: string;
   correo: string;
   telefono: string | null;
+  fechaNacimiento?: string | null;
   documento: string | null;
   especialidad: string | null;
   avatar: string | null;
@@ -81,6 +82,10 @@ export function FormularioPerfil(p: Props) {
         <div className="space-y-1.5">
           <Label htmlFor="p-tel">Celular</Label>
           <Input id="p-tel" name="telefono" inputMode="tel" defaultValue={p.telefono ?? ""} className="h-10 font-mono" />
+        </div>
+        <div className="space-y-1.5">
+          <Label htmlFor="p-nac">Fecha de nacimiento</Label>
+          <Input id="p-nac" name="fechaNacimiento" type="date" defaultValue={p.fechaNacimiento ?? ""} className="h-10" />
         </div>
         <div className="space-y-1.5">
           <Label htmlFor="p-doc">DNI / CE</Label>

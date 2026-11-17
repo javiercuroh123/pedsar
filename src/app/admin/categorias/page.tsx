@@ -1,9 +1,9 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { TagsIcon, Trash2Icon } from "lucide-react";
+import { EyeIcon, EyeOffIcon, TagsIcon, Trash2Icon } from "lucide-react";
 import { BotonAccion } from "@/components/boton-accion";
 import { EncabezadoPagina, EstadoVacio } from "@/components/comunes";
-import { eliminarCategoria } from "@/features/administracion/acciones";
+import { alternarCategoria, eliminarCategoria } from "@/features/administracion/acciones";
 import { DialogoCategoria } from "@/features/administracion/dialogos";
 import { degradadoCategoria, IconoCategoria } from "@/features/catalogo/portada-curso";
 import { requireRol } from "@/lib/auth";
@@ -16,33 +16,49 @@ export const metadata: Metadata = { title: "Categorías" };
 export default async function AdminCategoriasPage() {
   await requireRol("administrador");
   const supabase = await createClient();
-  const { data } = await supabase.from("categorias").select("id, nombre, slug, descripcion, cursos(count)").order("nombre");
+  const { data } = await supabase.from("categorias").select("id, nombre, slug, descripcion, padre_id, imagen_url, activa, cursos(count)").order("nombre");
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const categorias = (data ?? []) as any[];
+  const listaSimple = categorias.map((c) => ({ id: c.id as number, nombre: c.nombre as string }));
 
   return (
     <div className="space-y-6">
       <EncabezadoPagina eyebrow="Académico" titulo="Categorías" descripcion="Agrupan los cursos del catálogo público.">
-        <DialogoCategoria />
+        <DialogoCategoria categorias={listaSimple} />
       </EncabezadoPagina>
       {categorias.length ? (
         <div className="escalonado grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
           {categorias.map((c) => {
             const n = c.cursos?.[0]?.count ?? 0;
+            const activa = c.activa !== false;
+            const padre = categorias.find((p) => p.id === c.padre_id);
             return (
-              <div key={c.id} className="elevar flex items-start gap-4 rounded-2xl border bg-card p-5 shadow-xs">
+              <div key={c.id} className={cn("elevar flex items-start gap-4 rounded-2xl border bg-card p-5 shadow-xs", !activa && "opacity-60")}>
                 <span className={cn("grid size-12 shrink-0 place-items-center rounded-xl bg-linear-to-br text-brand-100 shadow-sm", degradadoCategoria(c.slug))}>
                   <IconoCategoria slug={c.slug} className="size-5.5" />
                 </span>
                 <div className="min-w-0 flex-1">
-                  <p className="font-semibold">{c.nombre}</p>
+                  <div className="flex items-center gap-2">
+                    <p className="font-semibold">{c.nombre}</p>
+                    {!activa && <span className="rounded bg-muted px-1.5 py-0.5 text-[11px] font-medium text-muted-foreground">Inactiva</span>}
+                  </div>
+                  {padre && <p className="text-xs text-muted-foreground">Subcategoría de {padre.nombre}</p>}
                   <p className="mt-1 text-sm text-muted-foreground">{c.descripcion ?? "Sin descripción"}</p>
                   <Link href={`/cursos?categoria=${c.slug}`} className="mt-3 inline-block text-xs font-medium text-primary hover:underline">
                     {n} curso{n === 1 ? "" : "s"} →
                   </Link>
                 </div>
                 <div className="flex">
-                  <DialogoCategoria categoria={c} />
+                  <DialogoCategoria categoria={c} categorias={listaSimple} />
+                  <BotonAccion
+                    accion={alternarCategoria}
+                    campos={{ id: c.id, activa: String(!activa) }}
+                    variant="ghost"
+                    size="icon-sm"
+                    aria-label={activa ? "Desactivar categoría" : "Activar categoría"}
+                  >
+                    {activa ? <EyeOffIcon /> : <EyeIcon />}
+                  </BotonAccion>
                   <BotonAccion
                     accion={eliminarCategoria}
                     campos={{ id: c.id }}

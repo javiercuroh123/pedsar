@@ -8,6 +8,7 @@ import { POST as webhook } from "@/app/api/pagos/webhook/[proveedor]/route";
 import { GET as pdfCertificado } from "@/app/certificados/[codigo]/pdf/route";
 import { GET as pdfComprobante } from "@/app/comprobantes/[id]/pdf/route";
 import { GET as exportarDatos } from "@/app/cuenta/exportar/route";
+import { GET as descargarContenido } from "@/app/estudiante/contenidos/[id]/descargar/route";
 import { GET as exportarReporteCurso } from "@/app/instructor/notas/exportar/route";
 import { leerPdf, leerXlsx } from "../../apoyo/archivos";
 import { conSesion, entorno, Redireccion, responder, UUID } from "../../apoyo/entorno";
@@ -334,5 +335,24 @@ describe("salud y verificación de correo", () => {
     const r = await confirmarCorreo(pedido("/auth/confirm?next=/cuenta/nueva-contrasena"));
     expect(r.headers.get("location")).toBe("https://pedsar.test/auth/sesion?next=%2Fcuenta%2Fnueva-contrasena");
     expect((await confirmarCorreo(pedido("/auth/confirm?next=//evil.com"))).headers.get("location")).toBe("https://pedsar.test/auth/sesion?next=%2F");
+  });
+
+  it("descarga materiales educativos y registra la fecha de descarga en auditoría (HU-26)", async () => {
+    expect((await descargarContenido(pedido("/estudiante/contenidos/12/descargar"), contexto({ id: "12" }))).status).toBe(401);
+    conSesion("estudiante");
+    expect((await descargarContenido(pedido("/estudiante/contenidos/no/descargar"), contexto({ id: "no" }))).status).toBe(404);
+    expect((await descargarContenido(pedido("/estudiante/contenidos/12/descargar"), contexto({ id: "12" }))).status).toBe(404);
+
+    responder({
+      contenidos: { data: { id: 12, titulo: "Guía de Excel", tipo: "PDF", url_archivo: "curso-1/guia.pdf" } },
+    });
+    const r = await descargarContenido(pedido("/estudiante/contenidos/12/descargar"), contexto({ id: "12" }));
+    expect(r.status).toBe(307);
+    expect(r.headers.get("location")).toBe("https://storage.pedsar.test/firmado.pdf");
+    expect(entorno.admin.de("registro_actividad")[0].valores).toMatchObject({
+      usuario_id: UUID.estudiante,
+      accion: "DESCARGAR_MATERIAL",
+      detalle: { contenido: 12, titulo: "Guía de Excel", tipo: "PDF" },
+    });
   });
 });

@@ -1,6 +1,6 @@
 "use client";
 
-import { FilePlus2Icon, FileUpIcon, FilmIcon, FolderPlusIcon, LinkIcon, PlusIcon } from "lucide-react";
+import { FilePlus2Icon, FileUpIcon, FilmIcon, FolderPlusIcon, LinkIcon, PencilIcon, PlusIcon } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 import { CampoForm, claseControl, DialogoFormulario } from "@/components/dialogo-formulario";
@@ -8,7 +8,8 @@ import { Input } from "@/components/ui/input";
 import type { EstadoFormulario } from "@/features/usuarios/esquemas";
 import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
-import { crearContenido, crearModulo, crearSesion } from "./acciones-instructor";
+import type { TipoContenido } from "@/types/dominio";
+import { crearContenido, crearModulo, crearSesion, editarContenido, editarModulo } from "./acciones-instructor";
 
 export function DialogoModulo({ cursoId }: { cursoId: string }) {
   return (
@@ -32,8 +33,37 @@ export function DialogoModulo({ cursoId }: { cursoId: string }) {
   );
 }
 
+/** HU-08 · Edición y reordenamiento de módulo existente. */
+export function DialogoEditarModulo({ modulo }: { modulo: { id: number; titulo: string; orden: number } }) {
+  return (
+    <DialogoFormulario
+      disparador={<PencilIcon />}
+      varianteDisparador="ghost"
+      tamanoDisparador="icon-sm"
+      titulo="Editar módulo"
+      descripcion="Actualiza el título o la posición del módulo dentro del temario."
+      accion={editarModulo}
+      textoEnviar="Guardar cambios"
+    >
+      <input type="hidden" name="id" value={modulo.id} />
+      <CampoForm etiqueta="Título del módulo" htmlFor={`m-titulo-${modulo.id}`}>
+        <Input id={`m-titulo-${modulo.id}`} name="titulo" required defaultValue={modulo.titulo} className="h-10" />
+      </CampoForm>
+      <CampoForm etiqueta="Orden en el temario" htmlFor={`m-orden-${modulo.id}`}>
+        <Input id={`m-orden-${modulo.id}`} name="orden" type="number" min={1} required defaultValue={modulo.orden} className="h-10" />
+      </CampoForm>
+    </DialogoFormulario>
+  );
+}
+
 const TIPOS = [
-  { v: "PDF", t: "PDF", icono: FileUpIcon, acepta: "application/pdf", limite: 20 },
+  {
+    v: "PDF",
+    t: "Documento",
+    icono: FileUpIcon,
+    acepta: "application/pdf,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.zip,.rar,image/png,image/jpeg,image/webp",
+    limite: 50,
+  },
   { v: "VIDEO", t: "Video", icono: FilmIcon, acepta: "video/mp4,video/webm", limite: 500 },
   { v: "ENLACE", t: "Enlace", icono: LinkIcon, acepta: "", limite: 0 },
 ] as const;
@@ -51,7 +81,7 @@ export function DialogoContenido({ cursoId, modulos }: { cursoId: string; modulo
   const accion = async (previo: EstadoFormulario, datos: FormData): Promise<EstadoFormulario> => {
     if (tipo !== "ENLACE") {
       const url = String(datos.get("url") ?? "");
-      if (!archivo && !url) return { ok: false, mensaje: "Adjunta un archivo o pega un enlace de YouTube / Vimeo" };
+      if (!archivo && !url) return { ok: false, mensaje: "Adjunta un archivo o pega un enlace de YouTube, Vimeo o Google Drive" };
       if (archivo) {
         if (archivo.size > conf.limite * 1024 * 1024) return { ok: false, mensaje: `El archivo supera ${conf.limite} MB` };
         const ruta = `${cursoId}/${Date.now()}-${archivo.name.normalize("NFD").replace(/[^\w.-]+/g, "_")}`;
@@ -120,7 +150,7 @@ export function DialogoContenido({ cursoId, modulos }: { cursoId: string; modulo
             <conf.icono className="size-7 text-primary" />
             <span className="mt-2 text-sm font-medium">{archivo ? archivo.name : "Haz clic para elegir el archivo"}</span>
             <span className="text-xs text-muted-foreground">
-              {tipo === "PDF" ? "PDF" : "MP4 / WebM"} · máximo {conf.limite} MB
+              {tipo === "PDF" ? "PDF, Office, imágenes o ZIP/RAR" : "MP4 / WebM"} · máximo {conf.limite} MB
             </span>
             <input
               type="file"
@@ -134,12 +164,51 @@ export function DialogoContenido({ cursoId, modulos }: { cursoId: string; modulo
             />
           </label>
           {tipo === "VIDEO" && (
-            <CampoForm etiqueta="…o pega un enlace de YouTube / Vimeo" htmlFor="url-video">
-              <Input id="url-video" name="url" type="url" placeholder="https://youtu.be/…" className="h-10" />
+            <CampoForm etiqueta="…o pega un enlace de YouTube, Vimeo o Google Drive" htmlFor="url-video">
+              <Input id="url-video" name="url" type="url" placeholder="https://youtu.be/… o https://drive.google.com/file/d/…" className="h-10" />
             </CampoForm>
           )}
         </>
       )}
+    </DialogoFormulario>
+  );
+}
+
+/** HU-08 · Edición de un contenido existente dentro de un módulo. */
+export function DialogoEditarContenido({
+  contenido,
+}: {
+  contenido: { id: number; titulo: string; tipo: TipoContenido; url_archivo: string; orden: number };
+}) {
+  return (
+    <DialogoFormulario
+      disparador={<PencilIcon />}
+      varianteDisparador="ghost"
+      tamanoDisparador="icon-sm"
+      titulo="Editar contenido"
+      descripcion="Modifica el título, el enlace/recurso o el orden de este material."
+      accion={editarContenido}
+      textoEnviar="Guardar cambios"
+    >
+      <input type="hidden" name="id" value={contenido.id} />
+      <CampoForm etiqueta="Título" htmlFor={`c-titulo-${contenido.id}`}>
+        <Input id={`c-titulo-${contenido.id}`} name="titulo" required defaultValue={contenido.titulo} className="h-10" />
+      </CampoForm>
+      <div className="grid grid-cols-2 gap-3">
+        <CampoForm etiqueta="Tipo" htmlFor={`c-tipo-${contenido.id}`}>
+          <select id={`c-tipo-${contenido.id}`} name="tipo" defaultValue={contenido.tipo} className={claseControl}>
+            <option value="PDF">PDF</option>
+            <option value="VIDEO">Video</option>
+            <option value="ENLACE">Enlace</option>
+          </select>
+        </CampoForm>
+        <CampoForm etiqueta="Orden" htmlFor={`c-orden-${contenido.id}`}>
+          <Input id={`c-orden-${contenido.id}`} name="orden" type="number" min={1} required defaultValue={contenido.orden} className="h-10" />
+        </CampoForm>
+      </div>
+      <CampoForm etiqueta="Ruta o URL del recurso" htmlFor={`c-url-${contenido.id}`}>
+        <Input id={`c-url-${contenido.id}`} name="url" required defaultValue={contenido.url_archivo} className="h-10" />
+      </CampoForm>
     </DialogoFormulario>
   );
 }

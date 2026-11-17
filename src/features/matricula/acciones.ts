@@ -84,8 +84,22 @@ export async function inscribirse(formData: FormData) {
   if (noDisponible) redirect(`/estudiante/cursos?error=${encodeURIComponent(noDisponible)}`);
   const supabase = await createClient();
 
-  const { data: curso } = await supabase.from("cursos").select("id, titulo, precio, slug").eq("id", datos.cursoId).single();
+  const { data: curso } = await supabase
+    .from("cursos")
+    .select("id, titulo, precio, slug, prerrequisito_curso_id")
+    .eq("id", datos.cursoId)
+    .single();
   if (!curso) redirect("/cursos");
+
+  if (curso.prerrequisito_curso_id) {
+    const { data: cumple } = await createAdminClient().rpc("cumple_prerrequisito", {
+      p_estudiante: estudiante.id,
+      p_curso: curso.id,
+    });
+    if (!cumple) {
+      redirect(`/estudiante/cursos?error=${encodeURIComponent("Debes completar primero el curso prerrequisito antes de inscribirte")}`);
+    }
+  }
 
   if (datos.telefono || datos.documento) {
     await supabase

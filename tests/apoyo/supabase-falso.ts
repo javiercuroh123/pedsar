@@ -107,6 +107,11 @@ export function supabaseFalso(manejadores: Record<string, Manejador> = {}) {
       exchangeCodeForSession: ok({}),
       admin: { inviteUserByEmail: ok({ user: { id: "invitado" } }) },
     },
+    storage: {
+      from: vi.fn(() => ({
+        createSignedUrl: ok<{ signedUrl: string | null }>({ signedUrl: "https://storage.pedsar.test/firmado.pdf" }),
+      })),
+    },
   };
 
   return {

@@ -1,10 +1,13 @@
 "use client";
 
-import { PencilIcon, PlusIcon } from "lucide-react";
+import { PencilIcon, PlusIcon, UploadIcon } from "lucide-react";
+import { useState } from "react";
+import { toast } from "sonner";
 import { CampoForm, claseControl, DialogoFormulario } from "@/components/dialogo-formulario";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { ETIQUETA_MODALIDAD, ETIQUETA_NIVEL } from "@/lib/formato";
+import { createClient } from "@/lib/supabase/client";
 import type { EstadoCurso, Modalidad, Nivel } from "@/types/dominio";
 import { guardarCurso } from "./acciones";
 
@@ -12,6 +15,8 @@ export interface CursoEditable {
   id: string;
   titulo: string;
   descripcion: string | null;
+  requisitos_previos?: string | null;
+  prerrequisito_curso_id?: string | null;
   categoria_id: number | null;
   instructor_id: string | null;
   nivel: Nivel;
@@ -30,15 +35,33 @@ export function DialogoCurso({
   curso,
   categorias,
   instructores,
+  cursos = [],
 }: {
   curso?: CursoEditable;
   categorias: { id: number; nombre: string }[];
   instructores: { id: string; nombre: string }[];
+  cursos?: { id: string; titulo: string }[];
 }) {
+  const [imagenUrl, setImagenUrl] = useState(curso?.imagen_url ?? "");
+  const [subiendo, setSubiendo] = useState(false);
+  const otrosCursos = cursos.filter((c) => c.id !== curso?.id);
   // datetime-local en hora de Lima.
   const publicarEn = curso?.publicar_en
     ? new Intl.DateTimeFormat("sv-SE", { timeZone: "America/Lima", dateStyle: "short", timeStyle: "short" }).format(new Date(curso.publicar_en)).replace(" ", "T")
     : "";
+
+  const subirPortada = async (archivo: File) => {
+    if (archivo.size > 5 * 1024 * 1024) return toast.error("La imagen supera 5 MB");
+    setSubiendo(true);
+    const supabase = createClient();
+    const ext = archivo.name.split(".").pop() ?? "jpg";
+    const ruta = `cursos/portada-${Date.now()}.${ext}`;
+    const { error } = await supabase.storage.from("avatares").upload(ruta, archivo, { upsert: true, contentType: archivo.type });
+    setSubiendo(false);
+    if (error) return toast.error(`No se pudo subir la imagen: ${error.message}`);
+    setImagenUrl(supabase.storage.from("avatares").getPublicUrl(ruta).data.publicUrl);
+    toast.success("Imagen subida. Guarda el curso para aplicarla.");
+  };
   return (
     <DialogoFormulario
       disparador={curso ? <PencilIcon /> : <><PlusIcon /> Nuevo curso</>}
@@ -107,8 +130,33 @@ export function DialogoCurso({
             <Input id="c-q" name="cupo" type="number" min={1} defaultValue={curso?.cupo_maximo ?? 30} className="h-10" />
           </CampoForm>
         </div>
-        <CampoForm etiqueta="Imagen de portada (URL)" htmlFor="c-img" className="sm:col-span-2" ayuda="Opcional. Sin imagen se usa una portada de color por categoría.">
-          <Input id="c-img" name="imagen" type="url" defaultValue={curso?.imagen_url ?? ""} placeholder="https://…" className="h-10" />
+        <CampoForm etiqueta="Imagen destacada (URL o archivo)" htmlFor="c-img" className="sm:col-span-2" ayuda="Opcional. Sube una imagen o pega su URL; sin imagen se usa una portada de color por categoría.">
+          <div className="flex gap-2">
+            <Input id="c-img" name="imagen" type="url" value={imagenUrl} onChange={(e) => setImagenUrl(e.target.value)} placeholder="https://…" className="h-10 flex-1" />
+            <label className="inline-flex h-10 shrink-0 cursor-pointer items-center gap-1.5 rounded-lg border bg-background px-3 text-sm font-medium hover:bg-muted">
+              <UploadIcon className="size-4" /> {subiendo ? "Subiendo…" : "Subir"}
+              <input
+                type="file"
+                accept="image/png,image/jpeg,image/webp"
+                className="sr-only"
+                disabled={subiendo}
+                onChange={(e) => e.target.files?.[0] && subirPortada(e.target.files[0])}
+              />
+            </label>
+          </div>
+        </CampoForm>
+        <CampoForm etiqueta="Curso prerrequisito" htmlFor="c-prereq" ayuda="Opcional. El estudiante deberá haberlo completado para matricularse.">
+          <select id="c-prereq" name="prerrequisitoCursoId" defaultValue={curso?.prerrequisito_curso_id ?? ""} className={claseControl}>
+            <option value="">Ninguno</option>
+            {otrosCursos.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.titulo}
+              </option>
+            ))}
+          </select>
+        </CampoForm>
+        <CampoForm etiqueta="Requisitos previos (texto)" htmlFor="c-req-txt" ayuda="Opcional. Ej.: Conocimientos básicos de Excel.">
+          <Input id="c-req-txt" name="requisitosPrevios" defaultValue={curso?.requisitos_previos ?? ""} placeholder="Conocimientos o herramientas previas" className="h-10" />
         </CampoForm>
         <CampoForm etiqueta="Estado" htmlFor="c-estado">
           <select id="c-estado" name="estado" defaultValue={curso?.estado ?? "BORRADOR"} className={claseControl}>

@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
+import { emitirCertificadosAutomaticos } from "@/features/certificacion/emision-automatica";
 import { notificarInscritosDelCurso } from "@/features/notificaciones/enviar";
 import { registrarActividad } from "@/lib/auditoria";
 import { requireRol } from "@/lib/auth";
@@ -17,6 +18,11 @@ const fallo = (e: z.ZodError): EstadoFormulario => ({ ok: false, mensaje: e.issu
 
 // ---------- Contenidos (HU-08 · HU-52 · HU-55) ----------
 const moduloSchema = z.object({ cursoId: z.uuid(), titulo: z.string().trim().min(3, "Escribe el título del módulo").max(160) });
+const editarModuloSchema = z.object({
+  id: z.coerce.number().int().positive(),
+  titulo: z.string().trim().min(3, "Escribe el título del módulo").max(160),
+  orden: z.preprocess((v) => (v === "" || v === undefined ? undefined : v), z.coerce.number().int().min(1, "El orden debe ser al menos 1").optional()),
+});
 
 export async function crearModulo(_: EstadoFormulario, formData: FormData): Promise<EstadoFormulario> {
   const usuario = await staff();
@@ -29,6 +35,21 @@ export async function crearModulo(_: EstadoFormulario, formData: FormData): Prom
   await registrarActividad(usuario.id, "CREAR_MODULO", { curso: d.data.cursoId, titulo: d.data.titulo });
   revalidatePath("/instructor/contenidos");
   return { ok: true, mensaje: "Módulo agregado" };
+}
+
+export async function editarModulo(_: EstadoFormulario, formData: FormData): Promise<EstadoFormulario> {
+  const usuario = await staff();
+  const d = editarModuloSchema.safeParse(Object.fromEntries(formData));
+  if (!d.success) return fallo(d.error);
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("modulos")
+    .update({ titulo: d.data.titulo, ...(d.data.orden !== undefined && { orden: d.data.orden }) })
+    .eq("id", d.data.id);
+  if (error) return { ok: false, mensaje: "No tienes permiso para editar este módulo" };
+  await registrarActividad(usuario.id, "EDITAR_MODULO", { modulo: d.data.id, titulo: d.data.titulo });
+  revalidatePath("/instructor/contenidos");
+  return { ok: true, mensaje: "Módulo actualizado" };
 }
 
 export async function eliminarModulo(formData: FormData) {
@@ -46,8 +67,16 @@ const contenidoSchema = z.object({
   url: z.string().trim().min(1, "Adjunta un archivo o escribe la URL").max(1000),
 });
 
+const editarContenidoSchema = z.object({
+  id: z.coerce.number().int().positive(),
+  titulo: z.string().trim().min(3, "Escribe el título").max(200),
+  tipo: z.enum(["PDF", "VIDEO", "ENLACE"]),
+  url: z.string().trim().min(1, "Adjunta un archivo o escribe la URL").max(1000),
+  orden: z.preprocess((v) => (v === "" || v === undefined ? undefined : v), z.coerce.number().int().min(1, "El orden debe ser al menos 1").optional()),
+});
+
 const esUrlVideoEmbebible = (url: string) =>
-  /(?:youtube(?:-nocookie)?\.com\/(?:watch\?(?:.*&)?v=|embed\/|shorts\/|live\/)|youtu\.be\/)[\w-]{11}|(?:player\.)?vimeo\.com\/(?:video\/)?\d+/.test(
+  /(?:youtube(?:-nocookie)?\.com\/(?:watch\?(?:.*&)?v=|embed\/|shorts\/|live\/)|youtu\.be\/)[\w-]{11}|(?:player\.)?vimeo\.com\/(?:video\/)?\d+|drive\.google\.com\/(?:file\/d\/|open\?(?:.*&)?id=|uc\?(?:.*&)?id=)[\w-]{10,}/.test(
     url,
   );
 
@@ -66,6 +95,28 @@ export async function crearContenido(_: EstadoFormulario, formData: FormData): P
   await registrarActividad(usuario.id, "SUBIR_CONTENIDO", { modulo: d.data.moduloId, titulo: d.data.titulo, tipo: tipoFinal });
   revalidatePath("/instructor/contenidos");
   return { ok: true, mensaje: "Contenido publicado en el aula" };
+}
+
+export async function editarContenido(_: EstadoFormulario, formData: FormData): Promise<EstadoFormulario> {
+  const usuario = await staff();
+  const d = editarContenidoSchema.safeParse(Object.fromEntries(formData));
+  if (!d.success) return fallo(d.error);
+  if (d.data.tipo === "ENLACE" && !/^https?:\/\//.test(d.data.url)) return { ok: false, mensaje: "La URL debe empezar con https://" };
+  const tipoFinal = d.data.tipo === "ENLACE" && esUrlVideoEmbebible(d.data.url) ? "VIDEO" : d.data.tipo;
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("contenidos")
+    .update({
+      titulo: d.data.titulo,
+      tipo: tipoFinal,
+      url_archivo: d.data.url,
+      ...(d.data.orden !== undefined && { orden: d.data.orden }),
+    })
+    .eq("id", d.data.id);
+  if (error) return { ok: false, mensaje: "No se pudo actualizar el contenido" };
+  await registrarActividad(usuario.id, "EDITAR_CONTENIDO", { contenido: d.data.id, titulo: d.data.titulo, tipo: tipoFinal });
+  revalidatePath("/instructor/contenidos");
+  return { ok: true, mensaje: "Contenido actualizado" };
 }
 
 export async function eliminarContenido(formData: FormData) {
@@ -103,7 +154,7 @@ export async function crearSesion(_: EstadoFormulario, formData: FormData): Prom
   await notificarInscritosDelCurso(
     d.data.cursoId,
     `Nueva sesión programada para el ${d.data.fecha} a las ${d.data.horaInicio}.`,
-    "/estudiante/horarios",
+    "/estudiante",
   );
   await registrarActividad(usuario.id, "PROGRAMAR_SESION", { curso: d.data.cursoId, fecha: d.data.fecha });
   revalidatePath("/instructor", "layout");
@@ -140,12 +191,12 @@ export async function guardarAsistencia(_: EstadoFormulario, formData: FormData)
   const { data: validas } = await supabase.from("inscripciones").select("id").eq("curso_id", sesion.curso_id).eq("estado", "CONFIRMADA");
   const ids = new Set((validas ?? []).map((i: { id: string }) => i.id));
 
-  const { error } = await supabase.from("asistencias").upsert(
-    filas.filter((f) => ids.has(f.inscripcion_id)),
-    { onConflict: "inscripcion_id,sesion_id" },
-  );
+  const validasCurso = filas.filter((f) => ids.has(f.inscripcion_id));
+  const { error } = await supabase.from("asistencias").upsert(validasCurso, { onConflict: "inscripcion_id,sesion_id" });
   if (error) return { ok: false, mensaje: "No se pudo guardar la asistencia" };
   await registrarActividad(usuario.id, "REGISTRAR_ASISTENCIA", { sesion: sesionId, registros: filas.length });
+  const presentes = validasCurso.filter((f) => f.estado !== "AUSENTE").map((f) => f.inscripcion_id);
+  if (presentes.length) await emitirCertificadosAutomaticos(presentes, usuario.id);
   revalidatePath("/instructor", "layout");
   return { ok: true, mensaje: "Asistencia guardada correctamente" };
 }
@@ -157,6 +208,7 @@ const evaluacionSchema = z.object({
   puntajeTotal: z.number().positive().max(100),
   intentos: z.number().int().min(1).max(10),
   tiempo: z.number().int().min(0).max(300),
+  fechaLimite: z.string().optional(),
   preguntas: z
     .array(
       z.object({
@@ -176,6 +228,7 @@ export async function crearEvaluacion(datos: NuevaEvaluacion): Promise<EstadoFor
   const d = evaluacionSchema.safeParse(datos);
   if (!d.success) return fallo(d.error);
   const supabase = await createClient();
+  const fechaLimiteIso = d.data.fechaLimite?.trim() ? new Date(`${d.data.fechaLimite.trim()}:00-05:00`).toISOString() : undefined;
   const { data: evaluacion, error } = await supabase
     .from("evaluaciones")
     .insert({
@@ -184,6 +237,7 @@ export async function crearEvaluacion(datos: NuevaEvaluacion): Promise<EstadoFor
       puntaje_total: d.data.puntajeTotal,
       intentos_permitidos: d.data.intentos,
       tiempo_limite_min: d.data.tiempo || null,
+      ...(fechaLimiteIso ? { fecha_limite: fechaLimiteIso } : {}),
     })
     .select("id")
     .single();

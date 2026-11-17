@@ -1,11 +1,11 @@
 import { describe, expect, it, vi } from "vitest";
 import { enviarContacto } from "@/features/contacto/acciones";
-import { marcarLeida, marcarTodasLeidas } from "@/features/notificaciones/acciones";
+import { actualizarCanalNotificacion, marcarLeida, marcarTodasLeidas } from "@/features/notificaciones/acciones";
 import { contarNoLeidas, listarNotificaciones } from "@/features/notificaciones/consultas";
-import { notificarInscritosDelCurso, notificarUsuario } from "@/features/notificaciones/enviar";
+import { enviarRecordatoriosPendientes, notificarInscritosDelCurso, notificarUsuario } from "@/features/notificaciones/enviar";
 import { actualizarContrasena, cerrarSesion, iniciarSesion, registrarse, solicitarRecuperacion } from "@/features/usuarios/acciones";
 import { actualizarPerfil } from "@/features/usuarios/acciones-perfil";
-import { conSesion, entorno, formulario, Redireccion, responder, UUID } from "../../apoyo/entorno";
+import { conSesion, ejecutarTareas, entorno, formulario, Redireccion, responder, UUID } from "../../apoyo/entorno";
 
 vi.mock("@/lib/auth", () => import("../../apoyo/auth-falso"));
 
@@ -102,14 +102,15 @@ describe("perfil (HU-15)", () => {
     expect(entorno.servidor.de("perfiles", "update")[0].valores).not.toHaveProperty("especialidad");
   });
 
-  it("el instructor sí edita la especialidad; se valida el documento", async () => {
+  it("el instructor sí edita la especialidad; se valida el documento y la fecha de nacimiento", async () => {
     conSesion("instructor");
     responder({ perfiles: [{}, { error: { message: "x" } }] });
-    await actualizarPerfil({}, formulario({ ...datos, avatarUrl: undefined }));
-    expect(entorno.servidor.de("perfiles")[0].valores).toMatchObject({ especialidad: "Excel" });
+    await actualizarPerfil({}, formulario({ ...datos, fechaNacimiento: "1995-04-20", avatarUrl: undefined }));
+    expect(entorno.servidor.de("perfiles")[0].valores).toMatchObject({ especialidad: "Excel", fecha_nacimiento: "1995-04-20" });
     expect(entorno.servidor.de("perfiles")[0].valores).not.toHaveProperty("avatar_url");
     await expect(actualizarPerfil({}, formulario(datos))).resolves.toEqual({ ok: false, mensaje: "No se pudo guardar el perfil" });
     await expect(actualizarPerfil({}, formulario({ ...datos, documento: "123" }))).resolves.toEqual({ ok: false, mensaje: "DNI de 8 dígitos o CE válido" });
+    await expect(actualizarPerfil({}, formulario({ ...datos, fechaNacimiento: "no-fecha" }))).resolves.toEqual({ ok: false, mensaje: "Fecha de nacimiento no válida" });
   });
 });
 
@@ -151,10 +152,98 @@ describe("notificaciones in-app (HU-51)", () => {
     await notificarUsuario(UUID.estudiante, "Hola");
     expect(entorno.admin.de("notificaciones", "insert")[0].valores).toEqual({ usuario_id: UUID.estudiante, mensaje: "Hola", enlace: null, tipo: "IN_APP" });
 
-    responder({}, { inscripciones: { data: [{ estudiante_id: UUID.estudiante }, { estudiante_id: UUID.estudiante }] } });
+    responder(
+      {},
+      {
+        inscripciones: {
+          data: [
+            { estudiante_id: UUID.estudiante, estudiante: { nombres: "Ana", correo: "ana@pedsar.test", canal_notificacion: "AMBOS" }, curso: { titulo: "Excel" } },
+            { estudiante_id: UUID.estudiante, estudiante: { nombres: "Ana", correo: "ana@pedsar.test", canal_notificacion: "AMBOS" }, curso: { titulo: "Excel" } },
+          ],
+        },
+      },
+    );
     await notificarInscritosDelCurso(UUID.curso, "Nueva evaluación", "/estudiante/evaluaciones/1");
     expect(entorno.admin.de("notificaciones", "insert")[0].valores).toEqual([
       { usuario_id: UUID.estudiante, mensaje: "Nueva evaluación", enlace: "/estudiante/evaluaciones/1", tipo: "IN_APP" },
     ]);
+    expect(entorno.tareas).toHaveLength(1);
+    await ejecutarTareas();
+  });
+
+  it("actualiza la preferencia de canal de notificaciones y envía recordatorios 1 h y 24 h antes (HU-21 · HU-41 · RF-11)", async () => {
+    conSesion("estudiante");
+    responder({ "perfiles.update": [{}, { error: { message: "fallo" } }] });
+    await expect(actualizarCanalNotificacion(formulario({ canal: "CORREO" }))).resolves.toEqual({
+      ok: true,
+      mensaje: "Preferencia de notificaciones actualizada",
+    });
+    expect(entorno.servidor.de("perfiles", "update")[0]).toMatchObject({
+      valores: { canal_notificacion: "CORREO" },
+      filtros: [["eq", "id", UUID.estudiante]],
+    });
+    await expect(actualizarCanalNotificacion(formulario({ canal: "IN_APP" }))).resolves.toEqual({
+      ok: false,
+      mensaje: "No se pudo actualizar la preferencia",
+    });
+    await expect(actualizarCanalNotificacion(formulario({ canal: "SMS" }))).resolves.toMatchObject({ ok: false });
+
+    const ahora = new Date("2026-10-10T18:00:00-05:00");
+    responder(
+      {},
+      {
+        "sesiones.select": {
+          data: [
+            {
+              id: 10,
+              curso_id: UUID.curso,
+              fecha: "2026-10-10",
+              hora_inicio: "19:00:00",
+              modalidad: "VIRTUAL",
+              curso: { titulo: "Excel Avanzado", estado: "PUBLICADO" },
+            },
+          ],
+        },
+        "evaluaciones.select": {
+          data: [
+            {
+              id: 20,
+              curso_id: UUID.curso,
+              titulo: "Examen Final",
+              fecha_limite: "2026-10-11T12:00:00-05:00",
+              curso: { titulo: "Excel Avanzado", estado: "PUBLICADO" },
+            },
+          ],
+        },
+        "inscripciones.select": [
+          {
+            data: [
+              {
+                estudiante_id: UUID.estudiante,
+                estudiante: { nombres: "Ana", correo: "ana@pedsar.test", estado: true, canal_notificacion: "AMBOS" },
+              },
+            ],
+          },
+          {
+            data: [
+              {
+                id: UUID.inscripcion,
+                estudiante_id: UUID.estudiante,
+                estudiante: { nombres: "Ana", correo: "ana@pedsar.test", estado: true, canal_notificacion: "CORREO" },
+                intentos_evaluacion: [],
+              },
+            ],
+          },
+        ],
+        "recordatorios_enviados.insert": [{}, {}],
+      },
+    );
+
+    await expect(enviarRecordatoriosPendientes(ahora)).resolves.toEqual({ sesiones: 1, evaluaciones: 1 });
+    expect(entorno.admin.de("recordatorios_enviados", "insert")).toHaveLength(2);
+    // Sesión (AMBOS) genera notificación in-app y correo; Evaluación (CORREO) solo correo.
+    expect(entorno.admin.de("notificaciones", "insert")).toHaveLength(1);
+    expect(entorno.tareas).toHaveLength(2);
+    await ejecutarTareas();
   });
 });

@@ -80,24 +80,41 @@ export type Database = {
       }
       categorias: {
         Row: {
+          activa: boolean
           descripcion: string | null
           id: number
+          imagen_url: string | null
           nombre: string
+          padre_id: number | null
           slug: string
         }
         Insert: {
+          activa?: boolean
           descripcion?: string | null
           id?: never
+          imagen_url?: string | null
           nombre: string
+          padre_id?: number | null
           slug: string
         }
         Update: {
+          activa?: boolean
           descripcion?: string | null
           id?: never
+          imagen_url?: string | null
           nombre?: string
+          padre_id?: number | null
           slug?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "categorias_padre_id_fkey"
+            columns: ["padre_id"]
+            isOneToOne: false
+            referencedRelation: "categorias"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       certificados: {
         Row: {
@@ -376,7 +393,9 @@ export type Database = {
           modalidad: Database["public"]["Enums"]["modalidad_curso"]
           nivel: Database["public"]["Enums"]["nivel_curso"]
           precio: number
+          prerrequisito_curso_id: string | null
           publicar_en: string | null
+          requisitos_previos: string | null
           slug: string
           titulo: string
         }
@@ -395,7 +414,9 @@ export type Database = {
           modalidad?: Database["public"]["Enums"]["modalidad_curso"]
           nivel?: Database["public"]["Enums"]["nivel_curso"]
           precio?: number
+          prerrequisito_curso_id?: string | null
           publicar_en?: string | null
+          requisitos_previos?: string | null
           slug: string
           titulo: string
         }
@@ -414,7 +435,9 @@ export type Database = {
           modalidad?: Database["public"]["Enums"]["modalidad_curso"]
           nivel?: Database["public"]["Enums"]["nivel_curso"]
           precio?: number
+          prerrequisito_curso_id?: string | null
           publicar_en?: string | null
+          requisitos_previos?: string | null
           slug?: string
           titulo?: string
         }
@@ -431,6 +454,13 @@ export type Database = {
             columns: ["instructor_id"]
             isOneToOne: false
             referencedRelation: "perfiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cursos_prerrequisito_curso_id_fkey"
+            columns: ["prerrequisito_curso_id"]
+            isOneToOne: false
+            referencedRelation: "cursos"
             referencedColumns: ["id"]
           },
         ]
@@ -477,6 +507,7 @@ export type Database = {
       evaluaciones: {
         Row: {
           curso_id: string
+          fecha_limite: string | null
           id: number
           intentos_permitidos: number
           puntaje_total: number
@@ -485,6 +516,7 @@ export type Database = {
         }
         Insert: {
           curso_id: string
+          fecha_limite?: string | null
           id?: never
           intentos_permitidos?: number
           puntaje_total?: number
@@ -493,6 +525,7 @@ export type Database = {
         }
         Update: {
           curso_id?: string
+          fecha_limite?: string | null
           id?: never
           intentos_permitidos?: number
           puntaje_total?: number
@@ -882,10 +915,12 @@ export type Database = {
           actualizado_en: string
           apellidos: string
           avatar_url: string | null
+          canal_notificacion: "AMBOS" | "CORREO" | "IN_APP"
           correo: string
           documento: string | null
           especialidad: string | null
           estado: boolean
+          fecha_nacimiento: string | null
           fecha_registro: string
           id: string
           nombres: string
@@ -898,10 +933,12 @@ export type Database = {
           actualizado_en?: string
           apellidos?: string
           avatar_url?: string | null
+          canal_notificacion?: "AMBOS" | "CORREO" | "IN_APP"
           correo: string
           documento?: string | null
           especialidad?: string | null
           estado?: boolean
+          fecha_nacimiento?: string | null
           fecha_registro?: string
           id: string
           nombres?: string
@@ -914,10 +951,12 @@ export type Database = {
           actualizado_en?: string
           apellidos?: string
           avatar_url?: string | null
+          canal_notificacion?: "AMBOS" | "CORREO" | "IN_APP"
           correo?: string
           documento?: string | null
           especialidad?: string | null
           estado?: boolean
+          fecha_nacimiento?: string | null
           fecha_registro?: string
           id?: string
           nombres?: string
@@ -933,6 +972,38 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "roles"
             referencedColumns: ["codigo"]
+          },
+        ]
+      }
+      recordatorios_enviados: {
+        Row: {
+          enviado_en: string
+          id: number
+          referencia_id: number
+          tipo_evento: "SESION_1H" | "EVALUACION_24H"
+          usuario_id: string
+        }
+        Insert: {
+          enviado_en?: string
+          id?: never
+          referencia_id: number
+          tipo_evento: "SESION_1H" | "EVALUACION_24H"
+          usuario_id: string
+        }
+        Update: {
+          enviado_en?: string
+          id?: never
+          referencia_id?: number
+          tipo_evento?: "SESION_1H" | "EVALUACION_24H"
+          usuario_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "recordatorios_enviados_usuario_id_fkey"
+            columns: ["usuario_id"]
+            isOneToOne: false
+            referencedRelation: "perfiles"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -1201,6 +1272,10 @@ export type Database = {
         }[]
       }
       cupo_disponible: { Args: { p_curso: string }; Returns: number }
+      cumple_prerrequisito: {
+        Args: { p_estudiante: string; p_curso: string }
+        Returns: boolean
+      }
       cupos_disponibles: {
         Args: { p_cursos: string[] }
         Returns: {

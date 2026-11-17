@@ -35,16 +35,17 @@ export default async function AdminCursosPage({ searchParams }: PageProps<"/admi
   let consulta = supabase
     .from("cursos")
     .select(
-      "id, slug, titulo, descripcion, categoria_id, instructor_id, nivel, modalidad, precio, cupo_maximo, duracion_horas, estado, destacado, publicar_en, imagen_url, categoria:categorias(nombre, slug), inscripciones(count)",
+      "id, slug, titulo, descripcion, requisitos_previos, prerrequisito_curso_id, categoria_id, instructor_id, nivel, modalidad, precio, cupo_maximo, duracion_horas, estado, destacado, publicar_en, imagen_url, categoria:categorias(nombre, slug), inscripciones(count)",
     )
     .order("creado_en", { ascending: false });
   if (filtro) consulta = consulta.eq("estado", filtro);
   if (texto) consulta = consulta.ilike("titulo", `%${texto}%`);
 
-  const [{ data }, { data: categorias }, { data: instructores }] = await Promise.all([
+  const [{ data }, { data: categorias }, { data: instructores }, { data: todosCursos }] = await Promise.all([
     consulta,
     supabase.from("categorias").select("id, nombre").order("nombre"),
     supabase.from("perfiles").select("id, nombres, apellidos, correo").eq("rol", "instructor").order("nombres"),
+    supabase.from("cursos").select("id, titulo").order("titulo"),
   ]);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const cursos = (data ?? []) as any[];
@@ -57,7 +58,7 @@ export default async function AdminCursosPage({ searchParams }: PageProps<"/admi
   return (
     <div className="space-y-6">
       <EncabezadoPagina eyebrow="Académico" titulo="Gestión de cursos" descripcion="Crea, edita, publica, despublica, duplica o elimina cursos.">
-        <DialogoCurso categorias={categorias ?? []} instructores={listaInstructores} />
+        <DialogoCurso categorias={categorias ?? []} instructores={listaInstructores} cursos={todosCursos ?? []} />
       </EncabezadoPagina>
 
       <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
@@ -135,7 +136,7 @@ export default async function AdminCursosPage({ searchParams }: PageProps<"/admi
                     </td>
                     <td className={tabla.td}>
                       <div className="flex justify-end gap-0.5">
-                        <DialogoCurso curso={editable} categorias={categorias ?? []} instructores={listaInstructores} />
+                        <DialogoCurso curso={editable} categorias={categorias ?? []} instructores={listaInstructores} cursos={todosCursos ?? []} />
                         <BotonAccion
                           accion={cambiarEstadoCurso}
                           campos={{ id: c.id, estado: publicado ? "DESPUBLICADO" : "PUBLICADO" }}

@@ -22,7 +22,7 @@ export default async function CuentaPerfilPage({ searchParams }: PageProps<"/cue
   const { tab } = await searchParams;
   const activa = PESTANAS.some((p) => p.valor === tab) ? (tab as string) : "datos";
   const supabase = await createClient();
-  const { data: extra } = await supabase.from("perfiles").select("telefono, documento").eq("id", usuario.id).single();
+  const { data: extra } = await supabase.from("perfiles").select("telefono, documento, fecha_nacimiento").eq("id", usuario.id).single();
 
   return (
     <div className="space-y-6">
@@ -36,6 +36,7 @@ export default async function CuentaPerfilPage({ searchParams }: PageProps<"/cue
             apellidos={usuario.apellidos}
             correo={usuario.correo}
             telefono={extra?.telefono ?? null}
+            fechaNacimiento={extra?.fecha_nacimiento ?? null}
             documento={extra?.documento ?? null}
             especialidad={usuario.especialidad}
             avatar={usuario.avatar_url}

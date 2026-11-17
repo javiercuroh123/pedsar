@@ -126,5 +126,28 @@ select set_config('request.jwt.claims','{"sub":"a6000000-0000-4000-8000-00000000
 set local role authenticated;
 select is_empty($$select id from public.foro_temas where curso_id='c6000000-0000-4000-8000-000000000002'$$,'Usuario no inscrito no puede leer el foro del curso');
 reset role;
+
+-- HU-04 · HU-07 · RF-04 · Prerrequisitos de cursos validados en registrar_matricula.
+insert into public.cursos(id,slug,titulo,precio,cupo_maximo,estado,prerrequisito_curso_id,requisitos_previos) values
+ ('c6000000-0000-4000-8000-000000000005','curso-avanzado-prereq','Avanzado con prerrequisito',150,20,'PUBLICADO','c6000000-0000-4000-8000-000000000002','Haber completado el curso Dos');
+select is(public.cumple_prerrequisito('a6000000-0000-4000-8000-000000000004','c6000000-0000-4000-8000-000000000005'),false,'No cumple prerrequisito si no completó el curso previo');
+select throws_ok($$select * from public.registrar_matricula('a6000000-0000-4000-8000-000000000004','c6000000-0000-4000-8000-000000000005','YAPE','',150,'{}')$$,'22023','Debes completar primero el curso prerrequisito antes de inscribirte','registrar_matricula bloquea inscripción sin prerrequisito');
+insert into public.certificados(inscripcion_id,codigo_unico)
+ select id,'PED-2026-PREREQ01' from public.inscripciones where estudiante_id='a6000000-0000-4000-8000-000000000002' and curso_id='c6000000-0000-4000-8000-000000000002';
+select is(public.cumple_prerrequisito('a6000000-0000-4000-8000-000000000002','c6000000-0000-4000-8000-000000000005'),true,'Cumple prerrequisito cuando posee certificado del curso previo');
+select lives_ok($$select * from public.registrar_matricula('a6000000-0000-4000-8000-000000000002','c6000000-0000-4000-8000-000000000005','YAPE','',150,'{}')$$,'Permite inscribirse tras cumplir el prerrequisito');
+
+-- HU-21 · RF-11 · Recordatorios programados y preferencia de canal.
+insert into public.evaluaciones(id,curso_id,titulo,fecha_limite) overriding system value values
+ (96002,'c6000000-0000-4000-8000-000000000002','Evaluación con cierre próximo',now()+interval '12 hours');
+select is(privado.generar_recordatorios_programados(),1,'Genera recordatorio in-app para evaluación que vence en menos de 24 h');
+select is(privado.generar_recordatorios_programados(),0,'No duplica recordatorios ya enviados');
+
+-- HU-15 · HU-18 · Fecha de nacimiento en perfiles y jerarquía de categorías sin ciclos.
+update public.perfiles set fecha_nacimiento='1996-08-15' where id='a6000000-0000-4000-8000-000000000001';
+select is((select fecha_nacimiento::text from public.perfiles where id='a6000000-0000-4000-8000-000000000001'),'1996-08-15','Persiste la fecha de nacimiento en el perfil');
+insert into public.categorias(id,nombre,slug,activa) overriding system value values (96001,'Tecnología','tecnologia',true);
+select throws_ok($$update public.categorias set padre_id=96001 where id=96001$$,'23514',null,'Una categoría no puede ser subcategoría de sí misma');
+
 select * from finish();
 rollback;

@@ -26,7 +26,7 @@ const nueva = (): Pregunta => ({ clave: siguiente++, enunciado: "", opciones: ["
 /** Constructor de evaluaciones de opción múltiple (HU-09 / HU-59). */
 export function ConstructorEvaluacion({ cursos, cursoId }: { cursos: { id: string; titulo: string }[]; cursoId?: string }) {
   const router = useRouter();
-  const [config, setConfig] = useState({ cursoId: cursoId ?? cursos[0]?.id ?? "", titulo: "", puntajeTotal: 20, intentos: 3, tiempo: 20 });
+  const [config, setConfig] = useState({ cursoId: cursoId ?? cursos[0]?.id ?? "", titulo: "", puntajeTotal: 20, intentos: 3, tiempo: 20, fechaLimite: "" });
   const [preguntas, setPreguntas] = useState<Pregunta[]>(() => [nueva()]);
   const [pendiente, iniciar] = useTransition();
 
@@ -38,7 +38,7 @@ export function ConstructorEvaluacion({ cursos, cursoId }: { cursos: { id: strin
       const r = await crearEvaluacion({ ...config, preguntas: preguntas.map(({ enunciado, opciones, correcta, puntaje }) => ({ enunciado, opciones, correcta, puntaje })) });
       if (r.ok) {
         toast.success(r.mensaje);
-        setConfig((c) => ({ ...c, titulo: "" }));
+        setConfig((c) => ({ ...c, titulo: "", fechaLimite: "" }));
         setPreguntas([nueva()]);
         router.replace("/instructor/evaluaciones");
       } else toast.error(r.mensaje);
@@ -71,6 +71,9 @@ export function ConstructorEvaluacion({ cursos, cursoId }: { cursos: { id: strin
             <Input id="ev-total" type="number" min={1} value={config.puntajeTotal} onChange={(e) => setConfig({ ...config, puntajeTotal: Number(e.target.value) })} className="h-10" />
           </CampoForm>
         </div>
+        <CampoForm etiqueta="Fecha límite (opcional)" htmlFor="ev-limite" ayuda="Envía recordatorio 24 h antes del cierre.">
+          <Input id="ev-limite" type="datetime-local" value={config.fechaLimite} onChange={(e) => setConfig({ ...config, fechaLimite: e.target.value })} className="h-10" />
+        </CampoForm>
         <p className="rounded-lg bg-muted/60 p-3 text-xs text-muted-foreground">
           {preguntas.length} pregunta(s) · {sumaPuntajes} punto(s). Los puntos de cada pregunta se escalan a la nota máxima de {config.puntajeTotal}.
         </p>

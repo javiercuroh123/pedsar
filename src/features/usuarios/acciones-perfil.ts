@@ -11,6 +11,7 @@ const perfilSchema = z.object({
   nombres: z.string().trim().min(2, "Ingresa tus nombres").max(80),
   apellidos: z.string().trim().min(2, "Ingresa tus apellidos").max(80),
   telefono: z.string().trim().max(20).optional(),
+  fechaNacimiento: z.union([z.iso.date("Fecha de nacimiento no válida"), z.literal("")]).optional(),
   documento: z
     .string()
     .trim()
@@ -33,6 +34,7 @@ export async function actualizarPerfil(_: EstadoFormulario, formData: FormData):
       apellidos: d.data.apellidos,
       telefono: d.data.telefono || null,
       documento: d.data.documento || null,
+      ...(d.data.fechaNacimiento !== undefined && { fecha_nacimiento: d.data.fechaNacimiento || null }),
       ...(usuario.rol !== "estudiante" && { especialidad: d.data.especialidad || null }),
       ...(d.data.avatarUrl !== undefined && { avatar_url: d.data.avatarUrl || null }),
     })

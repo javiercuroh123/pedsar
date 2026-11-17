@@ -102,6 +102,18 @@ describe("matrícula y pago atómicos", () => {
     conSesion("estudiante");
     await expect(inscribirse(datos())).rejects.toEqual(new Redireccion("/cursos"));
   });
+  it("impide la matrícula si el estudiante no completó el curso prerrequisito (HU-07 · RF-04)", async () => {
+    conSesion("estudiante");
+    responder(
+      { cursos: { data: { id: UUID.curso, titulo: "Excel avanzado", precio: 180, slug: "excel-avanzado", prerrequisito_curso_id: UUID.otra } } },
+      { "rpc:cumple_prerrequisito": { data: false } },
+    );
+    await expect(inscribirse(datos())).rejects.toEqual(
+      new Redireccion(`/estudiante/cursos?error=${encodeURIComponent("Debes completar primero el curso prerrequisito antes de inscribirte")}`),
+    );
+    expect(entorno.admin.de("rpc:cumple_prerrequisito")[0].valores).toEqual({ p_estudiante: UUID.estudiante, p_curso: UUID.curso });
+    expect(entorno.admin.de("rpc:registrar_matricula")).toHaveLength(0);
+  });
 });
 
 describe("registro del pago manual por Yape / Plin", () => {

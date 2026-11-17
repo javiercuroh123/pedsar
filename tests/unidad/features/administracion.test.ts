@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import {
+  alternarCategoria,
   alternarCupon,
   alternarUsuario,
   cambiarEstadoCurso,
@@ -42,10 +43,14 @@ describe("cursos (HU-04 · HU-56 · HU-57)", () => {
     // Los mismos campos que envía DialogoCurso (los vacíos llegan como "").
     formulario({ id: "", titulo: "Excel Avanzado", descripcion: "", categoriaId: "3", instructorId: UUID.instructor, nivel: "AVANZADO", modalidad: "VIRTUAL", precio: "180", cupo: "25", horas: "24", estado: "PUBLICADO", publicarEn: "", imagen: "", ...extra });
 
-  it("valida los datos", async () => {
+  it("valida los datos y evita que un curso sea prerrequisito de sí mismo (RF-04)", async () => {
     conSesion("administrador");
     await expect(guardarCurso({}, curso({ cupo: "0" }))).resolves.toEqual({ ok: false, mensaje: "El cupo debe ser al menos 1" });
     await expect(guardarCurso({}, curso({ imagen: "portada.png" }))).resolves.toEqual({ ok: false, mensaje: "La imagen debe ser una URL" });
+    await expect(guardarCurso({}, curso({ id: UUID.curso, prerrequisitoCursoId: UUID.curso }))).resolves.toEqual({
+      ok: false,
+      mensaje: "Un curso no puede ser prerrequisito de sí mismo",
+    });
   });
 
   it("crea el curso con un slug único y la publicación programada en hora de Perú", async () => {
@@ -120,14 +125,20 @@ describe("cursos (HU-04 · HU-56 · HU-57)", () => {
 });
 
 describe("categorías (HU-18)", () => {
-  it("guarda con slug, informa nombres repetidos y elimina", async () => {
+  it("guarda con slug, subcategoría, estado activo/inactivo, informa nombres repetidos y elimina", async () => {
     conSesion("administrador");
-    responder({ "categorias.insert": [{}, { error: { code: "23505", message: "dup" } }], "categorias.update": { error: { message: "x" } } });
+    responder({ "categorias.insert": [{}, { error: { code: "23505", message: "dup" } }], "categorias.update": [{ error: { message: "x" } }, {}] });
     await expect(guardarCategoria({}, formulario({ id: "", nombre: "Seguridad y Salud", descripcion: "" }))).resolves.toEqual({ ok: true, mensaje: "Categoría guardada" });
     expect(entorno.servidor.de("categorias", "insert")[0].valores).toEqual({ nombre: "Seguridad y Salud", slug: "seguridad-y-salud", descripcion: null });
     await expect(guardarCategoria({}, formulario({ id: "", nombre: "Seguridad y Salud" }))).resolves.toEqual({ ok: false, mensaje: "Ya existe una categoría con ese nombre" });
     await expect(guardarCategoria({}, formulario({ id: "4", nombre: "Ofimática" }))).resolves.toEqual({ ok: false, mensaje: "x" });
+    await expect(guardarCategoria({}, formulario({ id: "4", nombre: "Ofimática", padreId: "4" }))).resolves.toEqual({
+      ok: false,
+      mensaje: "Una categoría no puede ser subcategoría de sí misma",
+    });
     await expect(guardarCategoria({}, formulario({ id: "", nombre: "TI" }))).resolves.toEqual({ ok: false, mensaje: "Escribe el nombre" });
+    await alternarCategoria(formulario({ id: "4", activa: "false" }));
+    expect(entorno.servidor.de("categorias", "update")[1].valores).toEqual({ activa: false });
     await eliminarCategoria(formulario({ id: "4" }));
     expect(entorno.servidor.de("categorias", "delete")[0].filtros).toContainEqual(["eq", "id", 4]);
   });

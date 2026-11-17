@@ -20,6 +20,12 @@ export default async function InscripcionPage({ params }: PageProps<"/cursos/[sl
   if (curso.cupo_disponible <= 0) redirect(`/cursos/${slug}`);
 
   const supabase = await createClient();
+  if (curso.prerrequisito) {
+    const { data: cumple } = await supabase.rpc("cumple_prerrequisito", { p_estudiante: usuario.id, p_curso: curso.id });
+    if (!cumple) {
+      redirect(`/estudiante/cursos?error=${encodeURIComponent(`Debes completar primero el curso prerrequisito «${curso.prerrequisito.titulo}» antes de inscribirte`)}`);
+    }
+  }
   const { data: perfil } = await supabase.from("perfiles").select("telefono, documento").eq("id", usuario.id).single();
 
   const inicio = curso.sesiones.find((s) => s.fecha >= hoyISO()) ?? curso.sesiones[0];

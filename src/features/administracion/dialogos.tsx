@@ -35,7 +35,14 @@ export function DialogoObservarPago({ inscripcionId, codigo }: { inscripcionId: 
   );
 }
 
-export function DialogoCategoria({ categoria }: { categoria?: { id: number; nombre: string; descripcion: string | null } }) {
+export function DialogoCategoria({
+  categoria,
+  categorias = [],
+}: {
+  categoria?: { id: number; nombre: string; descripcion: string | null; padre_id?: number | null; imagen_url?: string | null };
+  categorias?: { id: number; nombre: string }[];
+}) {
+  const opcionesPadre = categorias.filter((c) => c.id !== categoria?.id);
   return (
     <DialogoFormulario
       disparador={categoria ? <PencilIcon /> : <><PlusIcon /> Nueva categoría</>}
@@ -50,6 +57,21 @@ export function DialogoCategoria({ categoria }: { categoria?: { id: number; nomb
       </CampoForm>
       <CampoForm etiqueta="Descripción" htmlFor="cat-desc">
         <Textarea id="cat-desc" name="descripcion" rows={3} defaultValue={categoria?.descripcion ?? ""} />
+      </CampoForm>
+      {opcionesPadre.length > 0 && (
+        <CampoForm etiqueta="Categoría superior (opcional)" htmlFor="cat-padre" ayuda="Permite organizar subcategorías.">
+          <select id="cat-padre" name="padreId" defaultValue={categoria?.padre_id ?? ""} className={claseControl}>
+            <option value="">Ninguna (categoría principal)</option>
+            {opcionesPadre.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.nombre}
+              </option>
+            ))}
+          </select>
+        </CampoForm>
+      )}
+      <CampoForm etiqueta="Imagen representativa (URL opcional)" htmlFor="cat-img">
+        <Input id="cat-img" name="imagenUrl" type="url" defaultValue={categoria?.imagen_url ?? ""} placeholder="https://…" className="h-10" />
       </CampoForm>
     </DialogoFormulario>
   );

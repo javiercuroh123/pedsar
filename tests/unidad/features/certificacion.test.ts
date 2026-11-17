@@ -2,10 +2,11 @@ import { encode } from "uqr";
 import { describe, expect, it } from "vitest";
 import type { InscripcionEstudiante } from "@/features/academico/consultas";
 import { datosCertificado, obtenerResultados, verificarCertificado } from "@/features/certificacion/consultas";
+import { emitirCertificadosAutomaticos, emitirCertificadoTrasEvaluacion } from "@/features/certificacion/emision-automatica";
 import { generarPdfCertificado, type DatosPdfCertificado } from "@/features/certificacion/pdf-certificado";
 import { enlacesCompartirCertificado, trazadoQr, urlVerificacion } from "@/features/certificacion/qr";
 import { leerPdf } from "../../apoyo/archivos";
-import { entorno, responder } from "../../apoyo/entorno";
+import { entorno, responder, UUID } from "../../apoyo/entorno";
 
 describe("QR de verificación", () => {
   it("dibuja un cuadrado por cada módulo oscuro, sin margen", () => {
@@ -123,5 +124,95 @@ describe("PDF del certificado (HU-11)", () => {
     expect(titulo).toHaveLength(2);
     expect(curso.startsWith(titulo[0])).toBe(true);
     expect(titulo[1].endsWith("…")).toBe(true);
+  });
+});
+
+describe("emisión automática de certificados al aprobar el curso (HU-11 · RF-08)", () => {
+  it("emite el certificado automáticamente cuando se cumplen nota y asistencia y aún no existe", async () => {
+    await expect(emitirCertificadosAutomaticos([], UUID.admin)).resolves.toBe(0);
+
+    responder(
+      {},
+      {
+        "evaluaciones.select": { data: { curso_id: UUID.curso } },
+        "inscripciones.select": [
+          { data: { id: UUID.inscripcion } },
+          {
+            data: [
+              {
+                id: UUID.inscripcion,
+                estudiante_id: UUID.estudiante,
+                estudiante: { nombres: "Ana", apellidos: "Quispe", correo: "ana@pedsar.test" },
+                curso: { titulo: "Excel Avanzado", duracion_horas: 24, instructor: { nombres: "Luis", apellidos: "Ramos" } },
+                certificados: null,
+              },
+            ],
+          },
+        ],
+        "rpc:resultado_academico": {
+          data: [
+            {
+              inscripcion_id: UUID.inscripcion,
+              evaluaciones: 1,
+              rendidas: 1,
+              nota_final: "16.00",
+              sesiones: 2,
+              presentes: 2,
+              asistencia: "100.0",
+              contenidos: 3,
+              completados: 3,
+              progreso: "100.0",
+            },
+          ],
+        },
+      },
+    );
+
+    await expect(emitirCertificadoTrasEvaluacion(UUID.estudiante, 5)).resolves.toBe(1);
+    expect(entorno.admin.de("certificados", "insert")[0].valores).toMatchObject({
+      inscripcion_id: UUID.inscripcion,
+      estudiante_nombre: "Ana Quispe",
+      curso_titulo: "Excel Avanzado",
+      duracion_horas: 24,
+      instructor_nombre: "Luis Ramos",
+      nota_final: 16,
+      asistencia: 100,
+      motivo_excepcion: null,
+    });
+    expect(entorno.admin.de("registro_actividad")[0].valores).toMatchObject({
+      accion: "EMITIR_CERTIFICADO",
+      detalle: expect.objectContaining({ automatico: true }),
+    });
+    expect(entorno.admin.de("notificaciones", "insert")[0].valores).toMatchObject({
+      usuario_id: UUID.estudiante,
+      mensaje: expect.stringContaining("Excel Avanzado"),
+    });
+    expect(entorno.tareas).toHaveLength(1);
+  });
+
+  it("no emite si el estudiante aún no es apto o si ya tiene certificado", async () => {
+    responder(
+      {},
+      {
+        "rpc:resultado_academico": {
+          data: [
+            {
+              inscripcion_id: UUID.inscripcion,
+              evaluaciones: 2,
+              rendidas: 1,
+              nota_final: "15.00",
+              sesiones: 2,
+              presentes: 2,
+              asistencia: "100.0",
+              contenidos: 0,
+              completados: 0,
+              progreso: null,
+            },
+          ],
+        },
+      },
+    );
+    await expect(emitirCertificadosAutomaticos([UUID.inscripcion], UUID.instructor)).resolves.toBe(0);
+    expect(entorno.admin.de("certificados", "insert")).toHaveLength(0);
   });
 });
