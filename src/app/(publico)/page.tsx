@@ -18,6 +18,7 @@ import Link from "next/link";
 import { EstadoVacio } from "@/components/comunes";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { categoriasHoja, categoriasPrincipales, contarCursosPorCategoria } from "@/features/catalogo/categorias";
 import { listarCategorias, listarCursosPublicados } from "@/features/catalogo/consultas";
 import { CursoCard, IndicadorCupo } from "@/features/catalogo/curso-card";
 import { degradadoCategoria, IconoCategoria, PortadaCurso } from "@/features/catalogo/portada-curso";
@@ -64,8 +65,11 @@ export default async function InicioPage() {
   const enLinea = pasarelaActiva();
   const destacado = cursos[0];
   const proximos = cursos.slice(destacado ? 1 : 0, 5);
-  const porCategoria = new Map<string, number>();
-  cursos.forEach((c) => c.categoria && porCategoria.set(c.categoria.slug, (porCategoria.get(c.categoria.slug) ?? 0) + 1));
+  // HU-18 · Las tarjetas y los atajos muestran las subcategorías; la principal titula la sección.
+  const porCategoria = contarCursosPorCategoria(cursos, categorias);
+  const areas = categoriasHoja(categorias);
+  const populares = [...areas].sort((a, b) => (porCategoria[b.slug] ?? 0) - (porCategoria[a.slug] ?? 0)).slice(0, 4);
+  const principales = categoriasPrincipales(categorias);
 
   return (
     <>
@@ -85,7 +89,7 @@ export default async function InicioPage() {
               Aprende tecnología con <span className="texto-degradado">certificación verificable</span>
             </h1>
             <p className="animar-entrada mt-6 max-w-xl text-lg text-muted-foreground [--i:2]">
-              Cursos de programación, redes, ofimática e IA en Ica. Inscríbete en línea las 24 horas, paga con{" "}
+              Cursos de ofimática, programación, redes, datos y ciberseguridad en Ica. Inscríbete en línea las 24 horas, paga con{" "}
               {enLinea ? "tarjeta, Yape o Plin" : "Yape o Plin"} y recibe tu certificado digital.
             </p>
             <form
@@ -106,10 +110,10 @@ export default async function InicioPage() {
                 Buscar cursos
               </Button>
             </form>
-            {categorias.length > 0 && (
+            {populares.length > 0 && (
               <div className="animar-entrada mt-4 flex flex-wrap items-center gap-2 text-sm [--i:4]">
                 <span className="text-muted-foreground">Populares:</span>
-                {categorias.slice(0, 4).map((c) => (
+                {populares.map((c) => (
                   <Link
                     key={c.id}
                     href={`/cursos?categoria=${c.slug}`}
@@ -214,12 +218,12 @@ export default async function InicioPage() {
       </section>
 
       {/* ---------- Categorías ---------- */}
-      {categorias.length > 0 && (
+      {areas.length > 0 && (
         <section className="mx-auto max-w-7xl px-4 pb-20 sm:px-6 lg:px-8">
-          <EncabezadoSeccion sobre="Categorías" titulo="Explora por área" />
+          <EncabezadoSeccion sobre={principales.length === 1 ? principales[0].nombre : "Categorías"} titulo="Explora por área" />
           <div className="escalonado mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            {categorias.map((c) => {
-              const n = porCategoria.get(c.slug) ?? 0;
+            {areas.map((c) => {
+              const n = porCategoria[c.slug] ?? 0;
               return (
                 <Link
                   key={c.id}

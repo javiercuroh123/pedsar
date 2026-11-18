@@ -2,6 +2,7 @@ import "server-only";
 import { createClient } from "@/lib/supabase/server";
 import { hoyISO, nombreCompleto } from "@/lib/formato";
 import type { Modalidad, Nivel } from "@/types/dominio";
+import { conSubcategorias, type Categoria } from "@/features/catalogo/categorias";
 
 export interface CursoResumen {
   id: string;
@@ -116,7 +117,9 @@ export async function listarCursosPublicados(filtros: FiltrosCatalogo = {}): Pro
     .order("destacado", { ascending: false })
     .order("creado_en", { ascending: false });
 
-  if (filtros.categorias?.length) consulta = consulta.in("categoria.slug", filtros.categorias);
+  // HU-18 · Filtrar por una categoría principal incluye los cursos de sus subcategorías.
+  if (filtros.categorias?.length)
+    consulta = consulta.in("categoria.slug", conSubcategorias(filtros.categorias, await listarCategorias()));
   if (filtros.niveles?.length) consulta = consulta.in("nivel", filtros.niveles);
   if (filtros.modalidades?.length) consulta = consulta.in("modalidad", filtros.modalidades);
   if (filtros.precioMin !== undefined) consulta = consulta.gte("precio", filtros.precioMin);
@@ -231,11 +234,15 @@ export async function obtenerCursoPorSlug(slug: string) {
 
 export type CursoDetalle = NonNullable<Awaited<ReturnType<typeof obtenerCursoPorSlug>>>;
 
-// HU-18 · Categorías
-export async function listarCategorias() {
+// HU-18 · Categorías activas, con su categoría principal (padre_id)
+export async function listarCategorias(): Promise<Categoria[]> {
   const supabase = await createClient();
-  const { data } = await supabase.from("categorias").select("id, nombre, slug, descripcion").order("nombre");
-  return (data ?? []) as { id: number; nombre: string; slug: string; descripcion: string | null }[];
+  const { data } = await supabase
+    .from("categorias")
+    .select("id, nombre, slug, descripcion, padre_id")
+    .eq("activa", true)
+    .order("nombre");
+  return (data ?? []) as Categoria[];
 }
 
 /**

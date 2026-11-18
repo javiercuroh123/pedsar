@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { CampoForm, claseControl, DialogoFormulario } from "@/components/dialogo-formulario";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { arbolDeCategorias } from "@/features/catalogo/categorias";
 import { ETIQUETA_MODALIDAD, ETIQUETA_NIVEL } from "@/lib/formato";
 import { createClient } from "@/lib/supabase/client";
 import type { EstadoCurso, Modalidad, Nivel } from "@/types/dominio";
@@ -38,7 +39,7 @@ export function DialogoCurso({
   cursos = [],
 }: {
   curso?: CursoEditable;
-  categorias: { id: number; nombre: string }[];
+  categorias: { id: number; nombre: string; slug: string; padre_id: number | null }[];
   instructores: { id: string; nombre: string }[];
   cursos?: { id: string; titulo: string }[];
 }) {
@@ -84,9 +85,10 @@ export function DialogoCurso({
         <CampoForm etiqueta="Categoría" htmlFor="c-cat">
           <select id="c-cat" name="categoriaId" defaultValue={curso?.categoria_id ?? ""} className={claseControl}>
             <option value="">Sin categoría</option>
-            {categorias.map((c) => (
+            {/* HU-18 · Subcategorías sangradas bajo su categoría principal */}
+            {arbolDeCategorias(categorias).map(({ categoria: c, nivel }) => (
               <option key={c.id} value={c.id}>
-                {c.nombre}
+                {"   ".repeat(nivel) + c.nombre}
               </option>
             ))}
           </select>

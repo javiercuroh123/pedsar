@@ -3,6 +3,7 @@ import Link from "next/link";
 import { ChevronRightIcon, SearchXIcon, XIcon } from "lucide-react";
 import { EstadoVacio } from "@/components/comunes";
 import { buttonVariants } from "@/components/ui/button";
+import { arbolDeCategorias, contarCursosPorCategoria } from "@/features/catalogo/categorias";
 import { listarCategorias, listarCursosPublicados, type OrdenCatalogo } from "@/features/catalogo/consultas";
 import { CursoCard } from "@/features/catalogo/curso-card";
 import { DURACION_TOPE, FiltrosCatalogo, PRECIO_TOPE } from "@/features/catalogo/filtros-catalogo";
@@ -36,8 +37,9 @@ export default async function CatalogoPage({ searchParams }: PageProps<"/cursos"
     listarCursosPublicados(),
   ]);
 
-  const conteo: Record<string, number> = {};
-  todosLosCursos.forEach((c) => c.categoria && (conteo[c.categoria.slug] = (conteo[c.categoria.slug] ?? 0) + 1));
+  // HU-18 · La categoría principal cuenta los cursos de sus subcategorías y se lista con ellas debajo.
+  const conteo = contarCursosPorCategoria(todosLosCursos, todas);
+  const arbol = arbolDeCategorias(todas).map(({ categoria, nivel }) => ({ slug: categoria.slug, nombre: categoria.nombre, nivel }));
 
   // Chips de filtros activos: cada uno enlaza a la URL sin ese filtro.
   const actual = new URLSearchParams();
@@ -89,7 +91,7 @@ export default async function CatalogoPage({ searchParams }: PageProps<"/cursos"
             duracionMax: duracionMax ?? DURACION_TOPE,
             orden,
           }}
-          categorias={todas}
+          categorias={arbol}
           conteoCategorias={conteo}
         >
           <div className="mt-4 flex flex-wrap items-center gap-2">

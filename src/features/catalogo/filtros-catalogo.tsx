@@ -22,11 +22,31 @@ export interface ValoresFiltro {
   orden: string;
 }
 
-function Casilla({ nombre, valor, etiqueta, marcada, conteo }: { nombre: string; valor: string; etiqueta: string; marcada: boolean; conteo?: number }) {
+function Casilla({
+  nombre,
+  valor,
+  etiqueta,
+  marcada,
+  conteo,
+  nivel = 0,
+  principal = false,
+}: {
+  nombre: string;
+  valor: string;
+  etiqueta: string;
+  marcada: boolean;
+  conteo?: number;
+  /** Profundidad de la subcategoría (HU-18): cada nivel se sangra bajo su categoría principal. */
+  nivel?: number;
+  principal?: boolean;
+}) {
   return (
-    <label className="flex cursor-pointer items-center gap-2.5 rounded-lg px-2 py-1.5 text-sm transition hover:bg-muted">
+    <label
+      className="flex cursor-pointer items-center gap-2.5 rounded-lg py-1.5 pr-2 text-sm transition hover:bg-muted"
+      style={{ paddingLeft: `${0.5 + nivel * 1.25}rem` }}
+    >
       <input type="checkbox" name={nombre} value={valor} defaultChecked={marcada} className="size-4 rounded" />
-      <span className="flex-1">{etiqueta}</span>
+      <span className={principal ? "flex-1 font-medium" : "flex-1"}>{etiqueta}</span>
       {conteo !== undefined && <span className="font-mono text-xs text-muted-foreground">{conteo}</span>}
     </label>
   );
@@ -43,7 +63,8 @@ export function FiltrosCatalogo({
   children,
 }: {
   valores: ValoresFiltro;
-  categorias: { slug: string; nombre: string }[];
+  /** En orden de árbol (categoría principal y debajo sus subcategorías). */
+  categorias: { slug: string; nombre: string; nivel?: number }[];
   conteoCategorias: Record<string, number>;
   children: React.ReactNode;
 }) {
@@ -88,7 +109,7 @@ export function FiltrosCatalogo({
   const bloques = [
     {
       titulo: "Categoría",
-      contenido: categorias.map((c) => (
+      contenido: categorias.map((c, i) => (
         <Casilla
           key={c.slug}
           nombre="categoria"
@@ -96,6 +117,8 @@ export function FiltrosCatalogo({
           etiqueta={c.nombre}
           marcada={valores.categorias.includes(c.slug)}
           conteo={conteoCategorias[c.slug] ?? 0}
+          nivel={c.nivel}
+          principal={(categorias[i + 1]?.nivel ?? 0) > (c.nivel ?? 0)}
         />
       )),
     },

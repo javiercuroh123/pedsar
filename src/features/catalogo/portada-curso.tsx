@@ -1,15 +1,17 @@
 import {
   BuildingIcon,
   ChartColumnIcon,
+  CloudIcon,
   CodeIcon,
+  DatabaseIcon,
+  FileSpreadsheetIcon,
   GlobeIcon,
   GraduationCapIcon,
+  LaptopIcon,
   MonitorIcon,
-  NetworkIcon,
+  ServerIcon,
   ShieldCheckIcon,
   ShuffleIcon,
-  SparklesIcon,
-  WrenchIcon,
   type LucideIcon,
 } from "lucide-react";
 import { createElement, type ComponentProps } from "react";
@@ -29,14 +31,17 @@ const DEGRADADOS = [
   "from-zinc-600 to-zinc-950",
 ];
 
+// Categorías del catálogo de la empresa (migración catalogo_tecnologia_informatica).
 const POR_CATEGORIA: Record<string, { degradado: string; icono: LucideIcon }> = {
+  "tecnologia-informatica": { degradado: "from-brand-700 to-zinc-950", icono: LaptopIcon },
+  "ofimatica-excel": { degradado: "from-green-700 to-zinc-900", icono: FileSpreadsheetIcon },
+  "datos-bi": { degradado: "from-amber-700 to-zinc-900", icono: ChartColumnIcon },
+  "bases-de-datos": { degradado: "from-brand-800 to-zinc-950", icono: DatabaseIcon },
   programacion: { degradado: "from-brand-600 to-zinc-900", icono: CodeIcon },
-  "desarrollo-web": { degradado: "from-brand-800 to-zinc-950", icono: GlobeIcon },
-  "datos-ofimatica": { degradado: "from-green-700 to-zinc-900", icono: ChartColumnIcon },
-  redes: { degradado: "from-zinc-600 to-zinc-950", icono: NetworkIcon },
+  "desarrollo-web-movil": { degradado: "from-violet-700 to-zinc-900", icono: GlobeIcon },
+  "redes-servidores": { degradado: "from-zinc-600 to-zinc-950", icono: ServerIcon },
   ciberseguridad: { degradado: "from-rose-700 to-zinc-900", icono: ShieldCheckIcon },
-  "inteligencia-artificial": { degradado: "from-violet-700 to-zinc-900", icono: SparklesIcon },
-  "soporte-tecnico": { degradado: "from-amber-700 to-zinc-900", icono: WrenchIcon },
+  "nube-procesos": { degradado: "from-sky-700 to-zinc-900", icono: CloudIcon },
 };
 
 export const ICONO_MODALIDAD: Record<Modalidad, typeof MonitorIcon> = {

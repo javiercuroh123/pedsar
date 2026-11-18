@@ -1,0 +1,34 @@
+💻 Tecnología e Informática
+✅ Windows Server Essentials
+✅ Ciberseguridad
+✅ Informática Forense
+✅ Análisis de Datos con Python, SQL Server y Power BI
+✅ Power BI – Inteligencia de Negocios
+✅ Excel Básico, 
+✅ Excel Intermedio, 
+✅ Excel desde cero hasta Macros
+✅ Generación de Dashboards con Excel y Power BI
+✅ Ofimática Básica 
+✅ Ofimática Intermedia 
+✅ Ofimática Profesional
+✅ Administración de Base de Datos con SQL Server
+✅ Oracle
+✅ MongoDB
+✅ JavaScript
+✅ C# 
+✅ C++ 
+✅ C#.NET
+✅ React Server
+✅ Aplicaciones Móviles
+✅ Desarrollo Java I 
+✅ Desarrollo Java II
+✅ Programación Python I 
+✅ Programación Python II
+✅ Diseño Web con WordPress 
+✅ Diseño Web con PHP 
+✅ Diseño Web con Visual Studio
+✅ Linux 
+✅ CCNA 
+✅ DNS y DHCP
+✅ AWS – Amazon Web Services
+✅ BPM – Gestión de Procesos de Negocio

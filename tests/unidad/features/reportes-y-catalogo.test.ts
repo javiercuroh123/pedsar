@@ -248,11 +248,30 @@ describe("catálogo público (HU-05 · HU-06 · HU-33)", () => {
     await expect(obtenerCursoPorSlug("x")).rejects.toThrow("Curso: caído");
   });
 
-  it("lista las categorías", async () => {
+  it("lista las categorías activas con su categoría principal (HU-18)", async () => {
     responder({ categorias: { data: [{ id: 1, nombre: "Ofimática" }] } });
     await expect(listarCategorias()).resolves.toEqual([{ id: 1, nombre: "Ofimática" }]);
+    expect(entorno.servidor.de("categorias")[0].columnas).toContain("padre_id");
+    expect(entorno.servidor.de("categorias")[0].filtros).toEqual(expect.arrayContaining([["eq", "activa", true]]));
     responder();
     await expect(listarCategorias()).resolves.toEqual([]);
+  });
+
+  it("filtrar por la categoría principal incluye los cursos de sus subcategorías (HU-18)", async () => {
+    responder({
+      categorias: {
+        data: [
+          { id: 1, nombre: "Tecnología e Informática", slug: "tecnologia-informatica", descripcion: null, padre_id: null },
+          { id: 2, nombre: "Programación", slug: "programacion", descripcion: null, padre_id: 1 },
+          { id: 3, nombre: "Redes y servidores", slug: "redes-servidores", descripcion: null, padre_id: 1 },
+          { id: 4, nombre: "Gestión", slug: "gestion", descripcion: null, padre_id: null },
+        ],
+      },
+      cursos: { data: [] },
+    });
+    await listarCursosPublicados({ categorias: ["tecnologia-informatica"] });
+    const filtro = entorno.servidor.de("cursos")[0].filtros.find((f) => f[0] === "in" && f[1] === "categoria.slug");
+    expect((filtro?.[2] as string[]).sort()).toEqual(["programacion", "redes-servidores", "tecnologia-informatica"]);
   });
 
   it("recomienda cursos por afinidad de categoría o mismo instructor, destacados y cupo disponible (HU-25)", async () => {

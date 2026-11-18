@@ -43,7 +43,7 @@ export default async function AdminCursosPage({ searchParams }: PageProps<"/admi
 
   const [{ data }, { data: categorias }, { data: instructores }, { data: todosCursos }] = await Promise.all([
     consulta,
-    supabase.from("categorias").select("id, nombre").order("nombre"),
+    supabase.from("categorias").select("id, nombre, slug, padre_id").order("nombre"),
     supabase.from("perfiles").select("id, nombres, apellidos, correo").eq("rol", "instructor").order("nombres"),
     supabase.from("cursos").select("id, titulo").order("titulo"),
   ]);
