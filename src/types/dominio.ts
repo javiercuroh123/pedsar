@@ -23,4 +23,6 @@ export interface Perfil {
   especialidad: string | null;
   avatar_url: string | null;
   estado: boolean;
+  /** HU-45: entró con Google y aún no acepta la política de privacidad. */
+  pendienteTerminos?: boolean;
 }

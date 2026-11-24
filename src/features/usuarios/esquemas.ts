@@ -21,6 +21,9 @@ export const registroSchema = z
   })
   .refine((d) => d.contrasena === d.confirmar, { path: ["confirmar"], message: "Las contraseñas no coinciden" });
 
+/** HU-45: aceptación pendiente de quien se registró con Google desde el login. */
+export const terminosSchema = z.object({ aceptaPrivacidad: registroSchema.shape.aceptaPrivacidad });
+
 export const recuperarSchema = z.object({ correo: z.email("Correo no válido") });
 
 export const nuevaContrasenaSchema = z

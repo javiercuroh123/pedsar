@@ -14,6 +14,7 @@ import {
   nuevaContrasenaSchema,
   recuperarSchema,
   registroSchema,
+  terminosSchema,
   type EstadoFormulario,
 } from "./esquemas";
 
@@ -42,6 +43,41 @@ export async function iniciarSesion(_: EstadoFormulario, formData: FormData): Pr
   await registrarActividad(data.user.id, "INICIO_SESION");
 
   redirect(destinoSeguro(formData.get("next")) ?? INICIO_POR_ROL[(perfil?.rol as Rol) ?? "estudiante"]);
+}
+
+// HU-45 · Login y registro con Google. Con `acepta=on` (registro con la casilla
+// marcada) se envía la versión vigente de la política para guardarla al volver.
+export async function iniciarConGoogle(formData: FormData) {
+  const retorno = new URL("/auth/google", publicEnv.NEXT_PUBLIC_SITE_URL);
+  const next = destinoSeguro(formData.get("next"));
+  if (next) retorno.searchParams.set("next", next);
+  if (formData.get("acepta") === "on") retorno.searchParams.set("acepta", VERSION_POLITICA_PRIVACIDAD);
+
+  const supabase = await createClient();
+  const { data, error } = await supabase.auth.signInWithOAuth({
+    provider: "google",
+    options: { redirectTo: retorno.toString(), queryParams: { prompt: "select_account" } },
+  });
+  if (error || !data.url) redirect("/login?error=google");
+  redirect(data.url);
+}
+
+// HU-45 + HU-47 · Quien entra con Google sin haber aceptado la política la acepta aquí.
+export async function aceptarTerminos(_: EstadoFormulario, formData: FormData): Promise<EstadoFormulario> {
+  const usuario = await getUsuarioActual();
+  if (!usuario) redirect("/login");
+  const datos = terminosSchema.safeParse(Object.fromEntries(formData));
+  if (!datos.success) return { errores: errores(datos.error) };
+
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("perfiles")
+    .update({ privacidad_version: VERSION_POLITICA_PRIVACIDAD, privacidad_aceptada_en: new Date().toISOString() })
+    .eq("id", usuario.id);
+  if (error) return { mensaje: "No se pudo guardar tu aceptación. Inténtalo de nuevo." };
+
+  await registrarActividad(usuario.id, "INICIO_SESION", { proveedor: "google" });
+  redirect(destinoSeguro(formData.get("next")) ?? INICIO_POR_ROL[usuario.rol]);
 }
 
 // HU-01 · Registro de usuarios (+ HU-46 verificación por correo)

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { CircleAlertIcon } from "lucide-react";
+import { BotonGoogle } from "@/features/usuarios/boton-google";
 import { LoginForm } from "@/features/usuarios/formularios";
 
 export const metadata: Metadata = { title: "Iniciar sesión" };
@@ -8,11 +9,13 @@ export const metadata: Metadata = { title: "Iniciar sesión" };
 const ERRORES: Record<string, string> = {
   "cuenta-inactiva": "Tu cuenta está desactivada. Contacta con el administrador.",
   "enlace-invalido": "El enlace no es válido o ya venció. Solicita uno nuevo.",
+  google: "No se pudo iniciar sesión con Google. Inténtalo de nuevo.",
 };
 
 export default async function LoginPage({ searchParams }: PageProps<"/login">) {
   const { next, error } = await searchParams;
   const mensajeError = typeof error === "string" ? ERRORES[error] : undefined;
+  const destino = typeof next === "string" ? next : undefined;
   return (
     <>
       <h1 className="text-[1.875rem] leading-tight font-semibold tracking-tight">Bienvenido de nuevo</h1>
@@ -23,7 +26,8 @@ export default async function LoginPage({ searchParams }: PageProps<"/login">) {
           {mensajeError}
         </p>
       )}
-      <LoginForm next={typeof next === "string" ? next : undefined} />
+      <LoginForm next={destino} />
+      <BotonGoogle next={destino} />
       <p className="mt-8 text-center text-sm text-muted-foreground">
         ¿No tienes cuenta?{" "}
         <Link href="/registro" className="font-semibold text-primary hover:underline">

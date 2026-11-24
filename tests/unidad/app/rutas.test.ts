@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import { describe, expect, it, vi } from "vitest";
 import { GET as confirmarCorreo } from "@/app/auth/confirm/route";
+import { GET as volverDeGoogle } from "@/app/auth/google/route";
 import { GET as exportarAuditoria } from "@/app/admin/auditoria/exportar/route";
 import { GET as exportarReporte } from "@/app/admin/reportes/exportar/route";
 import { GET as salud } from "@/app/api/salud/route";
@@ -300,6 +301,58 @@ describe("exportaciones", () => {
       accion: "EXPORTAR_AUDITORIA",
       detalle: { formato: "csv", desde: "2026-10-01", hasta: "2026-10-31", registros: 1 },
     });
+  });
+});
+
+describe("retorno del login con Google (HU-45)", () => {
+  const ID = UUID.estudiante;
+  const conGoogle = (perfilFila: unknown, actualizar: { error: { message: string } | null } = { error: null }) => {
+    responder({ "perfiles.select": { data: perfilFila }, "perfiles.update": actualizar });
+    entorno.servidor.cliente.auth.exchangeCodeForSession.mockResolvedValue({ data: { user: { id: ID } }, error: null } as never);
+  };
+  const destino = async (ruta: string) => (await volverDeGoogle(pedido(ruta))).headers.get("location");
+
+  it("si ya aceptó la privacidad, inicia sesión, lo registra y va a su panel o al destino interno", async () => {
+    conGoogle({ rol: "estudiante", estado: true, privacidad_aceptada_en: "2026-11-01T00:00:00Z" });
+    expect(await destino("/auth/google?code=c0d1g0")).toBe("https://pedsar.test/estudiante");
+    expect(entorno.servidor.cliente.auth.exchangeCodeForSession).toHaveBeenCalledWith("c0d1g0");
+    expect(entorno.admin.de("registro_actividad")[0].valores).toMatchObject({ usuario_id: ID, accion: "INICIO_SESION" });
+    expect(entorno.servidor.de("perfiles", "update")).toHaveLength(0);
+    expect(await destino("/auth/google?code=c&next=/cursos/excel")).toBe("https://pedsar.test/cursos/excel");
+    // Nunca redirige fuera del sitio.
+    expect(await destino("/auth/google?code=c&next=//sitio-malicioso.com")).toBe("https://pedsar.test/estudiante");
+  });
+
+  it("desde el registro con la casilla marcada, guarda la versión y la fecha aceptadas", async () => {
+    conGoogle({ rol: "estudiante", estado: true, privacidad_aceptada_en: null });
+    expect(await destino("/auth/google?code=c&acepta=2026-10")).toBe("https://pedsar.test/estudiante");
+    const [cambio] = entorno.servidor.de("perfiles", "update");
+    expect(cambio.valores).toEqual({ privacidad_version: "2026-10", privacidad_aceptada_en: expect.any(String) });
+    expect(cambio.filtros).toContainEqual(["eq", "id", ID]);
+  });
+
+  it("sin aceptación (o con una versión que no es la vigente) lo manda a aceptar los términos", async () => {
+    conGoogle({ rol: "estudiante", estado: true, privacidad_aceptada_en: null });
+    expect(await destino("/auth/google?code=c&next=/cursos/excel")).toBe("https://pedsar.test/auth/terminos?next=%2Fcursos%2Fexcel");
+    expect(await destino("/auth/google?code=c&acepta=2020-01")).toBe("https://pedsar.test/auth/terminos");
+    expect(entorno.servidor.de("perfiles", "update")).toHaveLength(0);
+    expect(entorno.admin.de("registro_actividad")).toHaveLength(0);
+    // Si no se pudo guardar la aceptación, también pasa por la pantalla de términos.
+    conGoogle({ rol: "estudiante", estado: true, privacidad_aceptada_en: null }, { error: { message: "caída" } });
+    expect(await destino("/auth/google?code=c&acepta=2026-10")).toBe("https://pedsar.test/auth/terminos");
+  });
+
+  it("una cuenta desactivada no entra: se cierra la sesión", async () => {
+    conGoogle({ rol: "estudiante", estado: false, privacidad_aceptada_en: "2026-11-01T00:00:00Z" });
+    expect(await destino("/auth/google?code=c")).toBe("https://pedsar.test/login?error=cuenta-inactiva");
+    expect(entorno.servidor.cliente.auth.signOut).toHaveBeenCalled();
+  });
+
+  it("si el usuario cancela en Google o el código no sirve, vuelve al login con un aviso", async () => {
+    expect(await destino("/auth/google?error=access_denied")).toBe("https://pedsar.test/login?error=google");
+    expect(entorno.servidor.cliente.auth.exchangeCodeForSession).not.toHaveBeenCalled();
+    entorno.servidor.cliente.auth.exchangeCodeForSession.mockResolvedValueOnce({ data: { user: null }, error: { message: "sin verificador" } } as never);
+    expect(await destino("/auth/google?code=c")).toBe("https://pedsar.test/login?error=google");
   });
 });
 

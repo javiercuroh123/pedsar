@@ -3,7 +3,15 @@ import { enviarContacto } from "@/features/contacto/acciones";
 import { actualizarCanalNotificacion, marcarLeida, marcarTodasLeidas } from "@/features/notificaciones/acciones";
 import { contarNoLeidas, listarNotificaciones } from "@/features/notificaciones/consultas";
 import { enviarRecordatoriosPendientes, notificarInscritosDelCurso, notificarUsuario } from "@/features/notificaciones/enviar";
-import { actualizarContrasena, cerrarSesion, iniciarSesion, registrarse, solicitarRecuperacion } from "@/features/usuarios/acciones";
+import {
+  aceptarTerminos,
+  actualizarContrasena,
+  cerrarSesion,
+  iniciarConGoogle,
+  iniciarSesion,
+  registrarse,
+  solicitarRecuperacion,
+} from "@/features/usuarios/acciones";
 import { actualizarPerfil } from "@/features/usuarios/acciones-perfil";
 import { conSesion, ejecutarTareas, entorno, formulario, Redireccion, responder, UUID } from "../../apoyo/entorno";
 
@@ -32,6 +40,46 @@ describe("inicio de sesión (HU-02)", () => {
     // Evita redirecciones abiertas a otros sitios.
     responder();
     await expect(iniciarSesion({}, formulario({ correo: "a@pedsar.test", contrasena: "x", next: "//sitio-malicioso.com" }))).rejects.toEqual(new Redireccion("/estudiante"));
+  });
+});
+
+describe("login con Google (HU-45)", () => {
+  it("envía a Google y pide volver a /auth/google con el destino interno", async () => {
+    await expect(iniciarConGoogle(formulario({ next: "/cursos/excel" }))).rejects.toEqual(new Redireccion("https://accounts.google.test/o/oauth2/auth?estado=1"));
+    expect(entorno.servidor.cliente.auth.signInWithOAuth).toHaveBeenCalledWith({
+      provider: "google",
+      options: { redirectTo: "https://pedsar.test/auth/google?next=%2Fcursos%2Fexcel", queryParams: { prompt: "select_account" } },
+    });
+  });
+
+  it("desde el registro con la casilla marcada, envía la versión vigente de la política", async () => {
+    await expect(iniciarConGoogle(formulario({ acepta: "on", next: "//sitio-malicioso.com" }))).rejects.toBeInstanceOf(Redireccion);
+    expect(entorno.servidor.cliente.auth.signInWithOAuth).toHaveBeenCalledWith(
+      expect.objectContaining({ options: expect.objectContaining({ redirectTo: "https://pedsar.test/auth/google?acepta=2026-10" }) }),
+    );
+  });
+
+  it("si Supabase no da la URL de Google, vuelve al login con un aviso", async () => {
+    entorno.servidor.cliente.auth.signInWithOAuth.mockResolvedValueOnce({ data: { provider: "google", url: null }, error: { message: "provider is not enabled" } } as never);
+    await expect(iniciarConGoogle(formulario({}))).rejects.toEqual(new Redireccion("/login?error=google"));
+  });
+
+  it("acepta los términos pendientes: exige la casilla y guarda versión y fecha", async () => {
+    await expect(aceptarTerminos({}, formulario({}))).rejects.toEqual(new Redireccion("/login"));
+
+    conSesion("estudiante");
+    await expect(aceptarTerminos({}, formulario({}))).resolves.toEqual({ errores: { aceptaPrivacidad: ["Debes aceptar la política de privacidad (Ley N° 29733)"] } });
+    expect(entorno.servidor.de("perfiles", "update")).toHaveLength(0);
+
+    await expect(aceptarTerminos({}, formulario({ aceptaPrivacidad: "on", next: "/cursos/excel" }))).rejects.toEqual(new Redireccion("/cursos/excel"));
+    const [cambio] = entorno.servidor.de("perfiles", "update");
+    expect(cambio.valores).toEqual({ privacidad_version: "2026-10", privacidad_aceptada_en: expect.any(String) });
+    expect(cambio.filtros).toContainEqual(["eq", "id", UUID.estudiante]);
+    expect(entorno.admin.de("registro_actividad")[0].valores).toMatchObject({ usuario_id: UUID.estudiante, accion: "INICIO_SESION" });
+
+    await expect(aceptarTerminos({}, formulario({ aceptaPrivacidad: "on", next: "//sitio-malicioso.com" }))).rejects.toEqual(new Redireccion("/estudiante"));
+    responder({ "perfiles.update": { error: { message: "caída" } } });
+    await expect(aceptarTerminos({}, formulario({ aceptaPrivacidad: "on" }))).resolves.toEqual({ mensaje: "No se pudo guardar tu aceptación. Inténtalo de nuevo." });
   });
 });
 

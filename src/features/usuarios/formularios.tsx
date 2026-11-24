@@ -8,11 +8,14 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 import {
+  aceptarTerminos,
   actualizarContrasena,
+  cerrarSesion,
   iniciarSesion,
   registrarse,
   solicitarRecuperacion,
 } from "./acciones";
+import { BotonGoogle } from "./boton-google";
 import type { EstadoFormulario } from "./esquemas";
 
 function Campo({
@@ -137,6 +140,7 @@ function ReglasContrasena({ valor }: { valor: string }) {
 export function RegistroForm() {
   const [estado, accion, pendiente] = useActionState(registrarse, {});
   const [clave, setClave] = useState("");
+  const [acepta, setAcepta] = useState(false);
   if (estado.ok) {
     return (
       <div className="rounded-2xl bg-green-50 p-6 text-center text-green-800 dark:bg-green-500/10 dark:text-green-300" role="status">
@@ -147,40 +151,75 @@ export function RegistroForm() {
     );
   }
   return (
-    <form action={accion} className="space-y-4">
-      <div className="grid gap-4 sm:grid-cols-2">
-        <Campo nombre="nombres" etiqueta="Nombres" autoComplete="given-name" estado={estado} required />
-        <Campo nombre="apellidos" etiqueta="Apellidos" autoComplete="family-name" estado={estado} required />
-      </div>
-      <Campo nombre="correo" etiqueta="Correo electrónico" type="email" autoComplete="email" placeholder="tu@correo.com" estado={estado} required />
-      <Campo
-        nombre="contrasena"
-        etiqueta="Contraseña"
-        type="password"
-        autoComplete="new-password"
-        estado={estado}
-        required
-        value={clave}
-        onChange={(e) => setClave(e.target.value)}
-      />
-      <ReglasContrasena valor={clave} />
-      <Campo nombre="confirmar" etiqueta="Confirmar contraseña" type="password" autoComplete="new-password" estado={estado} required />
-      <Label className="items-start gap-2 font-normal text-muted-foreground">
-        <input type="checkbox" name="aceptaPrivacidad" className="mt-0.5 size-4" />
-        <span>
-          Acepto la{" "}
-          <Link href="/privacidad" className="font-medium text-primary hover:underline">
-            política de privacidad
-          </Link>{" "}
-          y el tratamiento de mis datos personales (Ley N° 29733).
-        </span>
-      </Label>
-      {estado.errores?.aceptaPrivacidad && <p className="text-xs text-destructive">{estado.errores.aceptaPrivacidad[0]}</p>}
-      <Mensaje estado={estado} />
-      <Button type="submit" className={botonPrincipal} disabled={pendiente}>
-        {pendiente ? "Creando cuenta…" : "Crear cuenta"}
-      </Button>
-    </form>
+    <>
+      <form action={accion} className="space-y-4">
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Campo nombre="nombres" etiqueta="Nombres" autoComplete="given-name" estado={estado} required />
+          <Campo nombre="apellidos" etiqueta="Apellidos" autoComplete="family-name" estado={estado} required />
+        </div>
+        <Campo nombre="correo" etiqueta="Correo electrónico" type="email" autoComplete="email" placeholder="tu@correo.com" estado={estado} required />
+        <Campo
+          nombre="contrasena"
+          etiqueta="Contraseña"
+          type="password"
+          autoComplete="new-password"
+          estado={estado}
+          required
+          value={clave}
+          onChange={(e) => setClave(e.target.value)}
+        />
+        <ReglasContrasena valor={clave} />
+        <Campo nombre="confirmar" etiqueta="Confirmar contraseña" type="password" autoComplete="new-password" estado={estado} required />
+        <Label className="items-start gap-2 font-normal text-muted-foreground">
+          <input type="checkbox" name="aceptaPrivacidad" className="mt-0.5 size-4" checked={acepta} onChange={(e) => setAcepta(e.target.checked)} />
+          <span>
+            Acepto la{" "}
+            <Link href="/privacidad" className="font-medium text-primary hover:underline">
+              política de privacidad
+            </Link>{" "}
+            y el tratamiento de mis datos personales (Ley N° 29733).
+          </span>
+        </Label>
+        {estado.errores?.aceptaPrivacidad && <p className="text-xs text-destructive">{estado.errores.aceptaPrivacidad[0]}</p>}
+        <Mensaje estado={estado} />
+        <Button type="submit" className={botonPrincipal} disabled={pendiente}>
+          {pendiente ? "Creando cuenta…" : "Crear cuenta"}
+        </Button>
+      </form>
+      <BotonGoogle acepta={acepta} deshabilitado={!acepta} aviso="Marca la casilla de la política de privacidad para continuar con Google." />
+    </>
+  );
+}
+
+/** HU-45 · Aceptación pendiente de la política para quien entró con Google. */
+export function TerminosForm({ next }: { next?: string }) {
+  const [estado, accion, pendiente] = useActionState(aceptarTerminos, {});
+  return (
+    <div className="space-y-3">
+      <form action={accion} className="space-y-4">
+        {next && <input type="hidden" name="next" value={next} />}
+        <Label className="items-start gap-2 font-normal text-muted-foreground">
+          <input type="checkbox" name="aceptaPrivacidad" className="mt-0.5 size-4" />
+          <span>
+            Acepto la{" "}
+            <Link href="/privacidad" className="font-medium text-primary hover:underline">
+              política de privacidad
+            </Link>{" "}
+            y el tratamiento de mis datos personales (Ley N° 29733).
+          </span>
+        </Label>
+        {estado.errores?.aceptaPrivacidad && <p className="text-xs text-destructive">{estado.errores.aceptaPrivacidad[0]}</p>}
+        <Mensaje estado={estado} />
+        <Button type="submit" className={botonPrincipal} disabled={pendiente}>
+          {pendiente ? "Guardando…" : "Aceptar y continuar"}
+        </Button>
+      </form>
+      <form action={cerrarSesion}>
+        <Button type="submit" variant="ghost" className="h-10 w-full text-muted-foreground">
+          Cancelar y cerrar sesión
+        </Button>
+      </form>
+    </div>
   );
 }
 

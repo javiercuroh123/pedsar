@@ -41,6 +41,23 @@ describe("sesión y roles (lib/auth)", () => {
     await expect(requireUsuario()).rejects.toMatchObject({ destino: "/login?error=cuenta-inactiva" });
   });
 
+  it("una cuenta de Google sin la privacidad aceptada debe aceptarla antes de entrar (HU-45)", async () => {
+    const conProveedores = (providers: string[], aceptada: string | null) => {
+      responder({ perfiles: { data: { ...perfil("estudiante"), privacidad_aceptada_en: aceptada } } });
+      entorno.servidor.cliente.auth.getClaims.mockResolvedValue({ data: { claims: { sub: UUID.estudiante, app_metadata: { providers } } }, error: null });
+    };
+    conProveedores(["google"], null);
+    expect(await getUsuarioActual()).toMatchObject({ pendienteTerminos: true });
+    expect(entorno.servidor.de("perfiles")[0].columnas).toContain("privacidad_aceptada_en");
+    await expect(requireUsuario()).rejects.toMatchObject({ destino: "/auth/terminos" });
+
+    conProveedores(["email", "google"], "2026-11-01T00:00:00Z");
+    await expect(requireUsuario()).resolves.toMatchObject({ pendienteTerminos: false });
+    // Las cuentas antiguas o invitadas (sin Google) no quedan bloqueadas.
+    conProveedores(["email"], null);
+    await expect(requireUsuario()).resolves.toMatchObject({ pendienteTerminos: false });
+  });
+
   it("con otro rol, envía al usuario a su propio panel", async () => {
     conClaims(UUID.estudiante, perfil("estudiante"));
     await expect(requireRol("administrador")).rejects.toMatchObject({ destino: "/estudiante" });

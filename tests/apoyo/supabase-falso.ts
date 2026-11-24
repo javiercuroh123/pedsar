@@ -100,6 +100,7 @@ export function supabaseFalso(manejadores: Record<string, Manejador> = {}) {
       getClaims: ok<{ claims: Record<string, unknown> } | null>(null),
       signInWithPassword: ok({ user: { id: "usuario" } }),
       signUp: ok({ user: null }),
+      signInWithOAuth: ok<{ provider: string; url: string | null }>({ provider: "google", url: "https://accounts.google.test/o/oauth2/auth?estado=1" }),
       signOut: ok(null),
       resetPasswordForEmail: ok({}),
       updateUser: ok({ user: null }),
