@@ -291,18 +291,25 @@ export function FormularioInscripcion({ curso, perfil, cupoLibre, cupoMaximo, pa
                 </div>
               </div>
               {comprobante === "BOLETA" ? (
-                <p className="mt-3 text-sm text-muted-foreground">Recibirás tu comprobante de pago en PDF; la boleta electrónica irá a tu nombre.</p>
+                <p className="mt-3 text-sm text-muted-foreground">
+                  Al confirmarse tu pago recibirás un comprobante de pago en PDF. PEDSAR te enviará aparte la boleta electrónica a tu nombre.
+                </p>
               ) : (
-                <div className="mt-4 grid gap-4 sm:grid-cols-2">
-                  <div className="space-y-1.5">
-                    <Label htmlFor="ruc">RUC</Label>
-                    <Input id="ruc" name="ruc" required inputMode="numeric" pattern="(10|20)[0-9]{9}" maxLength={11} placeholder="20XXXXXXXXX" className="h-10 font-mono" />
+                <>
+                  <div className="mt-4 grid gap-4 sm:grid-cols-2">
+                    <div className="space-y-1.5">
+                      <Label htmlFor="ruc">RUC</Label>
+                      <Input id="ruc" name="ruc" required inputMode="numeric" pattern="(10|20)[0-9]{9}" maxLength={11} placeholder="20XXXXXXXXX" className="h-10 font-mono" />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label htmlFor="razonSocial">Razón social</Label>
+                      <Input id="razonSocial" name="razonSocial" required placeholder="Empresa S.A.C." className="h-10" />
+                    </div>
                   </div>
-                  <div className="space-y-1.5">
-                    <Label htmlFor="razonSocial">Razón social</Label>
-                    <Input id="razonSocial" name="razonSocial" required placeholder="Empresa S.A.C." className="h-10" />
-                  </div>
-                </div>
+                  <p className="mt-3 text-sm text-muted-foreground">
+                    Al confirmarse tu pago recibirás un comprobante de pago en PDF. PEDSAR emitirá la factura electrónica con estos datos y te la enviará aparte.
+                  </p>
+                </>
               )}
             </fieldset>
 

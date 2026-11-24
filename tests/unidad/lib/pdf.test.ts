@@ -107,14 +107,14 @@ describe("comprobante de pago interno (HU-12 · HU-30)", () => {
     referencia: "chr_test_1",
   };
 
-  it("muestra la empresa, el cliente con su RUC, los importes, el pago y la nota de que no es un comprobante SUNAT", async () => {
+  it("muestra la empresa, el cliente con su RUC, los importes, el pago y la nota de que el comprobante SUNAT va aparte", async () => {
     const { texto, tamanos } = await leerPdf(await generarPdfComprobante(datos));
     const plano = texto.replace(/\s+/g, " ");
     expect(tamanos[0].width).toBeLessThan(tamanos[0].height);
     for (const esperado of ["CP01-000123", "20605615521", "ACME SAC", "20123456789", "Ana Quispe", "Excel empresarial con tablas dinámicas", "S/ 180.00", "S/ 36.00", "S/ 144.00", "Culqi · Tarjeta", "chr_test_1"]) {
       expect(plano).toContain(esperado);
     }
-    expect(plano).toContain("no reemplaza la boleta o factura electrónica SUNAT");
+    expect(plano).toContain("La boleta o factura electrónica SUNAT se emite por separado");
   });
 
   it("sin factura muestra el nombre y documento del cliente, y omite el descuento y la referencia que no hay", async () => {

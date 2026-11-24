@@ -22,7 +22,7 @@ export interface DatosPdfComprobante {
 
 const [ANCHO, ALTO] = [595.28, 841.89];
 const MARGEN = 48;
-const NOTA = "Documento interno de PEDSAR; no reemplaza la boleta o factura electrónica SUNAT.";
+const NOTA = "Documento interno de PEDSAR. La boleta o factura electrónica SUNAT se emite por separado.";
 
 /**
  * HU-12 · HU-30 · Comprobante interno de pago en PDF (A4 vertical). Lo genera la ruta
