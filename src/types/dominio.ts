@@ -5,6 +5,8 @@ export type Rol = (typeof ROLES)[number];
 
 export type EstadoCurso = "BORRADOR" | "PUBLICADO" | "DESPUBLICADO";
 export type Modalidad = "PRESENCIAL" | "VIRTUAL" | "SEMIPRESENCIAL";
+/** HU-16 · Tipo de una sesión: en vivo o grabada (todos los cursos son virtuales). */
+export type TipoSesion = "VIRTUAL" | "ASINCRONA";
 export type Nivel = "BASICO" | "INTERMEDIO" | "AVANZADO";
 export type TipoContenido = "PDF" | "VIDEO" | "ENLACE";
 export type EstadoInscripcion = "PENDIENTE" | "CONFIRMADA" | "CANCELADA";

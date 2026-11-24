@@ -19,6 +19,7 @@ import { CursoCard } from "@/features/catalogo/curso-card";
 import { SiglaCurso } from "@/features/catalogo/portada-curso";
 import { requireRol } from "@/lib/auth";
 import {
+  ETIQUETA_TIPO_SESION,
   etiquetaPago,
   formatearDiaSemana,
   formatearFechaCorta,
@@ -154,7 +155,7 @@ export default async function EstudiantePage() {
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-sm font-medium">{s.curso.titulo}</p>
                       <p className="text-xs text-muted-foreground">
-                        {formatearHora(s.hora_inicio)} – {horaFin(s.hora_inicio, s.duracion_minutos)} · {s.modalidad === "PRESENCIAL" ? "Presencial" : "Virtual"}
+                        {s.modalidad === "ASINCRONA" ? `Disponible desde las ${formatearHora(s.hora_inicio)}` : `${formatearHora(s.hora_inicio)} – ${horaFin(s.hora_inicio, s.duracion_minutos)}`} · {ETIQUETA_TIPO_SESION[s.modalidad]}
                       </p>
                       {idx === 0 && s.enlace_virtual && (
                         <a
@@ -163,7 +164,15 @@ export default async function EstudiantePage() {
                           rel="noreferrer"
                           className={buttonVariants({ variant: "secondary", size: "sm", className: "mt-2 bg-brand-50 text-brand-800 hover:bg-brand-100 dark:bg-brand-500/15 dark:text-brand-200" })}
                         >
-                          <VideoIcon /> Unirse
+                          {s.modalidad === "ASINCRONA" ? (
+                            <>
+                              <PlayIcon /> Ver grabación
+                            </>
+                          ) : (
+                            <>
+                              <VideoIcon /> Unirse
+                            </>
+                          )}
                         </a>
                       )}
                     </div>

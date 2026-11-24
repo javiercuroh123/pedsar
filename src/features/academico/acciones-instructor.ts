@@ -133,7 +133,7 @@ const sesionSchema = z.object({
   fecha: z.iso.date("Fecha no válida"),
   horaInicio: z.string().regex(/^\d{2}:\d{2}$/, "Hora no válida"),
   duracion: z.coerce.number().int().min(15).max(600),
-  modalidad: z.enum(["PRESENCIAL", "VIRTUAL", "SEMIPRESENCIAL"]),
+  modalidad: z.enum(["VIRTUAL", "ASINCRONA"]),
   enlace: z.union([z.url("El enlace debe ser una URL válida"), z.literal("")]).optional(),
 });
 
@@ -153,7 +153,9 @@ export async function crearSesion(_: EstadoFormulario, formData: FormData): Prom
   if (error) return { ok: false, mensaje: "No se pudo programar la sesión" };
   await notificarInscritosDelCurso(
     d.data.cursoId,
-    `Nueva sesión programada para el ${d.data.fecha} a las ${d.data.horaInicio}.`,
+    d.data.modalidad === "ASINCRONA"
+      ? `Nueva clase asíncrona disponible desde el ${d.data.fecha} a las ${d.data.horaInicio}.`
+      : `Nueva sesión programada para el ${d.data.fecha} a las ${d.data.horaInicio}.`,
     "/estudiante",
   );
   await registrarActividad(usuario.id, "PROGRAMAR_SESION", { curso: d.data.cursoId, fecha: d.data.fecha });
@@ -186,8 +188,9 @@ export async function guardarAsistencia(_: EstadoFormulario, formData: FormData)
   const supabase = await createClient();
 
   // Solo inscripciones confirmadas del mismo curso de la sesión.
-  const { data: sesion } = await supabase.from("sesiones").select("curso_id").eq("id", sesionId).maybeSingle();
+  const { data: sesion } = await supabase.from("sesiones").select("curso_id, modalidad").eq("id", sesionId).maybeSingle();
   if (!sesion) return { ok: false, mensaje: "Sesión no encontrada" };
+  if (sesion.modalidad === "ASINCRONA") return { ok: false, mensaje: "Las sesiones asíncronas no registran asistencia" };
   const { data: validas } = await supabase.from("inscripciones").select("id").eq("curso_id", sesion.curso_id).eq("estado", "CONFIRMADA");
   const ids = new Set((validas ?? []).map((i: { id: string }) => i.id));
 

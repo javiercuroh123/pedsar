@@ -8,13 +8,13 @@ import { eliminarSesion } from "@/features/academico/acciones-instructor";
 import { listarCursosDelInstructor, listarSesionesDeCursos } from "@/features/academico/consultas-instructor";
 import { DialogoSesion } from "@/features/academico/formularios-instructor";
 import { requireRol } from "@/lib/auth";
-import { ETIQUETA_MODALIDAD, formatearDiaSemana, formatearFecha, formatearHora, horaFin, hoyISO } from "@/lib/formato";
+import { ETIQUETA_TIPO_SESION, formatearDiaSemana, formatearFecha, formatearHora, horaFin, hoyISO } from "@/lib/formato";
 import { cn } from "@/lib/utils";
-import type { Modalidad } from "@/types/dominio";
+import type { TipoSesion } from "@/types/dominio";
 
 export const metadata: Metadata = { title: "Sesiones" };
 
-const COLOR: Record<Modalidad, ColorPildora> = { VIRTUAL: "indigo", PRESENCIAL: "verde", SEMIPRESENCIAL: "coral" };
+const COLOR: Record<TipoSesion, ColorPildora> = { VIRTUAL: "indigo", ASINCRONA: "coral" };
 
 // HU-16 · Horario de sesiones · HU-38 · HU-62 (Zoom / Calendar)
 export default async function InstructorSesionesPage({ searchParams }: PageProps<"/instructor/sesiones">) {
@@ -29,7 +29,7 @@ export default async function InstructorSesionesPage({ searchParams }: PageProps
 
   return (
     <div className="space-y-6">
-      <EncabezadoPagina eyebrow="Docencia" titulo="Sesiones y horarios" descripcion="Programa clases presenciales, virtuales o semipresenciales.">
+      <EncabezadoPagina eyebrow="Docencia" titulo="Sesiones y horarios" descripcion="Programa clases virtuales en vivo o asíncronas (grabadas).">
         {cursos.length > 0 && <DialogoSesion cursos={cursos} />}
       </EncabezadoPagina>
 
@@ -56,7 +56,7 @@ export default async function InstructorSesionesPage({ searchParams }: PageProps
                 <th className={tabla.th}>Fecha</th>
                 <th className={tabla.th}>Horario</th>
                 <th className={tabla.th}>Curso</th>
-                <th className={tabla.th}>Modalidad</th>
+                <th className={tabla.th}>Tipo</th>
                 <th className={tabla.th}>Enlace</th>
                 <th className={tabla.th} />
               </tr>
@@ -73,7 +73,7 @@ export default async function InstructorSesionesPage({ searchParams }: PageProps
                   </td>
                   <td className={tabla.td}>{titulo(s.curso_id)}</td>
                   <td className={tabla.td}>
-                    <Pildora color={COLOR[s.modalidad]}>{ETIQUETA_MODALIDAD[s.modalidad]}</Pildora>
+                    <Pildora color={COLOR[s.modalidad]}>{ETIQUETA_TIPO_SESION[s.modalidad]}</Pildora>
                   </td>
                   <td className={tabla.td}>
                     {s.enlace_virtual ? (
@@ -85,9 +85,11 @@ export default async function InstructorSesionesPage({ searchParams }: PageProps
                     )}
                   </td>
                   <td className={cn(tabla.td, "text-right whitespace-nowrap")}>
-                    <Link href={`/instructor/asistencia?curso=${s.curso_id}&sesion=${s.id}`} className={buttonVariants({ variant: "ghost", size: "sm" })}>
-                      Asistencia
-                    </Link>
+                    {s.modalidad !== "ASINCRONA" && (
+                      <Link href={`/instructor/asistencia?curso=${s.curso_id}&sesion=${s.id}`} className={buttonVariants({ variant: "ghost", size: "sm" })}>
+                        Asistencia
+                      </Link>
+                    )}
                     <BotonAccion
                       accion={eliminarSesion}
                       campos={{ id: s.id }}

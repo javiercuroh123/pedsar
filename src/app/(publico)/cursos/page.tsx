@@ -74,7 +74,7 @@ export default async function CatalogoPage({ searchParams }: PageProps<"/cursos"
           </nav>
           <h1 className="animar-entrada mt-3 text-4xl font-bold tracking-tight [--i:1] sm:text-[2.5rem]">Catálogo de cursos</h1>
           <p className="animar-entrada mt-2 max-w-xl text-lg text-muted-foreground [--i:2]">
-            Busca por nombre o instructor y filtra por categoría, nivel, modalidad y precio.
+            Busca por nombre o instructor y filtra por categoría, nivel y precio. Todos los cursos son virtuales.
           </p>
         </div>
       </section>

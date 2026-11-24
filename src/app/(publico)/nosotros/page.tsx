@@ -15,7 +15,7 @@ const SERVICIOS = [
 const VALORES = [
   { icono: TargetIcon, t: "Práctica", d: "Cada sesión incluye ejercicios aplicables al trabajo." },
   { icono: HandshakeIcon, t: "Cercanía", d: "Instructores que acompañan y responden a tiempo." },
-  { icono: UsersIcon, t: "Accesibilidad", d: "Clases presenciales, virtuales y semipresenciales." },
+  { icono: UsersIcon, t: "Accesibilidad", d: "Clases 100 % virtuales, en vivo y grabadas, desde cualquier lugar." },
 ];
 
 // HU-48 · Nosotros

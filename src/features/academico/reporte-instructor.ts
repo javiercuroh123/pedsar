@@ -47,7 +47,7 @@ export async function reporteDelCurso(curso: CursoInstructor): Promise<ReporteCu
   const ids = estudiantes.map((e) => e.inscripcionId);
   const [{ data: evaluaciones }, { data: sesiones }, { data: intentos }, { data: asistencias }, resultados] = await Promise.all([
     supabase.from("evaluaciones").select("id, titulo, puntaje_total").eq("curso_id", curso.id).order("id"),
-    supabase.from("sesiones").select("id, fecha, hora_inicio").eq("curso_id", curso.id).lte("fecha", hoyISO()).order("fecha").order("hora_inicio"),
+    supabase.from("sesiones").select("id, fecha, hora_inicio").eq("curso_id", curso.id).neq("modalidad", "ASINCRONA").lte("fecha", hoyISO()).order("fecha").order("hora_inicio"),
     ids.length ? supabase.from("intentos_evaluacion").select("inscripcion_id, evaluacion_id, puntaje_obtenido").in("inscripcion_id", ids) : Promise.resolve({ data: [] }),
     ids.length ? supabase.from("asistencias").select("inscripcion_id, sesion_id, estado").in("inscripcion_id", ids) : Promise.resolve({ data: [] }),
     obtenerResultados(ids),

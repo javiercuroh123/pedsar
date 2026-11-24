@@ -59,7 +59,8 @@ const cursoSchema = z.object({
   categoriaId: z.preprocess(vacioANull, z.coerce.number().int().nullable()),
   instructorId: z.preprocess(vacioANull, z.uuid().nullable()),
   nivel: z.enum(["BASICO", "INTERMEDIO", "AVANZADO"]),
-  modalidad: z.enum(["PRESENCIAL", "VIRTUAL", "SEMIPRESENCIAL"]),
+  // La empresa dicta todos sus cursos en modalidad virtual.
+  modalidad: z.literal("VIRTUAL", { error: "Los cursos se dictan solo en modalidad virtual" }).default("VIRTUAL"),
   precio: z.coerce.number().min(0, "El precio no puede ser negativo"),
   cupo: z.coerce.number().int().min(1, "El cupo debe ser al menos 1"),
   horas: z.coerce.number().int().min(0),

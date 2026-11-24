@@ -1228,7 +1228,7 @@ export type Database = {
           fecha: string
           hora_inicio: string
           id: number
-          modalidad: Database["public"]["Enums"]["modalidad_curso"]
+          modalidad: Database["public"]["Enums"]["tipo_sesion"]
         }
         Insert: {
           curso_id: string
@@ -1237,7 +1237,7 @@ export type Database = {
           fecha: string
           hora_inicio: string
           id?: never
-          modalidad?: Database["public"]["Enums"]["modalidad_curso"]
+          modalidad?: Database["public"]["Enums"]["tipo_sesion"]
         }
         Update: {
           curso_id?: string
@@ -1246,7 +1246,7 @@ export type Database = {
           fecha?: string
           hora_inicio?: string
           id?: never
-          modalidad?: Database["public"]["Enums"]["modalidad_curso"]
+          modalidad?: Database["public"]["Enums"]["tipo_sesion"]
         }
         Relationships: [
           {
@@ -1311,7 +1311,7 @@ export type Database = {
       }
       horarios_publicos: {
         Args: { p_cursos: string[] }
-        Returns: { id: number; curso_id: string; fecha: string; hora_inicio: string; duracion_minutos: number; modalidad: Database["public"]["Enums"]["modalidad_curso"] }[]
+        Returns: { id: number; curso_id: string; fecha: string; hora_inicio: string; duracion_minutos: number; modalidad: Database["public"]["Enums"]["tipo_sesion"] }[]
       }
       iniciar_evaluacion: {
         Args: { p_estudiante: string; p_evaluacion: number }
@@ -1367,6 +1367,7 @@ export type Database = {
       tipo_comprobante: "BOLETA" | "FACTURA"
       tipo_contenido: "PDF" | "VIDEO" | "ENLACE"
       tipo_notificacion: "CORREO" | "IN_APP"
+      tipo_sesion: "VIRTUAL" | "ASINCRONA"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -1515,6 +1516,7 @@ export const Constants = {
       tipo_comprobante: ["BOLETA", "FACTURA"],
       tipo_contenido: ["PDF", "VIDEO", "ENLACE"],
       tipo_notificacion: ["CORREO", "IN_APP"],
+      tipo_sesion: ["VIRTUAL", "ASINCRONA"],
     },
   },
 } as const

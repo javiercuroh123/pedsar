@@ -2,7 +2,7 @@ import "server-only";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { nombreCompleto } from "@/lib/formato";
-import type { EstadoCurso, Modalidad, Perfil } from "@/types/dominio";
+import type { EstadoCurso, Modalidad, Perfil, TipoSesion } from "@/types/dominio";
 import { uno } from "./consultas";
 
 export interface CursoInstructor {
@@ -76,7 +76,7 @@ export interface SesionCurso {
   fecha: string;
   hora_inicio: string;
   duracion_minutos: number;
-  modalidad: Modalidad;
+  modalidad: TipoSesion;
   enlace_virtual: string | null;
 }
 

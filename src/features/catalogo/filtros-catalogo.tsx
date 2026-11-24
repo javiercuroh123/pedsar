@@ -6,7 +6,7 @@ import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { ETIQUETA_MODALIDAD, ETIQUETA_NIVEL } from "@/lib/formato";
+import { ETIQUETA_NIVEL } from "@/lib/formato";
 
 export const PRECIO_TOPE = 1000;
 export const DURACION_TOPE = 120;
@@ -126,12 +126,6 @@ export function FiltrosCatalogo({
       titulo: "Nivel",
       contenido: Object.entries(ETIQUETA_NIVEL).map(([v, t]) => (
         <Casilla key={v} nombre="nivel" valor={v} etiqueta={t} marcada={valores.niveles.includes(v)} />
-      )),
-    },
-    {
-      titulo: "Modalidad",
-      contenido: Object.entries(ETIQUETA_MODALIDAD).map(([v, t]) => (
-        <Casilla key={v} nombre="modalidad" valor={v} etiqueta={t} marcada={valores.modalidades.includes(v)} />
       )),
     },
   ];

@@ -18,7 +18,8 @@ export default async function InstructorAsistenciaPage({ searchParams }: PagePro
   const cursos = await listarCursosDelInstructor(usuario);
   const curso = elegirCurso(cursos, pCurso);
 
-  const sesiones = curso ? await listarSesionesDeCursos([curso.id]) : [];
+  // HU-16 · las sesiones asíncronas no registran asistencia.
+  const sesiones = curso ? (await listarSesionesDeCursos([curso.id])).filter((s) => s.modalidad !== "ASINCRONA") : [];
   const hoy = hoyISO();
   // Por defecto: la sesión de hoy o la última realizada.
   const porDefecto = [...sesiones].reverse().find((s) => s.fecha <= hoy) ?? sesiones[0];
@@ -51,7 +52,7 @@ export default async function InstructorAsistenciaPage({ searchParams }: PagePro
       {!curso ? (
         <EstadoVacio icono={UserCheckIcon} titulo="No tienes cursos asignados" />
       ) : !sesion ? (
-        <EstadoVacio icono={CalendarXIcon} titulo="Este curso no tiene sesiones" descripcion="Programa una sesión para poder registrar asistencia." />
+        <EstadoVacio icono={CalendarXIcon} titulo="Este curso no tiene sesiones en vivo" descripcion="Programa una sesión virtual en vivo para registrar asistencia; las asíncronas no la registran." />
       ) : estudiantes.length === 0 ? (
         <EstadoVacio icono={UsersIcon} titulo="Aún no hay estudiantes confirmados" descripcion="La lista aparecerá cuando se confirmen las inscripciones." />
       ) : (

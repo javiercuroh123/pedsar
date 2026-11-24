@@ -47,6 +47,8 @@ describe("cursos (HU-04 · HU-56 · HU-57)", () => {
     conSesion("administrador");
     await expect(guardarCurso({}, curso({ cupo: "0" }))).resolves.toEqual({ ok: false, mensaje: "El cupo debe ser al menos 1" });
     await expect(guardarCurso({}, curso({ imagen: "portada.png" }))).resolves.toEqual({ ok: false, mensaje: "La imagen debe ser una URL" });
+    // La empresa dicta solo cursos virtuales.
+    await expect(guardarCurso({}, curso({ modalidad: "PRESENCIAL" }))).resolves.toEqual({ ok: false, mensaje: "Los cursos se dictan solo en modalidad virtual" });
     await expect(guardarCurso({}, curso({ id: UUID.curso, prerrequisitoCursoId: UUID.curso }))).resolves.toEqual({
       ok: false,
       mensaje: "Un curso no puede ser prerrequisito de sí mismo",

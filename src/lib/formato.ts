@@ -1,5 +1,5 @@
 import { reservaVencida } from "@/config/matricula";
-import type { EstadoCurso, EstadoInscripcion, EstadoPago, MedioPago, MetodoPago, Modalidad, Nivel, Rol } from "@/types/dominio";
+import type { EstadoCurso, EstadoInscripcion, EstadoPago, MedioPago, MetodoPago, Modalidad, Nivel, Rol, TipoSesion } from "@/types/dominio";
 
 // Todas las fechas se muestran en hora de Perú, aunque el servidor corra en UTC.
 const ZONA = "America/Lima";
@@ -51,6 +51,12 @@ export const ETIQUETA_MODALIDAD: Record<Modalidad, string> = {
   PRESENCIAL: "Presencial",
   VIRTUAL: "Virtual",
   SEMIPRESENCIAL: "Semipresencial",
+};
+
+/** HU-16 · Tipo de sesión del horario. */
+export const ETIQUETA_TIPO_SESION: Record<TipoSesion, string> = {
+  VIRTUAL: "Virtual en vivo",
+  ASINCRONA: "Asíncrona",
 };
 
 export const ETIQUETA_NIVEL: Record<Nivel, string> = {

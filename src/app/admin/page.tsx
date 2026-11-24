@@ -12,13 +12,13 @@ import { cursosMejorEvaluados } from "@/features/comunidad/consultas-resenas";
 import { Estrellas, formatearPromedio } from "@/features/comunidad/estrellas";
 import { requireRol } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
-import { ETIQUETA_MODALIDAD, etiquetaPago, formatearSoles, hoyISO, nombreCompleto } from "@/lib/formato";
+import { ETIQUETA_NIVEL, etiquetaPago, formatearSoles, hoyISO, nombreCompleto } from "@/lib/formato";
 import { cn } from "@/lib/utils";
-import type { MedioPago, MetodoPago, Modalidad } from "@/types/dominio";
+import type { MedioPago, MetodoPago, Nivel } from "@/types/dominio";
 
 export const metadata: Metadata = { title: "Panel principal" };
 
-const COLOR_MODALIDAD: Record<Modalidad, string> = { VIRTUAL: "var(--chart-1)", PRESENCIAL: "var(--chart-5)", SEMIPRESENCIAL: "var(--chart-3)" };
+const COLOR_NIVEL: Record<Nivel, string> = { BASICO: "var(--chart-1)", INTERMEDIO: "var(--chart-3)", AVANZADO: "var(--chart-5)" };
 const MES = new Intl.DateTimeFormat("es-PE", { month: "short", timeZone: "America/Lima" });
 
 // HU-20 · Panel de administración con indicadores
@@ -38,7 +38,7 @@ export default async function AdminPage() {
     supabase.from("inscripciones").select("id, curso_id, estado, fecha_inscripcion").neq("estado", "CANCELADA").gte("fecha_inscripcion", desde),
     supabase.from("pagos").select("monto, fecha_pago").eq("estado", "APROBADO"),
     supabase.from("certificados").select("id", { head: true, count: "exact" }),
-    supabase.from("cursos").select("id, titulo, modalidad, cupo_maximo, estado"),
+    supabase.from("cursos").select("id, titulo, nivel, cupo_maximo, estado"),
     supabase
       .from("inscripciones")
       .select("id, codigo, estudiante:perfiles(nombres, apellidos, correo), curso:cursos(titulo), pagos(monto, metodo, medio)")
@@ -50,7 +50,7 @@ export default async function AdminPage() {
 
   const filasIns = (inscripciones.data ?? []) as { id: string; curso_id: string; estado: string; fecha_inscripcion: string }[];
   const filasPagos = (pagos.data ?? []) as { monto: number; fecha_pago: string | null }[];
-  const listaCursos = (cursos.data ?? []) as { id: string; titulo: string; modalidad: Modalidad; cupo_maximo: number; estado: string }[];
+  const listaCursos = (cursos.data ?? []) as { id: string; titulo: string; nivel: Nivel; cupo_maximo: number; estado: string }[];
 
   const ingresos = filasPagos.reduce((a, p) => a + Number(p.monto), 0);
   const ingresosMes = filasPagos.filter((p) => p.fecha_pago && mesDe(p.fecha_pago) === mesActual).reduce((a, p) => a + Number(p.monto), 0);
@@ -65,7 +65,8 @@ export default async function AdminPage() {
   });
 
   const publicados = listaCursos.filter((c) => c.estado === "PUBLICADO");
-  const porModalidad = (Object.keys(ETIQUETA_MODALIDAD) as Modalidad[]).map((m) => ({ m, n: publicados.filter((c) => c.modalidad === m).length }));
+  // Todos los cursos son virtuales: la oferta se reparte por nivel.
+  const porNivel = (Object.keys(ETIQUETA_NIVEL) as Nivel[]).map((m) => ({ m, n: publicados.filter((c) => c.nivel === m).length }));
   const ocupacion = publicados
     .map((c) => ({ ...c, ins: filasIns.filter((i) => i.curso_id === c.id && i.estado !== "CANCELADA").length }))
     .map((c) => ({ ...c, p: Math.round((c.ins / c.cupo_maximo) * 100) }))
@@ -96,12 +97,12 @@ export default async function AdminPage() {
           <GraficoBarras datos={meses} etiqueta="Matrículas por mes" />
         </section>
         <section className="animar-entrada rounded-2xl border bg-card p-6 shadow-xs [--i:3]">
-          <h2 className="text-lg font-semibold tracking-tight">Oferta por modalidad</h2>
+          <h2 className="text-lg font-semibold tracking-tight">Oferta por nivel</h2>
           <p className="mb-6 text-sm text-muted-foreground">{publicados.length} cursos publicados</p>
           <GraficoDona
-            etiqueta="Oferta por modalidad"
+            etiqueta="Oferta por nivel"
             total={publicados.length}
-            datos={porModalidad.map(({ m, n }) => ({ clave: m, etiqueta: ETIQUETA_MODALIDAD[m], valor: n, color: COLOR_MODALIDAD[m] }))}
+            datos={porNivel.map(({ m, n }) => ({ clave: m, etiqueta: ETIQUETA_NIVEL[m], valor: n, color: COLOR_NIVEL[m] }))}
           />
         </section>
       </div>

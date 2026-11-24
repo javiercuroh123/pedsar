@@ -3,9 +3,9 @@ import { uno } from "@/features/academico/consultas";
 import { programarCorreo } from "@/lib/email";
 import { correoAvisoCurso, correoRecordatorioEvaluacion, correoRecordatorioSesion } from "@/lib/email/plantillas";
 import { publicEnv } from "@/lib/env";
-import { ETIQUETA_MODALIDAD, formatearFecha, formatearFechaHora, formatearHora } from "@/lib/formato";
+import { ETIQUETA_TIPO_SESION, formatearFecha, formatearFechaHora, formatearHora } from "@/lib/formato";
 import { createAdminClient } from "@/lib/supabase/admin";
-import type { Modalidad } from "@/types/dominio";
+import type { TipoSesion } from "@/types/dominio";
 
 /**
  * HU-51 · Notificaciones in-app. Se escriben con el cliente admin porque la
@@ -74,7 +74,8 @@ export async function enviarRecordatoriosPendientes(ahora = new Date()): Promise
   const { data: sesiones } = await db
     .from("sesiones")
     .select("id, curso_id, fecha, hora_inicio, modalidad, curso:cursos(titulo, estado)")
-    .eq("fecha", fechaLima);
+    .eq("fecha", fechaLima)
+    .neq("modalidad", "ASINCRONA"); // HU-16 · una clase grabada no «inicia»
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   for (const s of (sesiones ?? []) as any[]) {
@@ -119,7 +120,7 @@ export async function enviarRecordatoriosPendientes(ahora = new Date()): Promise
             curso: curso.titulo,
             fecha: formatearFecha(s.fecha),
             hora: formatearHora(s.hora_inicio),
-            modalidad: ETIQUETA_MODALIDAD[(s.modalidad as Modalidad) ?? "VIRTUAL"],
+            modalidad: ETIQUETA_TIPO_SESION[(s.modalidad as TipoSesion) ?? "VIRTUAL"],
             url: `${publicEnv.NEXT_PUBLIC_SITE_URL}/estudiante`,
           }),
         });

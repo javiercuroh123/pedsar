@@ -240,7 +240,7 @@ export function DialogoSesion({ cursos, cursoId }: { cursos: { id: string; titul
         <CampoForm etiqueta="Fecha" htmlFor="s-fecha">
           <Input id="s-fecha" name="fecha" type="date" required className="h-10" />
         </CampoForm>
-        <CampoForm etiqueta="Inicio" htmlFor="s-hora">
+        <CampoForm etiqueta={modalidad === "ASINCRONA" ? "Disponible desde" : "Inicio"} htmlFor="s-hora">
           <Input id="s-hora" name="horaInicio" type="time" required defaultValue="19:00" className="h-10" />
         </CampoForm>
         <CampoForm etiqueta="Duración" htmlFor="s-dur">
@@ -253,16 +253,20 @@ export function DialogoSesion({ cursos, cursoId }: { cursos: { id: string; titul
           </select>
         </CampoForm>
       </div>
-      <CampoForm etiqueta="Modalidad" htmlFor="s-mod">
+      <CampoForm etiqueta="Tipo de sesión" htmlFor="s-mod">
         <select id="s-mod" name="modalidad" value={modalidad} onChange={(e) => setModalidad(e.target.value)} className={claseControl}>
-          <option value="VIRTUAL">Virtual</option>
-          <option value="PRESENCIAL">Presencial</option>
-          <option value="SEMIPRESENCIAL">Semipresencial</option>
+          <option value="VIRTUAL">Virtual en vivo</option>
+          <option value="ASINCRONA">Asíncrona (grabada)</option>
         </select>
       </CampoForm>
-      {modalidad !== "PRESENCIAL" && (
+      {modalidad === "VIRTUAL" && (
         <CampoForm etiqueta="Enlace de videoconferencia" htmlFor="s-enlace" ayuda="Zoom, Google Meet o Teams.">
           <Input id="s-enlace" name="enlace" type="url" placeholder="https://zoom.us/j/…" className="h-10" />
+        </CampoForm>
+      )}
+      {modalidad === "ASINCRONA" && (
+        <CampoForm etiqueta="Enlace de la grabación o del material" htmlFor="s-enlace" ayuda="YouTube, Google Drive u otra plataforma. No registra asistencia.">
+          <Input id="s-enlace" name="enlace" type="url" placeholder="https://…" className="h-10" />
         </CampoForm>
       )}
     </DialogoFormulario>

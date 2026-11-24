@@ -310,6 +310,8 @@ describe("notificaciones in-app (HU-51)", () => {
     );
 
     await expect(enviarRecordatoriosPendientes(ahora)).resolves.toEqual({ sesiones: 1, evaluaciones: 1 });
+    // HU-16 · las sesiones asíncronas no llevan recordatorio de inicio.
+    expect(entorno.admin.de("sesiones", "select")[0].filtros).toContainEqual(["neq", "modalidad", "ASINCRONA"]);
     expect(entorno.admin.de("recordatorios_enviados", "insert")).toHaveLength(2);
     // Sesión (AMBOS) genera notificación in-app y correo; Evaluación (CORREO) solo correo.
     expect(entorno.admin.de("notificaciones", "insert")).toHaveLength(1);

@@ -20,8 +20,8 @@ insert into public.sesiones (curso_id, fecha, hora_inicio, duracion_minutos, mod
 select c.id,
        current_date + 7 + (s.n * 7) + (row_number() over (partition by s.n order by c.slug))::int % 5,
        '19:00', 120,
-       case when c.modalidad = 'PRESENCIAL' then 'PRESENCIAL'::public.modalidad_curso else 'VIRTUAL'::public.modalidad_curso end,
-       case when c.modalidad = 'PRESENCIAL' then null else 'https://zoom.us/j/0000000000' end
+       'VIRTUAL'::public.tipo_sesion,
+       'https://zoom.us/j/0000000000'
 from public.cursos c
 cross join generate_series(0, 7) as s(n)
 where not exists (select 1 from public.sesiones x where x.curso_id = c.id);

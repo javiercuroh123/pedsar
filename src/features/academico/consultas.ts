@@ -1,6 +1,6 @@
 import "server-only";
 import { createClient } from "@/lib/supabase/server";
-import type { EstadoInscripcion, EstadoPago, MedioPago, MetodoPago, Modalidad, TipoContenido } from "@/types/dominio";
+import type { EstadoInscripcion, EstadoPago, MedioPago, MetodoPago, Modalidad, TipoContenido, TipoSesion } from "@/types/dominio";
 
 /** PostgREST devuelve objeto o arreglo según detecte la relación; esto lo normaliza. */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -148,7 +148,7 @@ export interface SesionProxima {
   fecha: string;
   hora_inicio: string;
   duracion_minutos: number;
-  modalidad: Modalidad;
+  modalidad: TipoSesion;
   enlace_virtual: string | null;
   curso: { id: string; titulo: string; categoria: string | null };
 }

@@ -26,6 +26,7 @@ import { getUsuarioActual } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import {
   ETIQUETA_MODALIDAD,
+  ETIQUETA_TIPO_SESION,
   ETIQUETA_NIVEL,
   formatearDiaSemana,
   formatearFecha,
@@ -175,7 +176,7 @@ export default async function CursoPage({ params }: PageProps<"/cursos/[slug]">)
                     <tr>
                       <th className={tabla.th}>Fecha</th>
                       <th className={tabla.th}>Horario</th>
-                      <th className={tabla.th}>Modalidad</th>
+                      <th className={tabla.th}>Tipo</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -187,7 +188,7 @@ export default async function CursoPage({ params }: PageProps<"/cursos/[slug]">)
                         <td className={cn(tabla.td, "font-mono text-xs")}>
                           {formatearHora(s.hora_inicio)} – {horaFin(s.hora_inicio, s.duracion_minutos)}
                         </td>
-                        <td className={tabla.td}>{ETIQUETA_MODALIDAD[s.modalidad]}</td>
+                        <td className={tabla.td}>{ETIQUETA_TIPO_SESION[s.modalidad]}</td>
                       </tr>
                     ))}
                   </tbody>

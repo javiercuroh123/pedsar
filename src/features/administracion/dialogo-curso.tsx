@@ -7,7 +7,7 @@ import { CampoForm, claseControl, DialogoFormulario } from "@/components/dialogo
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { arbolDeCategorias } from "@/features/catalogo/categorias";
-import { ETIQUETA_MODALIDAD, ETIQUETA_NIVEL } from "@/lib/formato";
+import { ETIQUETA_NIVEL } from "@/lib/formato";
 import { createClient } from "@/lib/supabase/client";
 import type { EstadoCurso, Modalidad, Nivel } from "@/types/dominio";
 import { guardarCurso } from "./acciones";
@@ -112,14 +112,9 @@ export function DialogoCurso({
             ))}
           </select>
         </CampoForm>
-        <CampoForm etiqueta="Modalidad" htmlFor="c-mod">
-          <select id="c-mod" name="modalidad" defaultValue={curso?.modalidad ?? "VIRTUAL"} className={claseControl}>
-            {Object.entries(ETIQUETA_MODALIDAD).map(([v, t]) => (
-              <option key={v} value={v}>
-                {t}
-              </option>
-            ))}
-          </select>
+        <CampoForm etiqueta="Modalidad" htmlFor="c-mod" ayuda="PEDSAR dicta todos sus cursos en línea.">
+          <Input id="c-mod" value="Virtual" readOnly className="h-10 bg-muted/50" />
+          <input type="hidden" name="modalidad" value="VIRTUAL" />
         </CampoForm>
         <div className="grid grid-cols-3 gap-3 sm:col-span-2">
           <CampoForm etiqueta="Duración (h)" htmlFor="c-h">

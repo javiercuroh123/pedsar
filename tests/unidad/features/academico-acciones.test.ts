@@ -222,6 +222,25 @@ describe("portal del instructor", () => {
     await expect(crearSesion({}, formulario({ ...sesion, enlace: "zoom" }))).resolves.toEqual({ ok: false, mensaje: "El enlace debe ser una URL válida" });
   });
 
+  it("programa sesiones asíncronas con el enlace de la grabación y no acepta presencial ni semipresencial (HU-16)", async () => {
+    conSesion("instructor");
+    responder();
+    const sesion = { cursoId: UUID.curso, fecha: "2026-10-10", horaInicio: "08:00", duracion: "60", modalidad: "ASINCRONA", enlace: "https://video.test/clase-3" };
+    await expect(crearSesion({}, formulario(sesion))).resolves.toEqual({ ok: true, mensaje: "Sesión programada" });
+    expect(entorno.servidor.de("sesiones", "insert")[0].valores).toMatchObject({ modalidad: "ASINCRONA", enlace_virtual: "https://video.test/clase-3" });
+    await expect(crearSesion({}, formulario({ ...sesion, modalidad: "SEMIPRESENCIAL" }))).resolves.toMatchObject({ ok: false });
+    await expect(crearSesion({}, formulario({ ...sesion, modalidad: "PRESENCIAL" }))).resolves.toMatchObject({ ok: false });
+    expect(entorno.servidor.de("sesiones", "insert")).toHaveLength(1);
+  });
+
+  it("no registra asistencia en una sesión asíncrona (HU-16)", async () => {
+    conSesion("instructor");
+    responder({ "sesiones.select": { data: { curso_id: UUID.curso, modalidad: "ASINCRONA" } } });
+    const asistencia = formulario({ sesionId: "4", fecha: "2026-10-10", [`a:${UUID.inscripcion}`]: "PRESENTE" });
+    await expect(guardarAsistencia({}, asistencia)).resolves.toEqual({ ok: false, mensaje: "Las sesiones asíncronas no registran asistencia" });
+    expect(entorno.servidor.de("asistencias", "upsert")).toHaveLength(0);
+  });
+
   it("registra asistencia solo de inscripciones confirmadas del curso (HU-58)", async () => {
     conSesion("instructor");
     const ajena = "99999999-9999-4999-8999-999999999999";
