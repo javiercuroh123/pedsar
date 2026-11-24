@@ -1,5 +1,5 @@
 import { reservaVencida } from "@/config/matricula";
-import type { EstadoCurso, EstadoInscripcion, EstadoPago, MedioPago, MetodoPago, Modalidad, Nivel } from "@/types/dominio";
+import type { EstadoCurso, EstadoInscripcion, EstadoPago, MedioPago, MetodoPago, Modalidad, Nivel, Rol } from "@/types/dominio";
 
 // Todas las fechas se muestran en hora de Perú, aunque el servidor corra en UTC.
 const ZONA = "America/Lima";
@@ -40,6 +40,12 @@ export const iniciales = (nombre: string) =>
 
 export const nombreCompleto = (p: { nombres?: string | null; apellidos?: string | null } | null | undefined) =>
   [p?.nombres, p?.apellidos].filter(Boolean).join(" ").trim();
+
+export const ETIQUETA_ROL: Record<Rol, string> = {
+  administrador: "Administrador",
+  instructor: "Instructor",
+  estudiante: "Estudiante",
+};
 
 export const ETIQUETA_MODALIDAD: Record<Modalidad, string> = {
   PRESENCIAL: "Presencial",

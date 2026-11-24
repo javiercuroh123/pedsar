@@ -8,7 +8,7 @@ import { PLAZO_PAGO_HORAS, reservaVencida } from "@/config/matricula";
 import { uno } from "@/features/academico/consultas";
 import { confirmarPago } from "@/features/matricula/confirmar-pago";
 import { notificarAdministradores } from "@/features/notificaciones/enviar";
-import type { EstadoFormulario } from "@/features/usuarios/esquemas";
+import { celularOpcional, type EstadoFormulario } from "@/features/usuarios/esquemas";
 import { registrarActividad } from "@/lib/auditoria";
 import { requireRol } from "@/lib/auth";
 import { programarCorreo } from "@/lib/email";
@@ -24,7 +24,7 @@ const inscripcionSchema = z.object({
   // CULQI: pago en línea (tarjeta, Yape, billeteras); YAPE / PLIN: pago directo validado por el administrador.
   metodo: z.enum(["CULQI", "YAPE", "PLIN"], "Elige cómo pagar"),
   cupon: z.string().trim().toUpperCase().optional(),
-  telefono: z.string().trim().max(20).optional(),
+  telefono: celularOpcional,
   documento: z.string().trim().max(12).optional(),
   comprobante: z.enum(["BOLETA", "FACTURA"]).default("BOLETA"),
   ruc: z.string().trim().max(11).optional(),

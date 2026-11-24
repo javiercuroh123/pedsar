@@ -2,7 +2,7 @@
 
 import { CheckCircle2Icon, CircleAlertIcon, CircleIcon, EyeIcon, EyeOffIcon, MailCheckIcon } from "lucide-react";
 import Link from "next/link";
-import { useActionState, useState } from "react";
+import { useActionState, useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -197,11 +197,22 @@ export function RecuperarForm() {
   );
 }
 
-export function NuevaContrasenaForm() {
+/**
+ * Nueva contraseña (recuperación y perfil). En el perfil se usa plegable: `alCancelar`
+ * muestra el botón «Cancelar» y `alGuardar` se llama cuando el cambio se guardó.
+ */
+export function NuevaContrasenaForm({ alCancelar, alGuardar }: { alCancelar?: () => void; alGuardar?: () => void } = {}) {
   const [estado, accion, pendiente] = useActionState(actualizarContrasena, {});
   const [clave, setClave] = useState("");
+  useEffect(() => {
+    if (estado.ok) alGuardar?.();
+  }, [estado, alGuardar]);
   return (
-    <form action={accion} className="max-w-md space-y-4">
+    <form
+      action={accion}
+      onKeyDown={(e) => alCancelar && e.key === "Escape" && !pendiente && alCancelar()}
+      className="max-w-md space-y-4"
+    >
       <Campo
         nombre="contrasena"
         etiqueta="Nueva contraseña"
@@ -209,15 +220,24 @@ export function NuevaContrasenaForm() {
         autoComplete="new-password"
         estado={estado}
         required
+        autoFocus={Boolean(alCancelar)}
         value={clave}
         onChange={(e) => setClave(e.target.value)}
       />
       <ReglasContrasena valor={clave} />
       <Campo nombre="confirmar" etiqueta="Confirmar contraseña" type="password" autoComplete="new-password" estado={estado} required />
-      <Mensaje estado={estado} />
-      <Button type="submit" disabled={pendiente} className="h-10 px-5">
-        {pendiente ? "Guardando…" : "Guardar contraseña"}
-      </Button>
+      {/* En el perfil, el éxito lo avisa quien pliega el formulario (toast). */}
+      {(!alGuardar || !estado.ok) && <Mensaje estado={estado} />}
+      <div className="flex flex-wrap gap-2">
+        <Button type="submit" disabled={pendiente} className="h-10 px-5">
+          {pendiente ? "Guardando…" : "Guardar contraseña"}
+        </Button>
+        {alCancelar && (
+          <Button type="button" variant="ghost" onClick={alCancelar} disabled={pendiente} className="h-10 px-4">
+            Cancelar
+          </Button>
+        )}
+      </div>
     </form>
   );
 }

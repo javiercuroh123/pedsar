@@ -230,7 +230,12 @@ export function PestanasEnlace({
   className?: string;
 }) {
   return (
-    <nav className={cn("flex gap-6 overflow-x-auto border-b", className)} aria-label="Secciones">
+    // La línea inferior es una sombra interior (no un borde) para que el subrayado activo
+    // la cubra sin desbordar: así el contenedor no genera una barra vertical.
+    <nav
+      className={cn("sin-barra flex gap-6 overflow-x-auto overflow-y-hidden shadow-[inset_0_-1px_0_var(--color-border)]", className)}
+      aria-label="Secciones"
+    >
       {items.map((i) => (
         <Link
           key={i.valor}
@@ -238,7 +243,7 @@ export function PestanasEnlace({
           scroll={false}
           aria-current={i.valor === activa ? "page" : undefined}
           className={cn(
-            "-mb-px flex items-center gap-1.5 border-b-2 px-0.5 pb-3 text-sm font-medium whitespace-nowrap transition-colors",
+            "flex shrink-0 items-center gap-1.5 border-b-2 px-0.5 pb-3 text-sm font-medium whitespace-nowrap transition-colors",
             i.valor === activa
               ? "border-primary text-primary"
               : "border-transparent text-muted-foreground hover:border-border hover:text-foreground",

@@ -5,12 +5,12 @@ import { z } from "zod";
 import { registrarActividad } from "@/lib/auditoria";
 import { requireUsuario } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
-import type { EstadoFormulario } from "./esquemas";
+import { celularOpcional, type EstadoFormulario } from "./esquemas";
 
 const perfilSchema = z.object({
   nombres: z.string().trim().min(2, "Ingresa tus nombres").max(80),
   apellidos: z.string().trim().min(2, "Ingresa tus apellidos").max(80),
-  telefono: z.string().trim().max(20).optional(),
+  telefono: celularOpcional,
   fechaNacimiento: z.union([z.iso.date("Fecha de nacimiento no válida"), z.literal("")]).optional(),
   documento: z
     .string()

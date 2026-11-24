@@ -17,6 +17,7 @@ import Link from "next/link";
 import { useRef, useState, useTransition } from "react";
 import { toast } from "sonner";
 import { BotonEnviar } from "@/components/boton-enviar";
+import { CampoCelular } from "@/components/campo-celular";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -154,17 +155,7 @@ export function FormularioInscripcion({ curso, perfil, cupoLibre, cupoMaximo, pa
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor="telefono">Celular</Label>
-                <Input
-                  id="telefono"
-                  name="telefono"
-                  required
-                  inputMode="tel"
-                  pattern="[0-9 +]{9,15}"
-                  title="Número de celular"
-                  defaultValue={perfil.telefono ?? ""}
-                  placeholder="9XX XXX XXX"
-                  className="h-10 font-mono"
-                />
+                <CampoCelular id="telefono" name="telefono" required defaultValue={perfil.telefono} />
               </div>
               <div className="space-y-1.5 sm:col-span-2">
                 <Label>Correo electrónico</Label>

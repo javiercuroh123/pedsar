@@ -183,6 +183,62 @@
   [role="button"]:not(:disabled) {
     cursor: pointer;
   }
+
+  /* Barras de desplazamiento propias: finas, redondeadas, sin flechas y con la paleta.
+     Chromium/Safari usan ::-webkit-scrollbar; Firefox, scrollbar-width/color (solo ahí,
+     porque en Chromium esas propiedades anulan los pseudoelementos). */
+  :root {
+    --barra-pulgar: rgb(113 113 122 / 0.35);
+    --barra-pulgar-activo: color-mix(in oklab, var(--color-brand-500) 75%, transparent);
+  }
+  .dark {
+    --barra-pulgar: rgb(255 255 255 / 0.16);
+    --barra-pulgar-activo: color-mix(in oklab, var(--color-brand-400) 75%, transparent);
+  }
+  .alto-contraste {
+    --barra-pulgar: var(--muted-foreground);
+  }
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  ::-webkit-scrollbar-track,
+  ::-webkit-scrollbar-corner {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    border: 3px solid transparent;
+    border-radius: 9999px;
+    background-color: var(--barra-pulgar);
+    background-clip: padding-box;
+  }
+  ::-webkit-scrollbar-thumb:hover,
+  ::-webkit-scrollbar-thumb:active {
+    background-color: var(--barra-pulgar-activo);
+  }
+  ::-webkit-scrollbar-button {
+    display: none;
+  }
+  @supports not selector(::-webkit-scrollbar) {
+    * {
+      scrollbar-width: thin;
+      scrollbar-color: var(--barra-pulgar) transparent;
+    }
+  }
+}
+
+/* Barra sobre fondo oscuro (menú lateral, que es oscuro en ambos temas) */
+@utility barra-oscura {
+  --barra-pulgar: rgb(255 255 255 / 0.14);
+  --barra-pulgar-activo: color-mix(in oklab, var(--color-brand-400) 80%, transparent);
+}
+
+/* Desplazable sin barra visible (pestañas: se deslizan con el dedo o la rueda) */
+@utility sin-barra {
+  scrollbar-width: none;
+  &::-webkit-scrollbar {
+    display: none;
+  }
 }
 
 @utility texto-degradado {

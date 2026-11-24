@@ -1,7 +1,7 @@
 import { BotonTema, MenuAccesibilidad } from "@/components/preferencias";
 import { NAV_POR_ROL } from "@/config/navegacion";
 import { contarNoLeidas, listarNotificaciones } from "@/features/notificaciones/consultas";
-import { nombreCompleto } from "@/lib/formato";
+import { ETIQUETA_ROL, nombreCompleto } from "@/lib/formato";
 import type { Perfil, Rol } from "@/types/dominio";
 import { CampanaNotificaciones, MenuUsuario } from "./menus-cabecera";
 import { ContenidoLateral, MenuMovilPanel } from "./panel-nav";
@@ -10,12 +10,6 @@ const TITULO_PORTAL: Record<Rol, string> = {
   administrador: "Administración",
   instructor: "Portal del instructor",
   estudiante: "Portal del estudiante",
-};
-
-const ETIQUETA_ROL: Record<Rol, string> = {
-  administrador: "Administrador",
-  instructor: "Instructor",
-  estudiante: "Estudiante",
 };
 
 /** Estructura común de los tres portales: barra lateral + cabecera + contenido. */

@@ -126,7 +126,7 @@ export function ContenidoLateral({
 }) {
   const [saliendo, iniciar] = useTransition();
   return (
-    <div className="relative flex h-full flex-col overflow-hidden bg-sidebar text-sidebar-foreground">
+    <div className="barra-oscura relative flex h-full flex-col overflow-hidden bg-sidebar text-sidebar-foreground">
       <div className="pointer-events-none absolute -top-28 -left-24 size-64 rounded-full bg-brand-500/15 blur-3xl" />
       <div className="relative flex shrink-0 items-center px-6 pt-5">
         <Logo claro />

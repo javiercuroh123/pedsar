@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { errorCelular, normalizarCelular } from "@/lib/telefono";
 
 export const loginSchema = z.object({
   correo: z.email("Correo no válido"),
@@ -25,6 +26,13 @@ export const recuperarSchema = z.object({ correo: z.email("Correo no válido") }
 export const nuevaContrasenaSchema = z
   .object({ contrasena: registroSchema.shape.contrasena, confirmar: z.string() })
   .refine((d) => d.contrasena === d.confirmar, { path: ["confirmar"], message: "Las contraseñas no coinciden" });
+
+/** Celular peruano opcional: llega formateado ("987 654 321" o "+51 …") y se guarda solo con dígitos. */
+export const celularOpcional = z
+  .string()
+  .optional()
+  .refine((v) => errorCelular(v) === null, "El celular debe tener 9 dígitos y empezar con 9")
+  .transform((v) => normalizarCelular(v ?? ""));
 
 /** Estado que devuelven las Server Actions de formularios (para useActionState). */
 export interface EstadoFormulario {

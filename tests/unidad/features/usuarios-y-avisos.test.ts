@@ -112,15 +112,37 @@ describe("perfil (HU-15)", () => {
     await expect(actualizarPerfil({}, formulario({ ...datos, documento: "123" }))).resolves.toEqual({ ok: false, mensaje: "DNI de 8 dígitos o CE válido" });
     await expect(actualizarPerfil({}, formulario({ ...datos, fechaNacimiento: "no-fecha" }))).resolves.toEqual({ ok: false, mensaje: "Fecha de nacimiento no válida" });
   });
+
+  it("guarda el celular solo con dígitos y rechaza números que no son celulares peruanos", async () => {
+    conSesion("estudiante");
+    await actualizarPerfil({}, formulario({ ...datos, telefono: "+51 987 654 321" }));
+    expect(entorno.servidor.de("perfiles", "update")[0].valores).toMatchObject({ telefono: "987654321" });
+    for (const telefono of ["98765", "abc", "812 345 678"]) {
+      await expect(actualizarPerfil({}, formulario({ ...datos, telefono }))).resolves.toEqual({
+        ok: false,
+        mensaje: "El celular debe tener 9 dígitos y empezar con 9",
+      });
+    }
+  });
 });
 
 describe("contacto (HU-48)", () => {
-  const mensaje = { nombre: "Ana <b>", correo: "ana@pedsar.test", telefono: "987", asunto: "informes", mensaje: "Quisiera información\ndel curso de Excel" };
+  const mensaje = { nombre: "Ana <b>", correo: "ana@pedsar.test", telefono: "987 654 321", asunto: "informes", mensaje: "Quisiera información\ndel curso de Excel" };
 
   it("envía el mensaje a la empresa escapando el contenido", async () => {
+    const email = await import("@/lib/email");
+    const envio = vi.spyOn(email, "enviarCorreo");
     await expect(enviarContacto({}, formulario(mensaje))).resolves.toMatchObject({ ok: true });
     expect(console.info).toHaveBeenCalledWith("[correo simulado] → informes@pedsar.pe: [Web · informes] Ana <b>");
+    expect(envio.mock.calls[0][0].html).toContain("· +51 987 654 321");
     await expect(enviarContacto({}, formulario({ ...mensaje, mensaje: "corto" }))).resolves.toMatchObject({ errores: { mensaje: [expect.stringMatching(/mínimo 10/)] } });
+  });
+
+  it("el celular es opcional, pero si se escribe debe ser un celular peruano", async () => {
+    await expect(enviarContacto({}, formulario({ ...mensaje, telefono: "" }))).resolves.toMatchObject({ ok: true });
+    await expect(enviarContacto({}, formulario({ ...mensaje, telefono: "987" }))).resolves.toEqual({
+      errores: { telefono: ["El celular debe tener 9 dígitos y empezar con 9"] },
+    });
   });
 
   it("si el correo falla, sugiere otro canal", async () => {

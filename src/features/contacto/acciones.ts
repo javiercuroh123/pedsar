@@ -3,12 +3,13 @@
 import { z } from "zod";
 import { EMPRESA } from "@/config/empresa";
 import { enviarCorreo } from "@/lib/email";
-import type { EstadoFormulario } from "@/features/usuarios/esquemas";
+import { formatearCelular } from "@/lib/telefono";
+import { celularOpcional, type EstadoFormulario } from "@/features/usuarios/esquemas";
 
 const contactoSchema = z.object({
   nombre: z.string().trim().min(2, "Ingresa tu nombre").max(120),
   correo: z.email("Correo no válido"),
-  telefono: z.string().trim().max(20).optional(),
+  telefono: celularOpcional,
   asunto: z.enum(["informes", "empresas", "soporte", "reclamo"]),
   mensaje: z.string().trim().min(10, "Cuéntanos un poco más (mínimo 10 caracteres)").max(2000),
 });
@@ -25,7 +26,7 @@ export async function enviarContacto(_: EstadoFormulario, formData: FormData): P
     await enviarCorreo({
       para: EMPRESA.correo,
       asunto: `[Web · ${d.asunto}] ${d.nombre}`,
-      html: `<p><b>${escapar(d.nombre)}</b> &lt;${escapar(d.correo)}&gt; ${d.telefono ? `· ${escapar(d.telefono)}` : ""}</p><p>${escapar(d.mensaje).replace(/\n/g, "<br>")}</p>`,
+      html: `<p><b>${escapar(d.nombre)}</b> &lt;${escapar(d.correo)}&gt; ${d.telefono ? `· +51 ${formatearCelular(d.telefono)}` : ""}</p><p>${escapar(d.mensaje).replace(/\n/g, "<br>")}</p>`,
     });
   } catch {
     return { mensaje: "No pudimos enviar tu mensaje. Inténtalo de nuevo o escríbenos por WhatsApp." };

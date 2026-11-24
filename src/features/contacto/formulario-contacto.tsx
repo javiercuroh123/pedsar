@@ -2,6 +2,7 @@
 
 import { CheckCircle2Icon, SendIcon } from "lucide-react";
 import { useActionState } from "react";
+import { CampoCelular } from "@/components/campo-celular";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -42,7 +43,8 @@ export function FormularioContacto({ asunto }: { asunto?: string }) {
       </div>
       <div className="space-y-1.5">
         <Label htmlFor="telefono">Celular (opcional)</Label>
-        <Input id="telefono" name="telefono" inputMode="tel" autoComplete="tel" className="h-10 font-mono" />
+        <CampoCelular id="telefono" name="telefono" ayuda={null} />
+        {error("telefono") && <p className="text-xs text-destructive">{error("telefono")}</p>}
       </div>
       <div className="space-y-1.5">
         <Label htmlFor="asunto">Asunto</Label>
