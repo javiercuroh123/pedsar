@@ -254,6 +254,7 @@ export default async function CursoPage({ params }: PageProps<"/cursos/[slug]">)
         <aside className="animar-escala lg:sticky lg:top-24 lg:-mt-40 lg:self-start [--i:3]">
           <div className="overflow-hidden rounded-2xl border bg-card shadow-(--sombra-lg)">
             <PortadaCurso
+              slug={curso.slug}
               titulo={curso.titulo}
               imagen={curso.imagen_url}
               categoria={curso.categoria}

@@ -323,6 +323,7 @@ function TarjetaDestacado({ curso }: { curso: Awaited<ReturnType<typeof listarCu
         <span className="text-muted-foreground">{curso.proxima_sesion ? `Inicia ${formatearFecha(curso.proxima_sesion.fecha)}` : "Próximamente"}</span>
       </div>
       <PortadaCurso
+        slug={curso.slug}
         titulo={curso.titulo}
         imagen={curso.imagen_url}
         categoria={curso.categoria}

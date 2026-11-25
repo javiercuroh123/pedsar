@@ -54,14 +54,19 @@ export function DialogoCurso({
   const subirPortada = async (archivo: File) => {
     if (archivo.size > 5 * 1024 * 1024) return toast.error("La imagen supera 5 MB");
     setSubiendo(true);
-    const supabase = createClient();
-    const ext = archivo.name.split(".").pop() ?? "jpg";
-    const ruta = `cursos/portada-${Date.now()}.${ext}`;
-    const { error } = await supabase.storage.from("avatares").upload(ruta, archivo, { upsert: true, contentType: archivo.type });
-    setSubiendo(false);
-    if (error) return toast.error(`No se pudo subir la imagen: ${error.message}`);
-    setImagenUrl(supabase.storage.from("avatares").getPublicUrl(ruta).data.publicUrl);
-    toast.success("Imagen subida. Guarda el curso para aplicarla.");
+    try {
+      const portadas = createClient().storage.from("cursos");
+      const ext = archivo.name.split(".").pop() ?? "jpg";
+      const ruta = `portadas/${crypto.randomUUID()}.${ext}`;
+      const { error } = await portadas.upload(ruta, archivo, { upsert: false, contentType: archivo.type });
+      if (error) throw error;
+      setImagenUrl(portadas.getPublicUrl(ruta).data.publicUrl);
+      toast.success("Imagen subida. Guarda el curso para aplicarla.");
+    } catch (error) {
+      toast.error(error instanceof Error ? `No se pudo subir la imagen: ${error.message}` : "No se pudo subir la imagen");
+    } finally {
+      setSubiendo(false);
+    }
   };
   return (
     <DialogoFormulario
@@ -72,6 +77,7 @@ export function DialogoCurso({
       descripcion="Los cursos publicados aparecen en el catálogo público."
       accion={guardarCurso}
       textoEnviar="Guardar curso"
+      envioDeshabilitado={subiendo}
       className="sm:max-w-2xl"
     >
       <input type="hidden" name="id" value={curso?.id ?? ""} />
@@ -127,7 +133,7 @@ export function DialogoCurso({
             <Input id="c-q" name="cupo" type="number" min={1} defaultValue={curso?.cupo_maximo ?? 30} className="h-10" />
           </CampoForm>
         </div>
-        <CampoForm etiqueta="Imagen destacada (URL o archivo)" htmlFor="c-img" className="sm:col-span-2" ayuda="Opcional. Sube una imagen o pega su URL; sin imagen se usa una portada de color por categoría.">
+        <CampoForm etiqueta="Imagen destacada (URL o archivo)" htmlFor="c-img" className="sm:col-span-2" ayuda="Sube una imagen de hasta 5 MB o pega su URL. Deja el campo vacío para usar la portada predeterminada.">
           <div className="flex gap-2">
             <Input id="c-img" name="imagen" type="url" value={imagenUrl} onChange={(e) => setImagenUrl(e.target.value)} placeholder="https://…" className="h-10 flex-1" />
             <label className="inline-flex h-10 shrink-0 cursor-pointer items-center gap-1.5 rounded-lg border bg-background px-3 text-sm font-medium hover:bg-muted">

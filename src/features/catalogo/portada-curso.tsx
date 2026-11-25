@@ -81,31 +81,72 @@ export function SiglaCurso({ titulo, categoria, className }: { titulo: string; c
   );
 }
 
-/** Portada del curso: imagen subida o, si no hay, el degradado y el ícono de su categoría. */
+const CURSOS_CON_PORTADA = new Set([
+  "administracion-bd-sql-server",
+  "analisis-datos-python-sql-server-power-bi",
+  "aplicaciones-moviles",
+  "aws-amazon-web-services",
+  "bpm-gestion-procesos-negocio",
+  "c-plus-plus",
+  "c-sharp",
+  "c-sharp-net",
+  "ccna",
+  "ciberseguridad",
+  "dashboards-excel-power-bi",
+  "desarrollo-java-i",
+  "desarrollo-java-ii",
+  "diseno-web-php",
+  "diseno-web-visual-studio",
+  "diseno-web-wordpress",
+  "dns-dhcp",
+  "excel-basico",
+  "excel-desde-cero-hasta-macros",
+  "excel-intermedio",
+  "informatica-forense",
+  "javascript",
+  "linux",
+  "mongodb",
+  "ofimatica-basica",
+  "ofimatica-intermedia",
+  "ofimatica-profesional",
+  "oracle",
+  "power-bi-inteligencia-negocios",
+  "programacion-python-i",
+  "programacion-python-ii",
+  "react-server",
+  "windows-server-essentials",
+]);
+
 export function PortadaCurso({
+  slug,
   titulo,
   imagen,
   categoria,
   modalidad,
   sinCupo,
   destacado,
+  cargaDiferida = false,
   className,
 }: {
+  slug: string;
   titulo: string;
   imagen?: string | null;
   categoria?: { nombre: string; slug: string } | null;
   modalidad: Modalidad;
   sinCupo?: boolean;
   destacado?: boolean;
+  cargaDiferida?: boolean;
   className?: string;
 }) {
   const IconoModalidad = ICONO_MODALIDAD[modalidad];
+  const portada = imagen || (CURSOS_CON_PORTADA.has(slug) ? `/cursos/${slug}.webp` : null);
   return (
     <div className={cn("relative h-42 overflow-hidden bg-linear-to-br text-white", degradadoCategoria(categoria?.slug), className)}>
-      {imagen ? (
+      {portada ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img
-          src={imagen}
+          src={portada}
+          loading={cargaDiferida ? "lazy" : undefined}
           alt=""
           className="absolute inset-0 size-full object-cover transition-transform duration-700 ease-(--ease-salida) group-hover:scale-105"
         />
@@ -127,7 +168,7 @@ export function PortadaCurso({
         ) : (
           <span />
         )}
-        <span className="inline-flex items-center gap-1 rounded-full bg-white/15 px-2.5 py-0.5 text-xs font-medium text-white ring-1 ring-white/20 backdrop-blur">
+        <span className="inline-flex items-center gap-1 rounded-full bg-zinc-950/75 px-2.5 py-0.5 text-xs font-medium text-white ring-1 ring-white/20 backdrop-blur">
           <IconoModalidad className="size-3" />
           {ETIQUETA_MODALIDAD[modalidad]}
         </span>

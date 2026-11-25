@@ -17,6 +17,7 @@ export function DialogoFormulario({
   descripcion,
   accion,
   textoEnviar = "Guardar",
+  envioDeshabilitado = false,
   children,
   className,
   varianteDisparador = "default",
@@ -28,6 +29,7 @@ export function DialogoFormulario({
   descripcion?: string;
   accion: (estado: EstadoFormulario, datos: FormData) => Promise<EstadoFormulario>;
   textoEnviar?: string;
+  envioDeshabilitado?: boolean;
   children: React.ReactNode;
   className?: string;
   varianteDisparador?: "default" | "outline" | "ghost" | "secondary";
@@ -58,7 +60,7 @@ export function DialogoFormulario({
             <Button type="button" variant="outline" onClick={() => setAbierto(false)}>
               Cancelar
             </Button>
-            <Button type="submit" disabled={pendiente}>
+            <Button type="submit" disabled={pendiente || envioDeshabilitado}>
               {pendiente ? "Guardando…" : textoEnviar}
             </Button>
           </DialogFooter>

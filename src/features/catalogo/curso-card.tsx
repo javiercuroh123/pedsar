@@ -38,11 +38,13 @@ export function IndicadorCupo({ disponible, maximo }: { disponible: number; maxi
   );
 }
 
-export function CursoCard({ curso }: { curso: CursoResumen }) {
+export function CursoCard({ curso, cargaDiferida = false }: { curso: CursoResumen; cargaDiferida?: boolean }) {
   const sinCupo = curso.cupo_disponible <= 0;
   return (
     <article className="elevar group relative flex flex-col overflow-hidden rounded-2xl border bg-card shadow-xs hover:border-brand-200 dark:hover:border-brand-500/40">
       <PortadaCurso
+        slug={curso.slug}
+        cargaDiferida={cargaDiferida}
         titulo={curso.titulo}
         imagen={curso.imagen_url}
         categoria={curso.categoria}

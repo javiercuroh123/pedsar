@@ -114,8 +114,8 @@ export default async function CatalogoPage({ searchParams }: PageProps<"/cursos"
           </div>
           {cursos.length > 0 ? (
             <div className="escalonado mt-5 grid gap-6 sm:grid-cols-2 xl:grid-cols-3">
-              {cursos.map((c) => (
-                <CursoCard key={c.id} curso={c} />
+              {cursos.map((c, indice) => (
+                <CursoCard key={c.id} curso={c} cargaDiferida={indice >= 3} />
               ))}
             </div>
           ) : (
