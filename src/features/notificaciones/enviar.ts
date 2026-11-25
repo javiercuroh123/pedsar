@@ -1,6 +1,6 @@
 import "server-only";
 import { uno } from "@/features/academico/consultas";
-import { programarCorreo } from "@/lib/email";
+import { enviarCorreo, programarCorreo, type Correo } from "@/lib/email";
 import { correoAvisoCurso, correoRecordatorioEvaluacion, correoRecordatorioSesion } from "@/lib/email/plantillas";
 import { publicEnv } from "@/lib/env";
 import { ETIQUETA_TIPO_SESION, formatearFecha, formatearFechaHora, formatearHora } from "@/lib/formato";
@@ -60,21 +60,59 @@ export async function notificarInscritosDelCurso(cursoId: string, mensaje: strin
   }
 }
 
-/**
- * HU-21 · RF-11 · Envía recordatorios automáticos 1 hora antes de una sesión
- * y 24 horas antes del cierre de una evaluación pendiente, respetando la
- * preferencia de canal de cada estudiante (AMBOS, CORREO o IN_APP).
- */
-export async function enviarRecordatoriosPendientes(ahora = new Date()): Promise<{ sesiones: number; evaluaciones: number }> {
-  const db = createAdminClient();
-  let sesionesEnviadas = 0;
-  let evaluacionesEnviadas = 0;
+type MarcaRecordatorio = {
+  usuario_id: string;
+  tipo_evento: "SESION_1H_CORREO" | "EVALUACION_24H_CORREO";
+  referencia_id: number;
+};
 
-  const fechaLima = new Intl.DateTimeFormat("sv-SE", { timeZone: "America/Lima" }).format(ahora);
+/**
+ * Envía un recordatorio por correo una sola vez: primero registra la marca
+ * (única por usuario, tipo y referencia) y, si el envío falla, la borra para
+ * que la siguiente vuelta del cron lo reintente.
+ */
+async function enviarUnaVez(
+  db: ReturnType<typeof createAdminClient>,
+  marca: MarcaRecordatorio,
+  correo: Correo,
+): Promise<"enviado" | "repetido" | "fallido"> {
+  const { error } = await db.from("recordatorios_enviados").insert(marca);
+  if (error) return "repetido";
+  try {
+    await enviarCorreo(correo);
+    return "enviado";
+  } catch (e) {
+    console.error(`No se pudo enviar el recordatorio «${correo.asunto}»:`, (e as Error).message);
+    await db.from("recordatorios_enviados").delete().match(marca);
+    return "fallido";
+  }
+}
+
+/** Quien eligió solo avisos en la plataforma no recibe correos. */
+const recibeCorreo = (canal?: string | null) => (canal ?? "AMBOS") !== "IN_APP";
+
+/**
+ * HU-21 · HU-40 · RF-11 · Recordatorios por correo: 1 hora antes de una sesión en
+ * vivo y 24 horas antes del cierre de una evaluación pendiente. La llama
+ * /api/cron/recordatorios, que pg_cron invoca cada 15 minutos.
+ *
+ * Los avisos de la campana los crea aparte privado.generar_recordatorios_programados()
+ * en la base. Por eso aquí se usan marcas propias (SESION_1H_CORREO y
+ * EVALUACION_24H_CORREO): así un aviso in-app ya registrado no bloquea el correo.
+ */
+export async function enviarRecordatoriosPendientes(
+  ahora = new Date(),
+): Promise<{ sesiones: number; evaluaciones: number; fallidos: number }> {
+  const db = createAdminClient();
+  const cuenta = { sesiones: 0, evaluaciones: 0, fallidos: 0 };
+
+  // Hoy y mañana en Lima: una sesión a las 00:30 entra en la ventana desde las 23:15 del día anterior.
+  const fechaLima = (d: Date) => new Intl.DateTimeFormat("sv-SE", { timeZone: "America/Lima" }).format(d);
+  const dias = [...new Set([fechaLima(ahora), fechaLima(new Date(ahora.getTime() + 75 * 60_000))])];
   const { data: sesiones } = await db
     .from("sesiones")
     .select("id, curso_id, fecha, hora_inicio, modalidad, curso:cursos(titulo, estado)")
-    .eq("fecha", fechaLima)
+    .in("fecha", dias)
     .neq("modalidad", "ASINCRONA"); // HU-16 · una clase grabada no «inicia»
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -94,26 +132,12 @@ export async function enviarRecordatoriosPendientes(ahora = new Date()): Promise
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     for (const ins of (inscripciones ?? []) as any[]) {
       const est = uno<{ nombres: string; correo: string; estado: boolean; canal_notificacion?: string }>(ins.estudiante);
-      if (!est || !est.estado) continue;
-      const canal = est.canal_notificacion ?? "AMBOS";
+      if (!est?.estado || !est.correo || !recibeCorreo(est.canal_notificacion)) continue;
 
-      const { error: dup } = await db.from("recordatorios_enviados").insert({
-        usuario_id: ins.estudiante_id,
-        tipo_evento: "SESION_1H",
-        referencia_id: s.id,
-      });
-      if (dup) continue;
-
-      sesionesEnviadas++;
-      if (canal === "AMBOS" || canal === "IN_APP") {
-        await notificarUsuario(
-          ins.estudiante_id,
-          `Recordatorio: tu sesión de «${curso.titulo}» inicia a las ${formatearHora(s.hora_inicio)}`,
-          "/estudiante",
-        );
-      }
-      if ((canal === "AMBOS" || canal === "CORREO") && est.correo) {
-        programarCorreo({
+      const r = await enviarUnaVez(
+        db,
+        { usuario_id: ins.estudiante_id, tipo_evento: "SESION_1H_CORREO", referencia_id: s.id },
+        {
           para: est.correo,
           ...correoRecordatorioSesion({
             nombre: est.nombres || "estudiante",
@@ -123,8 +147,10 @@ export async function enviarRecordatoriosPendientes(ahora = new Date()): Promise
             modalidad: ETIQUETA_TIPO_SESION[(s.modalidad as TipoSesion) ?? "VIRTUAL"],
             url: `${publicEnv.NEXT_PUBLIC_SITE_URL}/estudiante`,
           }),
-        });
-      }
+        },
+      );
+      if (r === "enviado") cuenta.sesiones++;
+      else if (r === "fallido") cuenta.fallidos++;
     }
   }
 
@@ -151,26 +177,12 @@ export async function enviarRecordatoriosPendientes(ahora = new Date()): Promise
       const yaRindio = ((ins.intentos_evaluacion ?? []) as { evaluacion_id: number }[]).some((ie) => ie.evaluacion_id === ev.id);
       if (yaRindio) continue;
       const est = uno<{ nombres: string; correo: string; estado: boolean; canal_notificacion?: string }>(ins.estudiante);
-      if (!est || !est.estado) continue;
-      const canal = est.canal_notificacion ?? "AMBOS";
+      if (!est?.estado || !est.correo || !recibeCorreo(est.canal_notificacion)) continue;
 
-      const { error: dup } = await db.from("recordatorios_enviados").insert({
-        usuario_id: ins.estudiante_id,
-        tipo_evento: "EVALUACION_24H",
-        referencia_id: ev.id,
-      });
-      if (dup) continue;
-
-      evaluacionesEnviadas++;
-      if (canal === "AMBOS" || canal === "IN_APP") {
-        await notificarUsuario(
-          ins.estudiante_id,
-          `Recordatorio: la evaluación «${ev.titulo}» (${curso.titulo}) vence en menos de 24 h`,
-          `/estudiante/evaluaciones/${ev.id}`,
-        );
-      }
-      if ((canal === "AMBOS" || canal === "CORREO") && est.correo) {
-        programarCorreo({
+      const r = await enviarUnaVez(
+        db,
+        { usuario_id: ins.estudiante_id, tipo_evento: "EVALUACION_24H_CORREO", referencia_id: ev.id },
+        {
           para: est.correo,
           ...correoRecordatorioEvaluacion({
             nombre: est.nombres || "estudiante",
@@ -179,10 +191,12 @@ export async function enviarRecordatoriosPendientes(ahora = new Date()): Promise
             venceEn: formatearFechaHora(ev.fecha_limite),
             url: `${publicEnv.NEXT_PUBLIC_SITE_URL}/estudiante/evaluaciones/${ev.id}`,
           }),
-        });
-      }
+        },
+      );
+      if (r === "enviado") cuenta.evaluaciones++;
+      else if (r === "fallido") cuenta.fallidos++;
     }
   }
 
-  return { sesiones: sesionesEnviadas, evaluaciones: evaluacionesEnviadas };
+  return cuenta;
 }

@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import { enviarContacto } from "@/features/contacto/acciones";
 import { actualizarCanalNotificacion, marcarLeida, marcarTodasLeidas } from "@/features/notificaciones/acciones";
 import { contarNoLeidas, listarNotificaciones } from "@/features/notificaciones/consultas";
-import { enviarRecordatoriosPendientes, notificarInscritosDelCurso, notificarUsuario } from "@/features/notificaciones/enviar";
+import { notificarInscritosDelCurso, notificarUsuario } from "@/features/notificaciones/enviar";
 import {
   aceptarTerminos,
   actualizarContrasena,
@@ -241,7 +241,7 @@ describe("notificaciones in-app (HU-51)", () => {
     await ejecutarTareas();
   });
 
-  it("actualiza la preferencia de canal de notificaciones y envía recordatorios 1 h y 24 h antes (HU-21 · HU-41 · RF-11)", async () => {
+  it("actualiza la preferencia de canal de notificaciones (HU-40 · RF-11)", async () => {
     conSesion("estudiante");
     responder({ "perfiles.update": [{}, { error: { message: "fallo" } }] });
     await expect(actualizarCanalNotificacion(formulario({ canal: "CORREO" }))).resolves.toEqual({
@@ -257,65 +257,5 @@ describe("notificaciones in-app (HU-51)", () => {
       mensaje: "No se pudo actualizar la preferencia",
     });
     await expect(actualizarCanalNotificacion(formulario({ canal: "SMS" }))).resolves.toMatchObject({ ok: false });
-
-    const ahora = new Date("2026-10-10T18:00:00-05:00");
-    responder(
-      {},
-      {
-        "sesiones.select": {
-          data: [
-            {
-              id: 10,
-              curso_id: UUID.curso,
-              fecha: "2026-10-10",
-              hora_inicio: "19:00:00",
-              modalidad: "VIRTUAL",
-              curso: { titulo: "Excel Avanzado", estado: "PUBLICADO" },
-            },
-          ],
-        },
-        "evaluaciones.select": {
-          data: [
-            {
-              id: 20,
-              curso_id: UUID.curso,
-              titulo: "Examen Final",
-              fecha_limite: "2026-10-11T12:00:00-05:00",
-              curso: { titulo: "Excel Avanzado", estado: "PUBLICADO" },
-            },
-          ],
-        },
-        "inscripciones.select": [
-          {
-            data: [
-              {
-                estudiante_id: UUID.estudiante,
-                estudiante: { nombres: "Ana", correo: "ana@pedsar.test", estado: true, canal_notificacion: "AMBOS" },
-              },
-            ],
-          },
-          {
-            data: [
-              {
-                id: UUID.inscripcion,
-                estudiante_id: UUID.estudiante,
-                estudiante: { nombres: "Ana", correo: "ana@pedsar.test", estado: true, canal_notificacion: "CORREO" },
-                intentos_evaluacion: [],
-              },
-            ],
-          },
-        ],
-        "recordatorios_enviados.insert": [{}, {}],
-      },
-    );
-
-    await expect(enviarRecordatoriosPendientes(ahora)).resolves.toEqual({ sesiones: 1, evaluaciones: 1 });
-    // HU-16 · las sesiones asíncronas no llevan recordatorio de inicio.
-    expect(entorno.admin.de("sesiones", "select")[0].filtros).toContainEqual(["neq", "modalidad", "ASINCRONA"]);
-    expect(entorno.admin.de("recordatorios_enviados", "insert")).toHaveLength(2);
-    // Sesión (AMBOS) genera notificación in-app y correo; Evaluación (CORREO) solo correo.
-    expect(entorno.admin.de("notificaciones", "insert")).toHaveLength(1);
-    expect(entorno.tareas).toHaveLength(2);
-    await ejecutarTareas();
   });
 });

@@ -980,21 +980,21 @@ export type Database = {
           enviado_en: string
           id: number
           referencia_id: number
-          tipo_evento: "SESION_1H" | "EVALUACION_24H"
+          tipo_evento: "SESION_1H" | "EVALUACION_24H" | "SESION_1H_CORREO" | "EVALUACION_24H_CORREO"
           usuario_id: string
         }
         Insert: {
           enviado_en?: string
           id?: never
           referencia_id: number
-          tipo_evento: "SESION_1H" | "EVALUACION_24H"
+          tipo_evento: "SESION_1H" | "EVALUACION_24H" | "SESION_1H_CORREO" | "EVALUACION_24H_CORREO"
           usuario_id: string
         }
         Update: {
           enviado_en?: string
           id?: never
           referencia_id?: number
-          tipo_evento?: "SESION_1H" | "EVALUACION_24H"
+          tipo_evento?: "SESION_1H" | "EVALUACION_24H" | "SESION_1H_CORREO" | "EVALUACION_24H_CORREO"
           usuario_id?: string
         }
         Relationships: [

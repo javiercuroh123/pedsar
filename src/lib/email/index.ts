@@ -5,7 +5,7 @@ import { serverEnv } from "@/lib/env.server";
 
 const resend = serverEnv.RESEND_API_KEY ? new Resend(serverEnv.RESEND_API_KEY) : null;
 
-interface Correo {
+export interface Correo {
   para: string;
   asunto: string;
   html: string;

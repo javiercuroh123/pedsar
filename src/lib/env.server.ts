@@ -16,6 +16,8 @@ const serverEnvSchema = z.object({
   NIUBIZ_USER: z.string().optional(),
   NIUBIZ_PASSWORD: z.string().optional(),
   RESEND_API_KEY: z.string().optional(),
+  // HU-21 · HU-40 · Clave que pg_cron envía a /api/cron/recordatorios (Bearer). Sin ella la ruta no envía nada.
+  CRON_SECRET: z.string().optional(),
   EMAIL_FROM: z.string().default("PEDSAR <no-reply@pedsar.pe>"),
 });
 
