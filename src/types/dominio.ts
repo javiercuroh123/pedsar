@@ -14,7 +14,7 @@ export type MetodoPago = "CULQI" | "IZIPAY" | "NIUBIZ" | "YAPE" | "PLIN";
 export type EstadoPago = "PENDIENTE" | "APROBADO" | "RECHAZADO" | "REEMBOLSADO" | "VENCIDO";
 /** Medio con que se pagó por la pasarela (metodo = CULQI); los pagos directos por Yape / Plin no tienen. */
 export type MedioPago = "TARJETA" | "YAPE" | "BILLETERA" | "BANCA_MOVIL" | "AGENTE";
-export type EstadoAsistencia = "PRESENTE" | "AUSENTE" | "TARDANZA";
+export type EstadoAsistencia = "PRESENTE" | "AUSENTE" | "TARDANZA" | "JUSTIFICADA";
 
 export interface Perfil {
   id: string;

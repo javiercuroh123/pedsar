@@ -3,15 +3,14 @@ import { CalendarXIcon, UserCheckIcon, UsersIcon } from "lucide-react";
 import { EncabezadoPagina, EstadoVacio } from "@/components/comunes";
 import { SelectorUrl } from "@/components/selector-url";
 import { elegirCurso, listarCursosDelInstructor, listarEstudiantesDelCurso, listarSesionesDeCursos } from "@/features/academico/consultas-instructor";
-import { ListaAsistencia } from "@/features/academico/lista-asistencia";
+import { ListaAsistencia, type MarcaAsistencia } from "@/features/academico/lista-asistencia";
 import { requireRol } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { formatearDiaSemana, formatearFecha, formatearHora, hoyISO } from "@/lib/formato";
-import type { EstadoAsistencia } from "@/types/dominio";
 
 export const metadata: Metadata = { title: "Asistencia" };
 
-// HU-58 · Registro de asistencia por sesión
+// HU-58 · Registro de asistencia por sesión · HU-56 faltas justificadas con motivo
 export default async function InstructorAsistenciaPage({ searchParams }: PageProps<"/instructor/asistencia">) {
   const usuario = await requireRol("instructor", "administrador");
   const { curso: pCurso, sesion: pSesion } = await searchParams;
@@ -28,13 +27,13 @@ export default async function InstructorAsistenciaPage({ searchParams }: PagePro
   const [estudiantes, marcas] = curso && sesion
     ? await Promise.all([
         listarEstudiantesDelCurso(curso.id),
-        (await createClient()).from("asistencias").select("inscripcion_id, estado").eq("sesion_id", sesion.id),
+        (await createClient()).from("asistencias").select("inscripcion_id, estado, motivo").eq("sesion_id", sesion.id),
       ])
     : [[], { data: [] }];
 
   return (
     <div className="space-y-6">
-      <EncabezadoPagina eyebrow="Docencia" titulo="Registro de asistencia" descripcion="Marca la asistencia de cada estudiante en la sesión.">
+      <EncabezadoPagina eyebrow="Docencia" titulo="Registro de asistencia" descripcion="Marca la asistencia de cada estudiante en la sesión. Una falta justificada lleva su motivo y cuenta como asistencia.">
         {curso && (
           <SelectorUrl param="curso" valor={curso.id} etiqueta="Curso" reiniciar={["sesion"]} opciones={cursos.map((c) => ({ valor: c.id, etiqueta: c.titulo }))} className="w-56" />
         )}
@@ -61,7 +60,7 @@ export default async function InstructorAsistenciaPage({ searchParams }: PagePro
           sesionId={sesion.id}
           fecha={sesion.fecha}
           estudiantes={estudiantes}
-          iniciales={Object.fromEntries(((marcas.data ?? []) as { inscripcion_id: string; estado: EstadoAsistencia }[]).map((m) => [m.inscripcion_id, m.estado]))}
+          iniciales={Object.fromEntries(((marcas.data ?? []) as ({ inscripcion_id: string } & MarcaAsistencia)[]).map((m) => [m.inscripcion_id, { estado: m.estado, motivo: m.motivo }]))}
         />
       )}
     </div>

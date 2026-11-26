@@ -261,6 +261,35 @@ describe("portal del instructor", () => {
     await expect(guardarAsistencia({}, asistencia)).resolves.toEqual({ ok: false, mensaje: "No se pudo guardar la asistencia" });
   });
 
+  it("guarda la falta justificada con su motivo y descarta el motivo de los demás estados (HU-56)", async () => {
+    conSesion("instructor");
+    const asistencia = formulario({
+      sesionId: "4",
+      fecha: "2026-10-10",
+      [`a:${UUID.inscripcion}`]: "JUSTIFICADA",
+      [`m:${UUID.inscripcion}`]: "  Cita médica con constancia  ",
+      [`a:${UUID.otra}`]: "AUSENTE",
+      [`m:${UUID.otra}`]: "quedó escrito de antes",
+    });
+    responder({ "sesiones.select": { data: { curso_id: UUID.curso } }, "inscripciones.select": { data: [{ id: UUID.inscripcion }, { id: UUID.otra }] } });
+    await expect(guardarAsistencia({}, asistencia)).resolves.toEqual({ ok: true, mensaje: "Asistencia guardada correctamente" });
+    expect((entorno.servidor.de("asistencias", "upsert")[0].valores as { inscripcion_id: string; estado: string; motivo: string | null }[]).map((f) => [f.inscripcion_id, f.estado, f.motivo])).toEqual([
+      [UUID.inscripcion, "JUSTIFICADA", "Cita médica con constancia"],
+      [UUID.otra, "AUSENTE", null],
+    ]);
+  });
+
+  it("no guarda nada si una falta justificada no tiene motivo válido (HU-56)", async () => {
+    conSesion("instructor");
+    responder({ "sesiones.select": { data: { curso_id: UUID.curso } }, "inscripciones.select": { data: [{ id: UUID.inscripcion }] } });
+    const error = { ok: false, mensaje: "Escribe el motivo de cada falta justificada (de 3 a 300 caracteres)" };
+    for (const motivo of [undefined, "  ", "ok", "x".repeat(301)]) {
+      const datos = formulario({ sesionId: "4", fecha: "2026-10-10", [`a:${UUID.inscripcion}`]: "JUSTIFICADA", [`m:${UUID.inscripcion}`]: motivo });
+      await expect(guardarAsistencia({}, datos)).resolves.toEqual(error);
+    }
+    expect(entorno.servidor.de("asistencias", "upsert")).toHaveLength(0);
+  });
+
   describe("constructor de evaluaciones (HU-59)", () => {
     const nueva = (extra: Partial<NuevaEvaluacion> = {}): NuevaEvaluacion => ({
       cursoId: UUID.curso,

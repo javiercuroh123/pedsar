@@ -45,6 +45,7 @@ export type Database = {
           fecha: string
           id: number
           inscripcion_id: string
+          motivo: string | null
           sesion_id: number
         }
         Insert: {
@@ -52,6 +53,7 @@ export type Database = {
           fecha?: string
           id?: never
           inscripcion_id: string
+          motivo?: string | null
           sesion_id: number
         }
         Update: {
@@ -59,6 +61,7 @@ export type Database = {
           fecha?: string
           id?: never
           inscripcion_id?: string
+          motivo?: string | null
           sesion_id?: number
         }
         Relationships: [
@@ -1350,7 +1353,7 @@ export type Database = {
       }
     }
     Enums: {
-      estado_asistencia: "PRESENTE" | "AUSENTE" | "TARDANZA"
+      estado_asistencia: "PRESENTE" | "AUSENTE" | "TARDANZA" | "JUSTIFICADA"
       estado_curso: "BORRADOR" | "PUBLICADO" | "DESPUBLICADO"
       estado_inscripcion: "PENDIENTE" | "CONFIRMADA" | "CANCELADA"
       estado_pago:
@@ -1498,7 +1501,7 @@ export const Constants = {
   },
   public: {
     Enums: {
-      estado_asistencia: ["PRESENTE", "AUSENTE", "TARDANZA"],
+      estado_asistencia: ["PRESENTE", "AUSENTE", "TARDANZA", "JUSTIFICADA"],
       estado_curso: ["BORRADOR", "PUBLICADO", "DESPUBLICADO"],
       estado_inscripcion: ["PENDIENTE", "CONFIRMADA", "CANCELADA"],
       estado_pago: [

@@ -171,20 +171,26 @@ export async function eliminarSesion(formData: FormData) {
   revalidatePath("/instructor", "layout");
 }
 
-// ---------- Asistencia (HU-58) ----------
+// ---------- Asistencia (HU-58 · HU-56 faltas justificadas) ----------
+const MOTIVO_JUSTIFICACION = z.string().trim().min(3).max(300);
+
 export async function guardarAsistencia(_: EstadoFormulario, formData: FormData): Promise<EstadoFormulario> {
   const usuario = await staff();
   const sesionId = z.coerce.number().int().parse(formData.get("sesionId"));
   const fecha = z.iso.date().parse(formData.get("fecha"));
   const filas = [...formData.entries()]
     .filter(([k]) => k.startsWith("a:"))
-    .map(([k, v]) => ({
-      inscripcion_id: z.uuid().parse(k.slice(2)),
-      sesion_id: sesionId,
-      estado: z.enum(["PRESENTE", "AUSENTE", "TARDANZA"]).parse(v),
-      fecha,
-    }));
+    .map(([k, v]) => {
+      const inscripcion_id = z.uuid().parse(k.slice(2));
+      const estado = z.enum(["PRESENTE", "AUSENTE", "TARDANZA", "JUSTIFICADA"]).parse(v);
+      // El motivo solo se guarda en las faltas justificadas (la BD exige lo mismo).
+      const motivo = estado === "JUSTIFICADA" ? MOTIVO_JUSTIFICACION.safeParse(formData.get(`m:${inscripcion_id}`) ?? "") : null;
+      return { inscripcion_id, sesion_id: sesionId, estado, motivo, fecha };
+    });
   if (!filas.length) return { ok: false, mensaje: "No hay estudiantes para registrar" };
+  if (filas.some((f) => f.motivo && !f.motivo.success)) {
+    return { ok: false, mensaje: "Escribe el motivo de cada falta justificada (de 3 a 300 caracteres)" };
+  }
   const supabase = await createClient();
 
   // Solo inscripciones confirmadas del mismo curso de la sesión.
@@ -194,7 +200,9 @@ export async function guardarAsistencia(_: EstadoFormulario, formData: FormData)
   const { data: validas } = await supabase.from("inscripciones").select("id").eq("curso_id", sesion.curso_id).eq("estado", "CONFIRMADA");
   const ids = new Set((validas ?? []).map((i: { id: string }) => i.id));
 
-  const validasCurso = filas.filter((f) => ids.has(f.inscripcion_id));
+  const validasCurso = filas
+    .filter((f) => ids.has(f.inscripcion_id))
+    .map((f) => ({ ...f, motivo: f.motivo?.success ? f.motivo.data : null }));
   const { error } = await supabase.from("asistencias").upsert(validasCurso, { onConflict: "inscripcion_id,sesion_id" });
   if (error) return { ok: false, mensaje: "No se pudo guardar la asistencia" };
   await registrarActividad(usuario.id, "REGISTRAR_ASISTENCIA", { sesion: sesionId, registros: filas.length });

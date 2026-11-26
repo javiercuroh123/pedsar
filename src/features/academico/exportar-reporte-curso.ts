@@ -6,10 +6,10 @@ import { generarPdfReporte, type SeccionPdf } from "@/lib/pdf/reporte";
 import type { EstadoAsistencia } from "@/types/dominio";
 import { ETIQUETA_ESTADO_ACADEMICO, type ReporteCurso } from "./reporte-instructor";
 
-const SIGLA_ASISTENCIA: Record<EstadoAsistencia, string> = { PRESENTE: "P", TARDANZA: "T", AUSENTE: "A" };
+const SIGLA_ASISTENCIA: Record<EstadoAsistencia, string> = { PRESENTE: "P", TARDANZA: "T", JUSTIFICADA: "J", AUSENTE: "A" };
 const nota = (n: number | null) => (n === null ? "—" : formatearNota(n));
 const porcentaje = (n: number | null) => (n === null ? "—" : `${formatearAsistencia(n)} %`);
-const NOTA_CALCULO = `Nota final: promedio en escala vigesimal de la mejor nota de cada evaluación; las no rendidas cuentan 0. Apto: rindió todas las evaluaciones con nota final ≥ ${NOTA_MINIMA} y asistió al ${ASISTENCIA_MINIMA} % de las sesiones dictadas. En riesgo: asistencia o promedio parcial por debajo del mínimo. Asistencia: P presente, T tardanza (cuenta como asistencia), A ausente.`;
+const NOTA_CALCULO = `Nota final: promedio en escala vigesimal de la mejor nota de cada evaluación; las no rendidas cuentan 0. Apto: rindió todas las evaluaciones con nota final ≥ ${NOTA_MINIMA} y asistió al ${ASISTENCIA_MINIMA} % de las sesiones dictadas. En riesgo: asistencia o promedio parcial por debajo del mínimo. Asistencia: P presente, T tardanza y J falta justificada (cuentan como asistencia), A ausente.`;
 
 /** HU-42 · Reporte académico del curso en Excel: estudiantes con contacto, calificaciones y asistencia. */
 export async function reporteCursoAExcel(r: ReporteCurso): Promise<Buffer> {
