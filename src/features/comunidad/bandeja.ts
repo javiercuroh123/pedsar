@@ -56,3 +56,12 @@ export function estudiantesDeBandeja(items: ConversacionResumen[], curso?: strin
   for (const c of items) if (c.estudianteId && (!curso || c.cursoId === curso)) vistos.set(c.estudianteId, c.otro);
   return [...vistos].map(([id, nombre]) => ({ id, nombre })).sort((a, b) => a.nombre.localeCompare(b.nombre, "es"));
 }
+
+/**
+ * HU-63 · Resumen para el panel de inicio (estudiante o instructor): total de
+ * mensajes sin leer y las conversaciones que los tienen, las más recientes primero.
+ */
+export function resumenSinLeer(items: ConversacionResumen[], max = 3): { total: number; conversaciones: ConversacionResumen[] } {
+  const conPendientes = items.filter((c) => c.noLeidos > 0).sort((a, b) => (b.ultimoEn ?? "").localeCompare(a.ultimoEn ?? ""));
+  return { total: conPendientes.reduce((a, c) => a + c.noLeidos, 0), conversaciones: conPendientes.slice(0, max) };
+}

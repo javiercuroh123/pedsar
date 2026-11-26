@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { estudiantesDeBandeja, filtrarBandeja, leerFiltrosBandeja, noLeidosPorCurso } from "@/features/comunidad/bandeja";
+import { estudiantesDeBandeja, filtrarBandeja, leerFiltrosBandeja, noLeidosPorCurso, resumenSinLeer } from "@/features/comunidad/bandeja";
 import type { ConversacionResumen } from "@/features/comunidad/consultas";
 import { UUID } from "../../apoyo/entorno";
 
@@ -63,5 +63,27 @@ describe("bandeja unificada del instructor (HU-52)", () => {
     expect(leerFiltrosBandeja({ curso: REDES, estudiante: LUIS }, bandeja, cursos)).toEqual({ curso: REDES });
     // Valores vacíos o repetidos en la URL (?curso=&curso=…) cuentan como «todos».
     expect(leerFiltrosBandeja({ curso: "", estudiante: [ANA, LUIS], estado: undefined }, bandeja, cursos)).toEqual({});
+  });
+});
+
+describe("mensajes sin leer en el panel de inicio (HU-63)", () => {
+  it("suma los no leídos y muestra primero las conversaciones más recientes, hasta tres", () => {
+    const items = [
+      { ...conversacion(1, EXCEL, ANA, "Ana Quispe", 2), ultimoEn: "2026-10-02T10:00:00Z" },
+      { ...conversacion(2, EXCEL, LUIS, "Luis Ramos", 0), ultimoEn: "2026-10-05T10:00:00Z" },
+      { ...conversacion(3, REDES, ANA, "Ana Quispe", 1), ultimoEn: "2026-10-04T10:00:00Z" },
+      { ...conversacion(4, REDES, LUIS, "Luis Ramos", 4), ultimoEn: "2026-10-03T10:00:00Z" },
+      { ...conversacion(5, REDES, UUID.admin, "Rosa Torres", 1), ultimoEn: "2026-10-01T10:00:00Z" },
+    ];
+    const r = resumenSinLeer(items);
+    expect(r.total).toBe(8);
+    expect(ids(r.conversaciones)).toEqual([3, 4, 1]);
+    expect(ids(resumenSinLeer(items, 10).conversaciones)).toEqual([3, 4, 1, 5]);
+  });
+
+  it("sin pendientes devuelve cero y ninguna conversación (también el chat aún sin mensajes)", () => {
+    const sinEmpezar = { ...conversacion(0, EXCEL, ANA, "Luis Ramos", 0), id: null, ultimoEn: null, ultimoMensaje: null };
+    expect(resumenSinLeer([conversacion(2, EXCEL, LUIS, "Luis Ramos", 0), sinEmpezar])).toEqual({ total: 0, conversaciones: [] });
+    expect(resumenSinLeer([])).toEqual({ total: 0, conversaciones: [] });
   });
 });

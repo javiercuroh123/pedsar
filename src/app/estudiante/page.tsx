@@ -16,6 +16,8 @@ import { buttonVariants } from "@/components/ui/button";
 import { listarEvaluacionesEstudiante, listarMisInscripciones, listarSesionesProximas } from "@/features/academico/consultas";
 import { recomendarCursos } from "@/features/catalogo/consultas";
 import { CursoCard } from "@/features/catalogo/curso-card";
+import { listarConversacionesEstudiante } from "@/features/comunidad/consultas";
+import { MensajesSinLeer } from "@/features/comunidad/mensajes-sin-leer";
 import { SiglaCurso } from "@/features/catalogo/portada-curso";
 import { requireRol } from "@/lib/auth";
 import {
@@ -32,7 +34,7 @@ import {
 
 export const metadata: Metadata = { title: "Inicio" };
 
-// HU-65 · Panel del estudiante · HU-10 · HU-41
+// HU-63 · Panel del estudiante (con mensajes sin leer) · HU-10 · HU-40
 export default async function EstudiantePage() {
   const usuario = await requireRol("estudiante");
   const inscripciones = await listarMisInscripciones(usuario.id);
@@ -41,13 +43,14 @@ export default async function EstudiantePage() {
   const certificados = inscripciones.filter((i) => i.certificado);
   const confirmadas = inscripciones.filter((i) => i.estado === "CONFIRMADA");
 
-  const [sesiones, evaluaciones, recomendados] = await Promise.all([
+  const [sesiones, evaluaciones, recomendados, conversaciones] = await Promise.all([
     listarSesionesProximas(
       activas.map((i) => i.curso.id),
       hoyISO(),
     ),
     listarEvaluacionesEstudiante(confirmadas.map((i) => ({ id: i.id, cursoId: i.curso.id, titulo: i.curso.titulo }))),
     recomendarCursos(inscripciones, 3),
+    confirmadas.length ? listarConversacionesEstudiante(usuario.id) : Promise.resolve([]),
   ]);
   const evalPendientes = evaluaciones.filter((e) => e.intentos.length === 0);
   const promedio = activas.length ? Math.round(activas.reduce((a, i) => a + i.progreso.porcentaje, 0) / activas.length) : 0;
@@ -139,6 +142,10 @@ export default async function EstudiantePage() {
         </div>
 
         <div className="space-y-6">
+          {/* Sin cursos confirmados no hay a quién escribir: el bloque no se muestra. */}
+          {conversaciones.length > 0 && (
+            <MensajesSinLeer items={conversaciones} href={(c) => `/estudiante/mensajes/${c.cursoId}`} todos="/estudiante/mensajes" className="[--i:2]" />
+          )}
           <section className="animar-entrada overflow-hidden rounded-2xl border bg-card shadow-xs [--i:2]">
             <div className="flex items-center justify-between border-b px-5 py-4">
               <h2 className="text-lg font-semibold tracking-tight">Próximas sesiones</h2>

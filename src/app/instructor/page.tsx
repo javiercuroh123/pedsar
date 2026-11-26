@@ -6,6 +6,8 @@ import { buttonVariants } from "@/components/ui/button";
 import { calcularProgreso } from "@/features/academico/consultas";
 import { listarCursosDelInstructor, listarSesionesDeCursos } from "@/features/academico/consultas-instructor";
 import { SiglaCurso } from "@/features/catalogo/portada-curso";
+import { listarBandejaInstructor } from "@/features/comunidad/consultas";
+import { MensajesSinLeer } from "@/features/comunidad/mensajes-sin-leer";
 import { requireRol } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { formatearFecha, formatearHora, horaFin, hoyISO } from "@/lib/formato";
@@ -19,7 +21,7 @@ const sumarDias = (iso: string, dias: number) => {
   return d.toISOString().slice(0, 10);
 };
 
-// HU-65 · Panel del instructor · HU-54
+// HU-63 · Panel del instructor (con mensajes sin leer) · HU-52
 export default async function InstructorPage() {
   const usuario = await requireRol("instructor", "administrador");
   const cursos = await listarCursosDelInstructor(usuario);
@@ -27,12 +29,15 @@ export default async function InstructorPage() {
   const supabase = await createClient();
   const hoy = hoyISO();
 
-  const [sesiones, { data: inscripciones }, { count: evaluaciones }] = await Promise.all([
+  // La bandeja (/instructor/mensajes) es solo del instructor; el administrador no la ve aquí.
+  const esInstructor = usuario.rol === "instructor";
+  const [sesiones, { data: inscripciones }, { count: evaluaciones }, bandeja] = await Promise.all([
     listarSesionesDeCursos(ids),
     ids.length ? supabase.from("inscripciones").select("id, curso_id").in("curso_id", ids).eq("estado", "CONFIRMADA") : Promise.resolve({ data: [] }),
     ids.length
       ? supabase.from("evaluaciones").select("id", { head: true, count: "exact" }).in("curso_id", ids)
       : Promise.resolve({ count: 0 }),
+    esInstructor ? listarBandejaInstructor() : Promise.resolve([]),
   ]);
   const filas = (inscripciones ?? []) as { id: string; curso_id: string }[];
   const progreso = await calcularProgreso(filas.map((f) => ({ inscripcionId: f.id, cursoId: f.curso_id })));
@@ -124,36 +129,39 @@ export default async function InstructorPage() {
           )}
         </PanelTabla>
 
-        <section className="overflow-hidden rounded-2xl border bg-card shadow-xs">
-          <div className="border-b bg-red-50/60 px-5 py-4 dark:bg-red-500/10">
-            <h2 className="font-semibold">Agenda de hoy</h2>
-            <p className="text-xs text-muted-foreground">{formatearFecha(hoy)}</p>
-          </div>
-          {deHoy.length ? (
-            <ul className="divide-y">
-              {deHoy.map((s) => (
-                <li key={s.id} className="px-5 py-4">
-                  <p className="font-mono text-xs text-muted-foreground">
-                    {formatearHora(s.hora_inicio)} – {horaFin(s.hora_inicio, s.duracion_minutos)}
-                  </p>
-                  <p className="mt-1 text-sm font-medium">{tituloDe(s.curso_id)}</p>
-                  <div className="mt-2 flex gap-2">
-                    {s.enlace_virtual && (
-                      <a href={s.enlace_virtual} target="_blank" rel="noreferrer" className={buttonVariants({ size: "sm" })}>
-                        <VideoIcon /> Iniciar
-                      </a>
-                    )}
-                    <Link href={`/instructor/asistencia?curso=${s.curso_id}&sesion=${s.id}`} className={buttonVariants({ variant: "outline", size: "sm" })}>
-                      Asistencia
-                    </Link>
-                  </div>
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <EstadoVacio icono={CalendarDaysIcon} titulo="Sin sesiones hoy" className="m-4 border-0 py-8" />
-          )}
-        </section>
+        <div className="space-y-6">
+          <section className="overflow-hidden rounded-2xl border bg-card shadow-xs">
+            <div className="border-b bg-red-50/60 px-5 py-4 dark:bg-red-500/10">
+              <h2 className="font-semibold">Agenda de hoy</h2>
+              <p className="text-xs text-muted-foreground">{formatearFecha(hoy)}</p>
+            </div>
+            {deHoy.length ? (
+              <ul className="divide-y">
+                {deHoy.map((s) => (
+                  <li key={s.id} className="px-5 py-4">
+                    <p className="font-mono text-xs text-muted-foreground">
+                      {formatearHora(s.hora_inicio)} – {horaFin(s.hora_inicio, s.duracion_minutos)}
+                    </p>
+                    <p className="mt-1 text-sm font-medium">{tituloDe(s.curso_id)}</p>
+                    <div className="mt-2 flex gap-2">
+                      {s.enlace_virtual && (
+                        <a href={s.enlace_virtual} target="_blank" rel="noreferrer" className={buttonVariants({ size: "sm" })}>
+                          <VideoIcon /> Iniciar
+                        </a>
+                      )}
+                      <Link href={`/instructor/asistencia?curso=${s.curso_id}&sesion=${s.id}`} className={buttonVariants({ variant: "outline", size: "sm" })}>
+                        Asistencia
+                      </Link>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <EstadoVacio icono={CalendarDaysIcon} titulo="Sin sesiones hoy" className="m-4 border-0 py-8" />
+            )}
+          </section>
+          {esInstructor && <MensajesSinLeer items={bandeja} href={(c) => `/instructor/mensajes/${c.id}`} todos="/instructor/mensajes" />}
+        </div>
       </div>
     </div>
   );
