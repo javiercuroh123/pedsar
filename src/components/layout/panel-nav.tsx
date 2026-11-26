@@ -7,6 +7,7 @@ import {
   CalendarDaysIcon,
   ChartColumnIcon,
   ClipboardCheckIcon,
+  ClipboardListIcon,
   CreditCardIcon,
   FolderOpenIcon,
   GlobeIcon,
@@ -56,6 +57,7 @@ const ICONOS: Record<IconoNav, LucideIcon> = {
   notificaciones: BellIcon,
   mensajes: MessagesSquareIcon,
   resenas: StarIcon,
+  encuestas: ClipboardListIcon,
 };
 
 /** Raíces de portal: solo se marcan activas con coincidencia exacta. */

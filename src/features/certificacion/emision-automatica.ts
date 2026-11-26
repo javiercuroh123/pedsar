@@ -1,6 +1,7 @@
 import "server-only";
 import { evaluarAptitud, type ResultadoAcademico } from "@/config/academico";
 import { uno } from "@/features/academico/consultas";
+import { enlaceEncuestaDe } from "@/features/encuestas/enlace";
 import { notificarUsuario } from "@/features/notificaciones/enviar";
 import { registrarActividad } from "@/lib/auditoria";
 import { generarCodigoCertificado } from "@/lib/certificados";
@@ -95,6 +96,8 @@ export async function emitirCertificadosAutomaticos(inscripcionIds: string[], ac
           curso: titulo,
           codigo,
           url: `${publicEnv.NEXT_PUBLIC_SITE_URL}/verificar?codigo=${codigo}`,
+          // HU-43 · El trigger de la BD ya envió la encuesta al insertar el certificado.
+          encuestaUrl: await enlaceEncuestaDe(i.id),
         }),
       });
     }

@@ -507,6 +507,174 @@ export type Database = {
           },
         ]
       }
+      encuesta_envios: {
+        Row: {
+          curso_id: string
+          encuesta_id: number
+          enviada_en: string
+          estudiante_id: string
+          id: number
+          inscripcion_id: string
+          respondida_en: string | null
+        }
+        Insert: {
+          curso_id: string
+          encuesta_id: number
+          enviada_en?: string
+          estudiante_id: string
+          id?: never
+          inscripcion_id: string
+          respondida_en?: string | null
+        }
+        Update: {
+          curso_id?: string
+          encuesta_id?: number
+          enviada_en?: string
+          estudiante_id?: string
+          id?: never
+          inscripcion_id?: string
+          respondida_en?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "encuesta_envios_curso_id_fkey"
+            columns: ["curso_id"]
+            isOneToOne: false
+            referencedRelation: "cursos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "encuesta_envios_encuesta_id_fkey"
+            columns: ["encuesta_id"]
+            isOneToOne: false
+            referencedRelation: "encuestas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "encuesta_envios_estudiante_id_fkey"
+            columns: ["estudiante_id"]
+            isOneToOne: false
+            referencedRelation: "perfiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "encuesta_envios_inscripcion_id_fkey"
+            columns: ["inscripcion_id"]
+            isOneToOne: false
+            referencedRelation: "inscripciones"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      encuesta_preguntas: {
+        Row: {
+          aspecto: Database["public"]["Enums"]["aspecto_encuesta"] | null
+          encuesta_id: number
+          enunciado: string
+          id: number
+          obligatoria: boolean
+          orden: number
+          tipo: "ESCALA" | "TEXTO"
+        }
+        Insert: {
+          aspecto?: Database["public"]["Enums"]["aspecto_encuesta"] | null
+          encuesta_id: number
+          enunciado: string
+          id?: never
+          obligatoria?: boolean
+          orden: number
+          tipo: "ESCALA" | "TEXTO"
+        }
+        Update: {
+          aspecto?: Database["public"]["Enums"]["aspecto_encuesta"] | null
+          encuesta_id?: number
+          enunciado?: string
+          id?: never
+          obligatoria?: boolean
+          orden?: number
+          tipo?: "ESCALA" | "TEXTO"
+        }
+        Relationships: [
+          {
+            foreignKeyName: "encuesta_preguntas_encuesta_id_fkey"
+            columns: ["encuesta_id"]
+            isOneToOne: false
+            referencedRelation: "encuestas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      encuesta_respuestas: {
+        Row: {
+          envio_id: number
+          pregunta_id: number
+          texto: string | null
+          valor: number | null
+        }
+        Insert: {
+          envio_id: number
+          pregunta_id: number
+          texto?: string | null
+          valor?: number | null
+        }
+        Update: {
+          envio_id?: number
+          pregunta_id?: number
+          texto?: string | null
+          valor?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "encuesta_respuestas_envio_id_fkey"
+            columns: ["envio_id"]
+            isOneToOne: false
+            referencedRelation: "encuesta_envios"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "encuesta_respuestas_pregunta_id_fkey"
+            columns: ["pregunta_id"]
+            isOneToOne: false
+            referencedRelation: "encuesta_preguntas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      encuestas: {
+        Row: {
+          activa: boolean
+          creada_en: string
+          creada_por: string | null
+          descripcion: string | null
+          id: number
+          titulo: string
+        }
+        Insert: {
+          activa?: boolean
+          creada_en?: string
+          creada_por?: string | null
+          descripcion?: string | null
+          id?: never
+          titulo: string
+        }
+        Update: {
+          activa?: boolean
+          creada_en?: string
+          creada_por?: string | null
+          descripcion?: string | null
+          id?: never
+          titulo?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "encuestas_creada_por_fkey"
+            columns: ["creada_por"]
+            isOneToOne: false
+            referencedRelation: "perfiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       evaluaciones: {
         Row: {
           curso_id: string
@@ -1323,6 +1491,7 @@ export type Database = {
           texto: string
         }[]
       }
+      responder_encuesta: { Args: { p_envio: number; p_respuestas: Json }; Returns: undefined }
       registrar_matricula: {
         Args: { p_estudiante: string; p_curso: string; p_metodo: Database["public"]["Enums"]["metodo_pago"]; p_cupon: string; p_monto: number; p_facturacion: Json }
         Returns: { inscripcion_id: string; codigo: string; vence_en: string | null; pago_id: string; monto: number; cupon_id: number | null }[]
@@ -1368,6 +1537,7 @@ export type Database = {
       }
     }
     Enums: {
+      aspecto_encuesta: "CONTENIDO" | "INSTRUCTOR" | "PLATAFORMA" | "GENERAL"
       estado_asistencia: "PRESENTE" | "AUSENTE" | "TARDANZA" | "JUSTIFICADA"
       estado_curso: "BORRADOR" | "PUBLICADO" | "DESPUBLICADO"
       estado_inscripcion: "PENDIENTE" | "CONFIRMADA" | "CANCELADA"
@@ -1516,6 +1686,7 @@ export const Constants = {
   },
   public: {
     Enums: {
+      aspecto_encuesta: ["CONTENIDO", "INSTRUCTOR", "PLATAFORMA", "GENERAL"],
       estado_asistencia: ["PRESENTE", "AUSENTE", "TARDANZA", "JUSTIFICADA"],
       estado_curso: ["BORRADOR", "PUBLICADO", "DESPUBLICADO"],
       estado_inscripcion: ["PENDIENTE", "CONFIRMADA", "CANCELADA"],

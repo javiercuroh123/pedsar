@@ -11,6 +11,7 @@ import { formatearFechaHora, nombreCompleto } from "@/lib/formato";
 import { evaluarAptitud } from "@/config/academico";
 import { PLAZO_PAGO_HORAS } from "@/config/matricula";
 import { obtenerResultados } from "@/features/certificacion/consultas";
+import { enlaceEncuestaDe } from "@/features/encuestas/enlace";
 import { publicEnv } from "@/lib/env";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
@@ -534,6 +535,8 @@ export async function emitirCertificados(formData: FormData): Promise<EstadoForm
           curso: curso?.titulo ?? "tu curso",
           codigo,
           url: `${publicEnv.NEXT_PUBLIC_SITE_URL}/verificar?codigo=${codigo}`,
+          // HU-43 · El trigger de la BD ya envió la encuesta al insertar el certificado.
+          encuestaUrl: await enlaceEncuestaDe(ins.id),
         }),
       });
     }

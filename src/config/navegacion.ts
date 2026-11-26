@@ -20,7 +20,8 @@ export type IconoNav =
   | "perfil"
   | "notificaciones"
   | "mensajes"
-  | "resenas";
+  | "resenas"
+  | "encuestas";
 
 export interface ItemNav {
   titulo: string;
@@ -59,6 +60,7 @@ export const NAV_POR_ROL: Record<Rol, GrupoNav[]> = {
         { titulo: "Evaluaciones", href: "/estudiante/evaluaciones", icono: "evaluaciones" },
         { titulo: "Mensajes", href: "/estudiante/mensajes", icono: "mensajes" },
         { titulo: "Certificados", href: "/estudiante/certificados", icono: "certificados" },
+        { titulo: "Encuestas", href: "/estudiante/encuestas", icono: "encuestas" },
         { titulo: "Pagos y comprobantes", href: "/estudiante/pagos", icono: "pagos" },
       ],
     },
@@ -94,6 +96,7 @@ export const NAV_POR_ROL: Record<Rol, GrupoNav[]> = {
         { titulo: "Categorías", href: "/admin/categorias", icono: "categorias" },
         { titulo: "Certificados", href: "/admin/certificados", icono: "certificados" },
         { titulo: "Reseñas", href: "/admin/resenas", icono: "resenas" },
+        { titulo: "Encuestas", href: "/admin/encuestas", icono: "encuestas" },
       ],
     },
     {

@@ -157,7 +157,7 @@ export function correoMensajeNuevo(p: { nombre: string; de: string; curso: strin
 
 // ---------- Certificación ----------
 
-export function correoCertificadoEmitido(p: { nombre: string; curso: string; codigo: string; url: string }) {
+export function correoCertificadoEmitido(p: { nombre: string; curso: string; codigo: string; url: string; encuestaUrl?: string | null }) {
   return {
     asunto: `Tu certificado de ${p.curso}`,
     html: marco(`
@@ -165,7 +165,12 @@ export function correoCertificadoEmitido(p: { nombre: string; curso: string; cod
       <p style="margin:0">Tu certificado de <strong>${escapar(p.curso)}</strong> ya está disponible en tu cuenta.</p>
       ${datos([["Código de verificación", escapar(p.codigo)]])}
       <p style="margin:0">Cualquier persona puede comprobar su autenticidad con ese código.</p>
-      ${boton("Verificar certificado", p.url)}`),
+      ${boton("Verificar certificado", p.url)}${
+        p.encuestaUrl
+          ? `
+      <p style="margin:16px 0 0">¿Cómo te fue en el curso? Responde la encuesta de satisfacción (2 minutos): <a href="${escapar(encodeURI(p.encuestaUrl))}">${escapar(p.encuestaUrl)}</a></p>`
+          : ""
+      }`),
   };
 }
 

@@ -5,6 +5,7 @@ import {
   BookOpenIcon,
   CalendarIcon,
   ClipboardCheckIcon,
+  ClipboardListIcon,
   ClockAlertIcon,
   CompassIcon,
   PlayIcon,
@@ -18,6 +19,7 @@ import { recomendarCursos } from "@/features/catalogo/consultas";
 import { CursoCard } from "@/features/catalogo/curso-card";
 import { listarConversacionesEstudiante } from "@/features/comunidad/consultas";
 import { MensajesSinLeer } from "@/features/comunidad/mensajes-sin-leer";
+import { listarEncuestasEstudiante } from "@/features/encuestas/consultas";
 import { SiglaCurso } from "@/features/catalogo/portada-curso";
 import { requireRol } from "@/lib/auth";
 import {
@@ -43,7 +45,7 @@ export default async function EstudiantePage() {
   const certificados = inscripciones.filter((i) => i.certificado);
   const confirmadas = inscripciones.filter((i) => i.estado === "CONFIRMADA");
 
-  const [sesiones, evaluaciones, recomendados, conversaciones] = await Promise.all([
+  const [sesiones, evaluaciones, recomendados, conversaciones, encuestas] = await Promise.all([
     listarSesionesProximas(
       activas.map((i) => i.curso.id),
       hoyISO(),
@@ -51,7 +53,10 @@ export default async function EstudiantePage() {
     listarEvaluacionesEstudiante(confirmadas.map((i) => ({ id: i.id, cursoId: i.curso.id, titulo: i.curso.titulo }))),
     recomendarCursos(inscripciones, 3),
     confirmadas.length ? listarConversacionesEstudiante(usuario.id) : Promise.resolve([]),
+    certificados.length ? listarEncuestasEstudiante(usuario.id) : Promise.resolve([]),
   ]);
+  // HU-43 · La encuesta pendiente más reciente (se envía al emitirse el certificado).
+  const encuestaPendiente = encuestas.find((e) => !e.respondidaEn);
   const evalPendientes = evaluaciones.filter((e) => e.intentos.length === 0);
   const promedio = activas.length ? Math.round(activas.reduce((a, i) => a + i.progreso.porcentaje, 0) / activas.length) : 0;
   const nombre = usuario.nombres.split(" ")[0] || "estudiante";
@@ -83,6 +88,18 @@ export default async function EstudiantePage() {
 
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="space-y-4 lg:col-span-2">
+          {encuestaPendiente && (
+            <div className="animar-entrada flex flex-col gap-3 rounded-2xl border border-brand-200 bg-brand-50 p-4 text-sm sm:flex-row sm:items-center dark:border-brand-500/30 dark:bg-brand-500/10">
+              <ClipboardListIcon className="hidden size-5 shrink-0 text-brand-700 sm:block dark:text-brand-300" />
+              <div className="flex-1">
+                <p className="font-semibold text-brand-900 dark:text-brand-100">¿Cómo te fue en {encuestaPendiente.curso}?</p>
+                <p className="mt-0.5 text-brand-900/70 dark:text-brand-100/70">Responde la encuesta de satisfacción: te toma unos 2 minutos y nos ayuda a mejorar.</p>
+              </div>
+              <Link href={`/estudiante/encuestas/${encuestaPendiente.envioId}`} className={buttonVariants({ size: "sm" })}>
+                Responder encuesta
+              </Link>
+            </div>
+          )}
           <h2 className="text-lg font-semibold tracking-tight">Continúa donde lo dejaste</h2>
           {activas.length ? (
             <div className="escalonado space-y-4">
