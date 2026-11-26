@@ -1,6 +1,6 @@
 import { PDFDocument, StandardFonts } from "pdf-lib";
 import { describe, expect, it } from "vitest";
-import { aWinAnsi, centrado, dibujarIsotipo, partir, recortar, tamanoQueEntra } from "@/lib/pdf/comun";
+import { aWinAnsi, centrado, dibujarEmblema, incrustarEmblema, partir, recortar, tamanoQueEntra } from "@/lib/pdf/comun";
 import { generarPdfComprobante } from "@/features/matricula/pdf-comprobante";
 import { generarPdfReporte } from "@/lib/pdf/reporte";
 import { leerPdf } from "../../apoyo/archivos";
@@ -37,14 +37,19 @@ describe("texto compatible con las fuentes estándar del PDF", () => {
     expect(tamanoQueEntra("Ana", f, 30, 10, 200)).toBe(30);
   });
 
-  it("dibuja texto centrado e isotipo sin errores", async () => {
+  it("dibuja texto centrado y el emblema de PEDSAR (PNG incrustado)", async () => {
     const doc = await PDFDocument.create();
     const pagina = doc.addPage();
     const f = await doc.embedFont(StandardFonts.Helvetica);
     centrado(pagina, "CERTIFICADO", 500, f, 20, undefined, 3);
     centrado(pagina, "Otorgado a", 450, f, 12);
-    dibujarIsotipo(pagina, 40, 40, 32);
-    const { texto } = await leerPdf(await doc.save());
+    const emblema = await incrustarEmblema(doc);
+    expect([emblema.width, emblema.height]).toEqual([160, 160]);
+    dibujarEmblema(pagina, emblema, 40, 40, 32);
+    const bytes = await doc.save();
+    // El PNG queda como una imagen (XObject) del documento.
+    expect(Buffer.from(bytes).toString("latin1")).toContain("/Subtype /Image");
+    const { texto } = await leerPdf(bytes);
     expect(texto).toContain("CERTIFICADO");
     expect(texto).toContain("Otorgado a");
   });

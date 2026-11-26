@@ -1,7 +1,7 @@
 import "server-only";
 import { PDFDocument, StandardFonts, type PDFFont, type PDFPage } from "pdf-lib";
 import { EMPRESA } from "@/config/empresa";
-import { aWinAnsi, COLOR, dibujarIsotipo, partir, recortar } from "./comun";
+import { aWinAnsi, COLOR, dibujarEmblema, incrustarEmblema, partir, recortar } from "./comun";
 
 /** Columna de una tabla del reporte; `ancho` es relativo (se reparte el ancho útil de la página). */
 export interface ColumnaPdf {
@@ -54,11 +54,12 @@ export async function generarPdfReporte(d: DatosPdfReporte): Promise<Uint8Array>
   const [ancho, alto] = d.horizontal ? [841.89, 595.28] : [595.28, 841.89];
   const util = ancho - 2 * MARGEN;
 
+  const emblema = await incrustarEmblema(pdf);
   let pagina!: PDFPage;
   let y = 0;
   const nuevaPagina = () => {
     pagina = pdf.addPage([ancho, alto]);
-    dibujarIsotipo(pagina, MARGEN, alto - MARGEN - 22, 22);
+    dibujarEmblema(pagina, emblema, MARGEN, alto - MARGEN - 22, 22);
     pagina.drawText("PEDSAR", { x: MARGEN + 29, y: alto - MARGEN - 16, size: 13, font: f.negrita, color: COLOR.grafito });
     const titulo = aWinAnsi(d.titulo);
     const subtitulo = recortar(d.subtitulo, f.normal, 9, util - 160);

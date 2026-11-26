@@ -26,7 +26,6 @@ import {
   ETIQUETA_TIPO_SESION,
   etiquetaPago,
   formatearDiaSemana,
-  formatearFechaCorta,
   formatearHora,
   formatearSoles,
   horaFin,
@@ -174,7 +173,8 @@ export default async function EstudiantePage() {
                   <li key={s.id} className="flex gap-4 px-5 py-4 transition-colors hover:bg-muted/40">
                     <div className="w-14 shrink-0 rounded-lg bg-brand-50 py-1.5 text-center text-brand-800 dark:bg-brand-500/10 dark:text-brand-200">
                       <p className="text-[11px] font-semibold tracking-wider uppercase">{formatearDiaSemana(s.fecha)}</p>
-                      <p className="text-xl leading-tight font-semibold">{formatearFechaCorta(s.fecha).split(" ")[0]}</p>
+                      {/* Solo el número del día: el formato corto varía según el navegador («01 dic» o «01-dic»). */}
+                      <p className="text-xl leading-tight font-semibold">{s.fecha.slice(8, 10)}</p>
                     </div>
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-sm font-medium">{s.curso.titulo}</p>

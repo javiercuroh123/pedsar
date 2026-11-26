@@ -1,5 +1,6 @@
 import "server-only";
-import { LineCapStyle, rgb, setCharacterSpacing, type PDFFont, type PDFPage } from "pdf-lib";
+import { rgb, setCharacterSpacing, type PDFDocument, type PDFFont, type PDFImage, type PDFPage } from "pdf-lib";
+import { EMBLEMA_PNG_BASE64 } from "./emblema";
 
 /** Piezas compartidas por los PDF del sistema (certificados y reportes), con la paleta grafito y cian. */
 const hex = (h: string) => rgb(parseInt(h.slice(1, 3), 16) / 255, parseInt(h.slice(3, 5), 16) / 255, parseInt(h.slice(5, 7), 16) / 255);
@@ -90,28 +91,12 @@ export const tamanoQueEntra = (texto: string, fuente: PDFFont, max: number, min:
   return tam;
 };
 
-/** Isotipo de PEDSAR: birrete (ícono lucide) blanco sobre un cuadrado redondeado cian. (x, y) = esquina inferior izquierda. */
-export function dibujarIsotipo(pagina: PDFPage, x: number, y: number, lado: number) {
-  const r = lado * 0.24;
-  pagina.drawSvgPath(
-    `M${r} 0H${lado - r}Q${lado} 0 ${lado} ${r}V${lado - r}Q${lado} ${lado} ${lado - r} ${lado}H${r}Q0 ${lado} 0 ${lado - r}V${r}Q0 0 ${r} 0Z`,
-    { x, y: y + lado, color: COLOR.marca },
-  );
-  const escala = (lado * 0.62) / 24;
-  const desplazamiento = (lado - 24 * escala) / 2;
-  for (const d of [
-    "M21.42 10.922a1 1 0 0 0-.019-1.838L12.83 5.18a2 2 0 0 0-1.66 0L2.6 9.08a1 1 0 0 0 0 1.832l8.57 3.908a2 2 0 0 0 1.66 0z",
-    "M22 10v6",
-    "M6 12.5V16a6 3 0 0 0 12 0v-3.5",
-  ]) {
-    // El grosor se expresa en unidades del ícono (24×24) y se escala junto con el trazado.
-    pagina.drawSvgPath(d, {
-      x: x + desplazamiento,
-      y: y + lado - desplazamiento,
-      scale: escala,
-      borderColor: COLOR.blanco,
-      borderWidth: 2.2,
-      borderLineCap: LineCapStyle.Round,
-    });
-  }
+/** Incrusta el emblema redondo de PEDSAR una vez por documento (luego se dibuja en cada página). */
+export function incrustarEmblema(pdf: PDFDocument): Promise<PDFImage> {
+  return pdf.embedPng(Buffer.from(EMBLEMA_PNG_BASE64, "base64"));
+}
+
+/** Dibuja el emblema de PEDSAR (el mismo logo redondo del sitio) con su esquina inferior izquierda en (x, y). */
+export function dibujarEmblema(pagina: PDFPage, emblema: PDFImage, x: number, y: number, lado: number) {
+  pagina.drawImage(emblema, { x, y, width: lado, height: lado });
 }

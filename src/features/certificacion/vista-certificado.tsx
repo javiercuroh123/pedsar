@@ -1,4 +1,3 @@
-import { GraduationCapIcon } from "lucide-react";
 import { esCertificadoDeAprobacion, formatearNota } from "@/config/academico";
 import { publicEnv } from "@/lib/env";
 import { formatearFecha } from "@/lib/formato";
@@ -33,12 +32,9 @@ export function VistaCertificado({ datos }: { datos: DatosCertificado }) {
       <div className="absolute inset-[4.4%] rounded-sm border border-brand-700/30" />
       <div className="relative flex h-full flex-col items-center justify-between px-[11%] py-[8%] text-center">
         <div className="flex items-center gap-[1.2cqw]" style={{ fontSize: "2.2cqw" }}>
-          <span
-            className="grid place-items-center rounded-[0.9cqw] bg-linear-to-br from-brand-400 to-brand-700 text-white"
-            style={{ width: "3.8cqw", height: "3.8cqw" }}
-          >
-            <GraduationCapIcon style={{ width: "2.3cqw", height: "2.3cqw" }} />
-          </span>
+          {/* Emblema redondo de PEDSAR, el mismo del sitio y de los PDF. */}
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/pedsar-emblema.webp" alt="" className="shrink-0 rounded-full" style={{ width: "3.8cqw", height: "3.8cqw" }} />
           <b className="tracking-tight">PEDSAR</b>
         </div>
         <div>

@@ -2,7 +2,7 @@ import "server-only";
 import { PDFDocument, StandardFonts, type PDFFont, type PDFPage } from "pdf-lib";
 import { EMPRESA } from "@/config/empresa";
 import { formatearFecha, formatearSoles } from "@/lib/formato";
-import { aWinAnsi, COLOR, dibujarIsotipo, partir } from "@/lib/pdf/comun";
+import { aWinAnsi, COLOR, dibujarEmblema, incrustarEmblema, partir } from "@/lib/pdf/comun";
 
 export interface DatosPdfComprobante {
   serie: string;
@@ -47,7 +47,7 @@ export async function generarPdfComprobante(d: DatosPdfComprobante): Promise<Uin
 
   // ---------- Encabezado: empresa y número ----------
   let y = ALTO - MARGEN;
-  dibujarIsotipo(pagina, MARGEN, y - 40, 40);
+  dibujarEmblema(pagina, await incrustarEmblema(pdf), MARGEN, y - 40, 40);
   texto("PEDSAR", MARGEN + 52, y - 16, 18, negrita, COLOR.grafito);
   texto("Cursos y capacitaciones", MARGEN + 52, y - 32, 9, normal, COLOR.suave);
   const cajaAncho = 190;

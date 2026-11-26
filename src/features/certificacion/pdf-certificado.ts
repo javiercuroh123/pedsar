@@ -2,7 +2,7 @@ import "server-only";
 import { PDFDocument, StandardFonts, type PDFFont, type PDFPage } from "pdf-lib";
 import { esCertificadoDeAprobacion, formatearNota } from "@/config/academico";
 import { EMPRESA } from "@/config/empresa";
-import { aWinAnsi, centrado, COLOR, dibujarIsotipo, partir, tamanoQueEntra } from "@/lib/pdf/comun";
+import { aWinAnsi, centrado, COLOR, dibujarEmblema, incrustarEmblema, partir, tamanoQueEntra } from "@/lib/pdf/comun";
 import { trazadoQr } from "./qr";
 
 /** Datos congelados del certificado (tabla certificados) y la URL pública de verificación. */
@@ -63,10 +63,10 @@ export async function generarPdfCertificado(d: DatosPdfCertificado): Promise<Uin
   pagina.drawRectangle({ x: 22, y: 22, width: ANCHO - 44, height: ALTO - 44, borderColor: COLOR.cian, borderWidth: 2.5 });
   pagina.drawRectangle({ x: 31, y: 31, width: ANCHO - 62, height: ALTO - 62, borderColor: COLOR.cian, borderWidth: 0.6, borderOpacity: 0.35 });
 
-  // Encabezado: isotipo + PEDSAR
+  // Encabezado: emblema + PEDSAR
   const anchoMarca = negrita.widthOfTextAtSize("PEDSAR", 20);
   const inicio = ANCHO / 2 - (28 + 10 + anchoMarca) / 2;
-  dibujarIsotipo(pagina, inicio, ALTO - 104, 28);
+  dibujarEmblema(pagina, await incrustarEmblema(pdf), inicio, ALTO - 104, 28);
   pagina.drawText("PEDSAR", { x: inicio + 38, y: ALTO - 97, size: 20, font: negrita, color: COLOR.grafito });
 
   // Título y beneficiario
