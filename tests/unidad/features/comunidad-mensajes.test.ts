@@ -119,7 +119,7 @@ describe("leer conversaciones", () => {
     ]);
   });
 
-  it("la bandeja del instructor lista sus conversaciones (filtrables por curso) con los no leídos", async () => {
+  it("la bandeja del instructor lista todas sus conversaciones con el estudiante y los no leídos (HU-52)", async () => {
     conSesion("instructor");
     responder(
       {
@@ -128,10 +128,11 @@ describe("leer conversaciones", () => {
       },
       { perfiles: { data: [{ id: UUID.estudiante, nombres: "Ana", apellidos: "Quispe" }] } },
     );
-    await expect(listarBandejaInstructor(UUID.curso)).resolves.toEqual([
-      { id: 5, cursoId: UUID.curso, curso: "Excel", otro: "Ana Quispe", ultimoMensaje: "¿Hasta cuándo?", ultimoEn: "2026-10-02T15:00:00Z", noLeidos: 1 },
+    await expect(listarBandejaInstructor()).resolves.toEqual([
+      { id: 5, cursoId: UUID.curso, curso: "Excel", otro: "Ana Quispe", ultimoMensaje: "¿Hasta cuándo?", ultimoEn: "2026-10-02T15:00:00Z", noLeidos: 1, estudianteId: UUID.estudiante },
     ]);
-    expect(entorno.servidor.de("conversaciones")[0].filtros).toContainEqual(["eq", "curso_id", UUID.curso]);
+    // Se traen todas: los filtros se aplican en memoria para contar los no leídos de cada curso.
+    expect(entorno.servidor.de("conversaciones")[0].filtros).not.toContainEqual(expect.arrayContaining(["eq", "curso_id"]));
   });
 
   it("una conversación trae sus 500 mensajes más recientes en orden cronológico y marca cuáles son propios", async () => {

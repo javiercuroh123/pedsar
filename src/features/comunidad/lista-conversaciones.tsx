@@ -23,7 +23,8 @@ export function ListaConversaciones({ items, href }: { items: ConversacionResume
               </p>
             </div>
             <div className="flex shrink-0 flex-col items-end gap-1">
-              {c.ultimoEn && <span className="text-xs whitespace-nowrap text-muted-foreground">{formatearFechaHora(c.ultimoEn)}</span>}
+              {/* En pantallas chicas la fecha no cabe junto al nombre: solo queda el contador. */}
+              {c.ultimoEn && <span className="hidden text-xs whitespace-nowrap text-muted-foreground sm:inline">{formatearFechaHora(c.ultimoEn)}</span>}
               {c.noLeidos > 0 && <Pildora color="indigo">{c.noLeidos} sin leer</Pildora>}
             </div>
             <ChevronRightIcon className="size-4 shrink-0 text-muted-foreground" />

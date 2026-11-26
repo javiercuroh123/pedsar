@@ -15,6 +15,8 @@ export interface ConversacionResumen {
   ultimoMensaje: string | null;
   ultimoEn: string | null;
   noLeidos: number;
+  /** Solo en la bandeja del instructor: para filtrar por estudiante (HU-52). */
+  estudianteId?: string;
 }
 
 export interface Mensaje {
@@ -106,17 +108,19 @@ export async function listarConversacionesEstudiante(estudianteId: string): Prom
     .sort((a, b) => (b.ultimoEn ?? "").localeCompare(a.ultimoEn ?? ""));
 }
 
-/** HU-19 · HU-54 · Bandeja del instructor: sus conversaciones (RLS), las más recientes primero. */
-export async function listarBandejaInstructor(cursoId?: string): Promise<ConversacionResumen[]> {
+/**
+ * HU-19 · HU-52 · Bandeja del instructor: todas sus conversaciones (RLS), las más
+ * recientes primero. Los filtros por curso, estudiante y estado se aplican en
+ * memoria (ver bandeja.ts) para poder contar los no leídos de cada curso.
+ */
+export async function listarBandejaInstructor(): Promise<ConversacionResumen[]> {
   const supabase = await createClient();
-  let consulta = supabase
+  const { data } = await supabase
     .from("conversaciones")
     .select("id, curso_id, estudiante_id, ultimo_mensaje_en, curso:cursos(titulo), mensajes(texto, enviado_en)")
     .order("ultimo_mensaje_en", { ascending: false })
     .order("enviado_en", { referencedTable: "mensajes", ascending: false })
     .limit(1, { referencedTable: "mensajes" });
-  if (cursoId) consulta = consulta.eq("curso_id", cursoId);
-  const { data } = await consulta;
   const filas = (data ?? []) as FilaConversacion[];
   const [noLeidos, estudiantes] = await Promise.all([
     noLeidosPor(supabase, filas.map((c) => ({ id: c.id, estudianteId: c.estudiante_id! })), "instructor"),
@@ -132,6 +136,7 @@ export async function listarBandejaInstructor(cursoId?: string): Promise<Convers
       ultimoMensaje: ultimo?.texto ?? null,
       ultimoEn: ultimo?.enviado_en ?? c.ultimo_mensaje_en,
       noLeidos: noLeidos.get(c.id) ?? 0,
+      estudianteId: c.estudiante_id,
     };
   });
 }
