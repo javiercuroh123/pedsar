@@ -56,6 +56,9 @@ export function DialogoEditarModulo({ modulo }: { modulo: { id: number; titulo: 
   );
 }
 
+// HU-50 · 50 MB por archivo: es también el máximo que acepta el almacenamiento de Supabase
+// (file_size_limit en supabase/config.toml y límite del plan gratuito). Un tope mayor aquí haría
+// fallar la subida en el servidor después de esperar toda la carga.
 const TIPOS = [
   {
     v: "PDF",
@@ -64,7 +67,7 @@ const TIPOS = [
     acepta: "application/pdf,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.zip,.rar,image/png,image/jpeg,image/webp",
     limite: 50,
   },
-  { v: "VIDEO", t: "Video", icono: FilmIcon, acepta: "video/mp4,video/webm", limite: 500 },
+  { v: "VIDEO", t: "Video", icono: FilmIcon, acepta: "video/mp4,video/webm", limite: 50 },
   { v: "ENLACE", t: "Enlace", icono: LinkIcon, acepta: "", limite: 0 },
 ] as const;
 

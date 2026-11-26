@@ -230,7 +230,9 @@ max_frequency = "1s"
 # Number of characters used in the email OTP.
 otp_length = 6
 # Number of seconds before the email OTP expires (defaults to 1 hour).
-otp_expiry = 3600
+# HU-13 · los enlaces de recuperación (y de confirmación) vencen en 24 horas, como dice /recuperar.
+# En la nube se fija igual en Authentication → Email → «Email OTP Expiration» = 86400.
+otp_expiry = 86400
 
 # Use a production-ready SMTP server
 # [auth.email.smtp]
