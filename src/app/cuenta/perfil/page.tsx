@@ -17,13 +17,13 @@ const PESTANAS = [
   { valor: "privacidad", etiqueta: "Privacidad y datos", href: "/cuenta/perfil?tab=privacidad" },
 ];
 
-// HU-15 · Perfil · HU-13 · Contraseña · HU-44 · Datos personales (Ley N.º 29733)
+// HU-15 · Perfil (HU-34 biografía del instructor) · HU-13 · Contraseña · HU-44 · Datos personales (Ley N.º 29733)
 export default async function CuentaPerfilPage({ searchParams }: PageProps<"/cuenta/perfil">) {
   const usuario = await requireUsuario();
   const { tab } = await searchParams;
   const activa = PESTANAS.some((p) => p.valor === tab) ? (tab as string) : "datos";
   const supabase = await createClient();
-  const { data: extra } = await supabase.from("perfiles").select("telefono, documento, fecha_nacimiento").eq("id", usuario.id).single();
+  const { data: extra } = await supabase.from("perfiles").select("telefono, documento, fecha_nacimiento, biografia").eq("id", usuario.id).single();
 
   return (
     <div className="space-y-6">
@@ -40,6 +40,7 @@ export default async function CuentaPerfilPage({ searchParams }: PageProps<"/cue
             fechaNacimiento={extra?.fecha_nacimiento ?? null}
             documento={extra?.documento ?? null}
             especialidad={usuario.especialidad}
+            biografia={extra?.biografia ?? null}
             avatar={usuario.avatar_url}
             esStaff={usuario.rol !== "estudiante"}
             etiquetaRol={ETIQUETA_ROL[usuario.rol]}

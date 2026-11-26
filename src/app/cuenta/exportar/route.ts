@@ -12,7 +12,7 @@ export async function GET() {
   const [{ data: perfil }, { data: inscripciones }, { data: notificaciones }, { data: mensajes }, { data: resenas }] = await Promise.all([
     supabase
       .from("perfiles")
-      .select("nombres, apellidos, correo, telefono, documento, rol, especialidad, fecha_registro, privacidad_version, privacidad_aceptada_en")
+      .select("nombres, apellidos, correo, telefono, documento, rol, especialidad, biografia, fecha_registro, privacidad_version, privacidad_aceptada_en")
       .eq("id", usuario.id)
       .single(),
     supabase

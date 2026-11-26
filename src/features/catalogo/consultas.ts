@@ -224,7 +224,7 @@ export async function obtenerCursoPorSlug(slug: string) {
     cupo_disponible: (cupo as number | null) ?? 0,
     calificacion: notas.get(data.id) ?? null,
     resenas: ((resenas ?? []) as ResenaPublica[]).map((r) => ({ estrellas: r.estrellas, texto: r.texto, autor: r.autor, fecha: r.fecha })),
-    instructor: instructor as { nombres: string; apellidos: string; especialidad: string | null; avatar_url: string | null } | null,
+    instructor: instructor as { nombres: string; apellidos: string; especialidad: string | null; avatar_url: string | null; biografia: string | null } | null,
     modulos: [...((data.modulos ?? []) as { id: number; titulo: string; orden: number }[])].sort((a, b) => a.orden - b.orden),
     sesiones: [
       ...(horarios.data ?? []),

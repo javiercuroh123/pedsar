@@ -161,6 +161,27 @@ describe("perfil (HU-15)", () => {
     await expect(actualizarPerfil({}, formulario({ ...datos, fechaNacimiento: "no-fecha" }))).resolves.toEqual({ ok: false, mensaje: "Fecha de nacimiento no válida" });
   });
 
+  it("el instructor edita su biografía; vacía se guarda como null y el estudiante no la edita (HU-34)", async () => {
+    conSesion("instructor");
+    await actualizarPerfil({}, formulario({ ...datos, biografia: "  Docente de ofimática desde 2015.  " }));
+    await actualizarPerfil({}, formulario({ ...datos, biografia: "   " }));
+    await actualizarPerfil({}, formulario(datos));
+    const guardados = entorno.servidor.de("perfiles", "update").map((c) => c.valores as Record<string, unknown>);
+    expect(guardados[0]).toMatchObject({ biografia: "Docente de ofimática desde 2015." });
+    expect(guardados[1]).toMatchObject({ biografia: null });
+    // Sin el campo en el formulario, no se toca la biografía guardada.
+    expect(guardados[2]).not.toHaveProperty("biografia");
+    await expect(actualizarPerfil({}, formulario({ ...datos, biografia: "x".repeat(601) }))).resolves.toEqual({
+      ok: false,
+      mensaje: "La biografía admite hasta 600 caracteres",
+    });
+
+    conSesion("estudiante");
+    responder();
+    await actualizarPerfil({}, formulario({ ...datos, biografia: "Quiero aparecer en el catálogo" }));
+    expect(entorno.servidor.de("perfiles", "update")[0].valores).not.toHaveProperty("biografia");
+  });
+
   it("guarda el celular solo con dígitos y rechaza números que no son celulares peruanos", async () => {
     conSesion("estudiante");
     await actualizarPerfil({}, formulario({ ...datos, telefono: "+51 987 654 321" }));

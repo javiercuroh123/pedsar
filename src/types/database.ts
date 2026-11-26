@@ -918,6 +918,7 @@ export type Database = {
           actualizado_en: string
           apellidos: string
           avatar_url: string | null
+          biografia: string | null
           canal_notificacion: "AMBOS" | "CORREO" | "IN_APP"
           correo: string
           documento: string | null
@@ -936,6 +937,7 @@ export type Database = {
           actualizado_en?: string
           apellidos?: string
           avatar_url?: string | null
+          biografia?: string | null
           canal_notificacion?: "AMBOS" | "CORREO" | "IN_APP"
           correo: string
           documento?: string | null
@@ -954,6 +956,7 @@ export type Database = {
           actualizado_en?: string
           apellidos?: string
           avatar_url?: string | null
+          biografia?: string | null
           canal_notificacion?: "AMBOS" | "CORREO" | "IN_APP"
           correo?: string
           documento?: string | null
@@ -1293,6 +1296,7 @@ export type Database = {
         Returns: {
           apellidos: string
           avatar_url: string
+          biografia: string
           especialidad: string
           id: string
           nombres: string

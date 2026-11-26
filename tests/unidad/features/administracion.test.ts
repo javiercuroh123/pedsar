@@ -477,4 +477,16 @@ describe("usuarios y roles (HU-03 · HU-34)", () => {
     entorno.admin.cliente.auth.admin.inviteUserByEmail.mockResolvedValueOnce({ data: { user: null }, error: { message: "ya registrado" } } as never);
     await expect(invitarUsuario({}, formulario(datos))).resolves.toEqual({ ok: false, mensaje: "ya registrado" });
   });
+
+  it("guarda la biografía del instructor invitado y la descarta para estudiantes (HU-34)", async () => {
+    conSesion("administrador");
+    const datos = { nombres: "Luis", apellidos: "Ramos", correo: "luis@pedsar.test", especialidad: "Ofimática", biografia: "  Ingeniero de sistemas con 10 años enseñando Excel.  " };
+    await invitarUsuario({}, formulario({ ...datos, rol: "instructor" }));
+    await invitarUsuario({}, formulario({ ...datos, rol: "estudiante" }));
+    expect(entorno.admin.de("perfiles", "update").map((c) => c.valores)).toEqual([
+      { rol: "instructor", especialidad: "Ofimática", biografia: "Ingeniero de sistemas con 10 años enseñando Excel." },
+      { rol: "estudiante", especialidad: null, biografia: null },
+    ]);
+    await expect(invitarUsuario({}, formulario({ ...datos, rol: "instructor", biografia: "x".repeat(601) }))).resolves.toMatchObject({ ok: false });
+  });
 });

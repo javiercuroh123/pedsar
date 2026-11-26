@@ -18,6 +18,8 @@ const perfilSchema = z.object({
     .regex(/^(\d{8}|[A-Z0-9]{9,12})?$/i, "DNI de 8 dígitos o CE válido")
     .optional(),
   especialidad: z.string().trim().max(120).optional(),
+  // HU-34 · Presentación pública del instructor en el detalle del curso.
+  biografia: z.string().trim().max(600, "La biografía admite hasta 600 caracteres").optional(),
   avatarUrl: z.union([z.url(), z.literal("")]).optional(),
 });
 
@@ -36,6 +38,7 @@ export async function actualizarPerfil(_: EstadoFormulario, formData: FormData):
       documento: d.data.documento || null,
       ...(d.data.fechaNacimiento !== undefined && { fecha_nacimiento: d.data.fechaNacimiento || null }),
       ...(usuario.rol !== "estudiante" && { especialidad: d.data.especialidad || null }),
+      ...(usuario.rol !== "estudiante" && d.data.biografia !== undefined && { biografia: d.data.biografia || null }),
       ...(d.data.avatarUrl !== undefined && { avatar_url: d.data.avatarUrl || null }),
     })
     .eq("id", usuario.id);

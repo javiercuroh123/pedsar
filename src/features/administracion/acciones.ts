@@ -583,6 +583,7 @@ const invitacionSchema = z.object({
   correo: z.email("Correo no válido"),
   rol: z.enum(["administrador", "instructor", "estudiante"]),
   especialidad: z.string().trim().max(120).optional(),
+  biografia: z.string().trim().max(600, "La biografía admite hasta 600 caracteres").optional(),
 });
 
 export async function invitarUsuario(_: EstadoFormulario, formData: FormData): Promise<EstadoFormulario> {
@@ -596,7 +597,12 @@ export async function invitarUsuario(_: EstadoFormulario, formData: FormData): P
   });
   if (error || !data.user) return { ok: false, mensaje: error?.message ?? "No se pudo invitar al usuario" };
   // El trigger crea el perfil como estudiante; aquí se asigna el rol elegido.
-  await db.from("perfiles").update({ rol: d.data.rol, especialidad: d.data.especialidad || null }).eq("id", data.user.id);
+  // HU-34 · La especialidad y la biografía solo se guardan para el personal (no para estudiantes).
+  const esPersonal = d.data.rol !== "estudiante";
+  await db
+    .from("perfiles")
+    .update({ rol: d.data.rol, especialidad: (esPersonal && d.data.especialidad) || null, biografia: (esPersonal && d.data.biografia) || null })
+    .eq("id", data.user.id);
   await registrarActividad(usuario.id, "INVITAR_USUARIO", { correo: d.data.correo, rol: d.data.rol });
   revalidatePath("/admin/usuarios");
   return { ok: true, mensaje: `Invitación enviada a ${d.data.correo}` };

@@ -8,6 +8,7 @@ import { AvatarIniciales } from "@/components/comunes";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { formatearFecha } from "@/lib/formato";
 import { createClient } from "@/lib/supabase/client";
 import { formatearCelular } from "@/lib/telefono";
@@ -23,6 +24,8 @@ interface Props {
   fechaNacimiento?: string | null;
   documento: string | null;
   especialidad: string | null;
+  /** HU-34 · Presentación pública (solo personal: instructor o administrador). */
+  biografia?: string | null;
   avatar: string | null;
   esStaff: boolean;
   /** «Administrador», «Instructor» o «Estudiante». */
@@ -55,6 +58,7 @@ export function FormularioPerfil(p: Props) {
   const [editando, setEditando] = useState(false);
   const [avatar, setAvatar] = useState(p.avatar ?? "");
   const [subiendo, setSubiendo] = useState(false);
+  const [largoBio, setLargoBio] = useState((p.biografia ?? "").length);
   const botonEditar = useRef<HTMLButtonElement>(null);
   const volverAlBoton = useRef(false);
 
@@ -75,6 +79,7 @@ export function FormularioPerfil(p: Props) {
 
   const abrir = () => {
     setAvatar(p.avatar ?? "");
+    setLargoBio((p.biografia ?? "").length);
     setEditando(true);
   };
   function cerrar() {
@@ -165,6 +170,18 @@ export function FormularioPerfil(p: Props) {
           <Dato etiqueta="Fecha de nacimiento" valor={p.fechaNacimiento ? formatearFecha(p.fechaNacimiento) : null} />
           <Dato etiqueta="DNI / CE" valor={p.documento} mono />
           {p.esStaff && <Dato etiqueta="Especialidad" valor={p.especialidad} />}
+          {p.esStaff && (
+            <div className="min-w-0 sm:col-span-2">
+              <dt className="text-xs font-medium tracking-wide text-muted-foreground uppercase">Biografía</dt>
+              <dd className="mt-1 text-sm">
+                {p.biografia ? (
+                  <p className="leading-relaxed break-words whitespace-pre-line">{p.biografia}</p>
+                ) : (
+                  <span className="text-muted-foreground italic">Sin registrar · se muestra en el detalle de tus cursos</span>
+                )}
+              </dd>
+            </div>
+          )}
         </dl>
       </section>
     );
@@ -209,6 +226,29 @@ export function FormularioPerfil(p: Props) {
           <div className="space-y-1.5">
             <Label htmlFor="p-esp">Especialidad</Label>
             <Input id="p-esp" name="especialidad" defaultValue={p.especialidad ?? ""} className="h-10" />
+          </div>
+        )}
+        {p.esStaff && (
+          <div className="space-y-1.5 sm:col-span-2">
+            <div className="flex items-baseline justify-between gap-2">
+              <Label htmlFor="p-bio">Biografía</Label>
+              <span className="text-xs text-muted-foreground tabular-nums" aria-live="polite">
+                {largoBio}/600
+              </span>
+            </div>
+            <Textarea
+              id="p-bio"
+              name="biografia"
+              rows={4}
+              maxLength={600}
+              defaultValue={p.biografia ?? ""}
+              onChange={(e) => setLargoBio(e.target.value.length)}
+              aria-describedby="p-bio-ayuda"
+              placeholder="Tu formación, experiencia y lo que enseñas"
+            />
+            <p id="p-bio-ayuda" className="text-xs text-muted-foreground">
+              Se muestra a los visitantes en el detalle de tus cursos.
+            </p>
           </div>
         )}
       </div>

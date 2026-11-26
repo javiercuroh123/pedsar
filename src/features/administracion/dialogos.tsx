@@ -127,6 +127,9 @@ export function DialogoUsuario() {
         <CampoForm etiqueta="Especialidad" htmlFor="u-esp" ayuda="Solo instructores">
           <Input id="u-esp" name="especialidad" className="h-10" />
         </CampoForm>
+        <CampoForm etiqueta="Biografía" htmlFor="u-bio" ayuda="Solo instructores · se muestra en el detalle de sus cursos (hasta 600 caracteres)" className="sm:col-span-2">
+          <Textarea id="u-bio" name="biografia" rows={3} maxLength={600} placeholder="Formación, experiencia y lo que enseña" />
+        </CampoForm>
       </div>
     </DialogoFormulario>
   );

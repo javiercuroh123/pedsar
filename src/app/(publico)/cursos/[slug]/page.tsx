@@ -202,14 +202,20 @@ export default async function CursoPage({ params }: PageProps<"/cursos/[slug]">)
           {instructor && (
             <section>
               <h2 className="text-xl font-bold tracking-tight">Tu instructor</h2>
-              <div className="mt-4 flex items-center gap-4 rounded-2xl border bg-card p-5">
-                <AvatarIniciales nombre={instructor} src={curso.instructor?.avatar_url} className="size-14 text-base" />
-                <div>
-                  <p className="font-semibold">{instructor}</p>
-                  <p className="text-sm text-muted-foreground">
-                    {curso.instructor?.especialidad ?? `Especialista en ${curso.categoria?.nombre.toLowerCase() ?? "tecnología"}`}
-                  </p>
+              <div className="mt-4 rounded-2xl border bg-card p-5">
+                <div className="flex items-center gap-4">
+                  <AvatarIniciales nombre={instructor} src={curso.instructor?.avatar_url} className="size-14 text-base" />
+                  <div>
+                    <p className="font-semibold">{instructor}</p>
+                    <p className="text-sm text-muted-foreground">
+                      {curso.instructor?.especialidad ?? `Especialista en ${curso.categoria?.nombre.toLowerCase() ?? "tecnología"}`}
+                    </p>
+                  </div>
                 </div>
+                {/* HU-34 · Biografía del instructor */}
+                {curso.instructor?.biografia && (
+                  <p className="mt-4 border-t pt-4 text-sm leading-relaxed break-words whitespace-pre-line text-muted-foreground">{curso.instructor.biografia}</p>
+                )}
               </div>
             </section>
           )}
