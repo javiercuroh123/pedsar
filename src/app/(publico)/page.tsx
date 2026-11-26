@@ -10,18 +10,21 @@ import {
   GraduationCapIcon,
   LineChartIcon,
   QrCodeIcon,
+  QuoteIcon,
   SearchIcon,
   ShieldCheckIcon,
   WalletIcon,
 } from "lucide-react";
 import Link from "next/link";
-import { EstadoVacio } from "@/components/comunes";
+import { AvatarIniciales, EstadoVacio } from "@/components/comunes";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { categoriasHoja, categoriasPrincipales, contarCursosPorCategoria } from "@/features/catalogo/categorias";
 import { listarCategorias, listarCursosPublicados } from "@/features/catalogo/consultas";
 import { CursoCard, IndicadorCupo } from "@/features/catalogo/curso-card";
 import { degradadoCategoria, IconoCategoria, PortadaCurso } from "@/features/catalogo/portada-curso";
+import { listarTestimonios } from "@/features/comunidad/consultas-resenas";
+import { Estrellas } from "@/features/comunidad/estrellas";
 import { ETIQUETA_NIVEL, formatearFecha, formatearHora, formatearSoles } from "@/lib/formato";
 import { pasarelaActiva } from "@/lib/pagos";
 import { cn } from "@/lib/utils";
@@ -59,9 +62,9 @@ function EncabezadoSeccion({ sobre, titulo, texto, accion, oscuro }: { sobre: st
   );
 }
 
-// HU-48 · Página de inicio
+// HU-46 · Página de inicio (héroe, servicios, testimonios y llamados al catálogo)
 export default async function InicioPage() {
-  const [cursos, categorias] = await Promise.all([listarCursosPublicados(), listarCategorias()]);
+  const [cursos, categorias, testimonios] = await Promise.all([listarCursosPublicados(), listarCategorias(), listarTestimonios(3)]);
   const enLinea = pasarelaActiva();
   const destacado = cursos[0];
   const proximos = cursos.slice(destacado ? 1 : 0, 5);
@@ -274,6 +277,31 @@ export default async function InicioPage() {
           </ol>
         </div>
       </section>
+
+      {/* ---------- Testimonios (HU-46): reseñas reales; sin reseñas aptas, la sección no aparece ---------- */}
+      {testimonios.length > 0 && (
+        <section className="mx-auto max-w-7xl px-4 pt-20 sm:px-6 lg:px-8">
+          <EncabezadoSeccion sobre="Testimonios" titulo="Lo que dicen nuestros estudiantes" texto="Reseñas de quienes ya culminaron sus cursos en PEDSAR." />
+          <ul className="escalonado mt-8 grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+            {testimonios.map((t) => (
+              <li key={`${t.autor}-${t.cursoSlug}`} className="elevar relative flex flex-col rounded-2xl border bg-card p-6 shadow-xs">
+                <QuoteIcon aria-hidden className="absolute top-5 right-5 size-8 text-brand-200 dark:text-brand-500/30" />
+                <Estrellas valor={t.estrellas} className="text-base" />
+                <blockquote className="mt-4 flex-1 leading-relaxed break-words whitespace-pre-line">«{t.texto}»</blockquote>
+                <div className="mt-6 flex items-center gap-3 border-t pt-4">
+                  <AvatarIniciales nombre={t.autor} />
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold">{t.autor}</p>
+                    <Link href={`/cursos/${t.cursoSlug}`} className="block truncate text-xs text-muted-foreground hover:text-primary hover:underline">
+                      {t.curso}
+                    </Link>
+                  </div>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
 
       {/* ---------- Verificación ---------- */}
       <section className="mx-auto max-w-7xl px-4 py-20 sm:px-6 lg:px-8">

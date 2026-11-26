@@ -76,3 +76,23 @@ export async function cursosMejorEvaluados(limite = 5): Promise<CursoEvaluado[]>
     .sort((a, b) => b.promedio - a.promedio || b.cantidad - a.cantidad)
     .slice(0, limite);
 }
+
+/** HU-46 · Un testimonio de la página de inicio: una reseña real visible, con el autor abreviado. */
+export interface Testimonio {
+  estrellas: number;
+  texto: string;
+  autor: string;
+  curso: string;
+  cursoSlug: string;
+}
+
+/**
+ * HU-46 · Testimonios para la página de inicio: reseñas visibles de 4–5 estrellas con texto,
+ * de cursos publicados y una por estudiante (lo filtra la BD). Si falla, la sección no se muestra.
+ */
+export async function listarTestimonios(limite = 3): Promise<Testimonio[]> {
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("testimonios_publicos", { p_limite: limite });
+  if (error) return [];
+  return (data ?? []).map((t) => ({ estrellas: t.estrellas, texto: t.texto, autor: t.autor, curso: t.curso, cursoSlug: t.curso_slug }));
+}

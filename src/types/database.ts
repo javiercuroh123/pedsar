@@ -1308,6 +1308,17 @@ export type Database = {
           texto: string
         }[]
       }
+      testimonios_publicos: {
+        Args: { p_limite?: number }
+        Returns: {
+          autor: string
+          curso: string
+          curso_slug: string
+          estrellas: number
+          fecha: string
+          texto: string
+        }[]
+      }
       registrar_matricula: {
         Args: { p_estudiante: string; p_curso: string; p_metodo: Database["public"]["Enums"]["metodo_pago"]; p_cupon: string; p_monto: number; p_facturacion: Json }
         Returns: { inscripcion_id: string; codigo: string; vence_en: string | null; pago_id: string; monto: number; cupon_id: number | null }[]

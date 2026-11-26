@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { cursosMejorEvaluados, datosResenaPropia, listarResenasAdmin } from "@/features/comunidad/consultas-resenas";
+import { cursosMejorEvaluados, datosResenaPropia, listarResenasAdmin, listarTestimonios } from "@/features/comunidad/consultas-resenas";
 import { entorno, responder, UUID } from "../../apoyo/entorno";
 
 describe("reseña propia en el aula (HU-24)", () => {
@@ -80,5 +80,24 @@ describe("cursos mejor evaluados (HU-20)", () => {
     responder({ cursos: { data: [] } });
     await expect(cursosMejorEvaluados()).resolves.toEqual([]);
     expect(entorno.servidor.de("rpc:calificacion_cursos")).toHaveLength(0);
+  });
+});
+
+describe("testimonios de la página de inicio (HU-46)", () => {
+  it("pide a la BD las reseñas aptas y las entrega listas para la landing", async () => {
+    responder({
+      "rpc:testimonios_publicos": {
+        data: [{ estrellas: 5, texto: "Aprendí tablas dinámicas.", autor: "Ana Q.", curso: "Excel Avanzado", curso_slug: "excel-avanzado", fecha: "2026-11-20T10:00:00Z" }],
+      },
+    });
+    await expect(listarTestimonios()).resolves.toEqual([{ estrellas: 5, texto: "Aprendí tablas dinámicas.", autor: "Ana Q.", curso: "Excel Avanzado", cursoSlug: "excel-avanzado" }]);
+    expect(entorno.servidor.de("rpc:testimonios_publicos")[0].valores).toEqual({ p_limite: 3 });
+  });
+
+  it("si la consulta falla o no hay reseñas aptas, no devuelve testimonios (la sección se oculta)", async () => {
+    responder({ "rpc:testimonios_publicos": { error: { message: "function does not exist" } } });
+    await expect(listarTestimonios(6)).resolves.toEqual([]);
+    responder();
+    await expect(listarTestimonios()).resolves.toEqual([]);
   });
 });
